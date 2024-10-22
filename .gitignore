@@ -46,6 +46,6 @@ yarn-error.log
 # Security
 secrets.json
 
-celerbeat-schedule.bak
-celerbeat-schedule.dat
-celerbeat-schedule.dir
+celerybeat-schedule.bak
+celerybeat-schedule.dat
+celerybeat-schedule.dir
