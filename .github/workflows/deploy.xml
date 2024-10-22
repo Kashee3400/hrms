@@ -1,13 +1,45 @@
-name: Django CI/CD
+name: Django CI/CD Pipeline
 
 on:
   push:
     branches:
-      - main
+      - main  # This runs on every push to the main branch
+  pull_request:
+    branches:
+      - main  # This runs on pull requests to the main branch
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+
+    steps:
+    # Step 1: Checkout the code from GitHub repository
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    # Step 2: Set up Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'  # Use the Python version required by your project
+
+    # Step 3: Install dependencies (Django and others)
+    - name: Install dependencies
+      run: |
+        python -m venv venv  # Set up virtual environment
+        source venv/bin/activate
+        pip install -r requirements.txt  # Install required packages
+
+    # Step 4: Run tests
+    - name: Run Tests
+      run: |
+        source venv/bin/activate
+        python manage.py test 
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
     steps:
     - name: Checkout code
@@ -16,19 +48,25 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.9'
+        python-version: '3.10'
 
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
+        python -m venv venv
+        source venv/bin/activate
         pip install -r requirements.txt
 
-    - name: Run Tests
+    - name: Deploy to server (optional)
       run: |
-        python manage.py test
-
-    - name: Deploy to WSL
-      if: github.ref == 'refs/heads/main'
-      run: |
-        scp -r ./* user@windowsserver:/mnt/c/path/to/project
-        ssh user@windowsserver "cd /mnt/c/path/to/project && ./deploy.sh"
+        ssh user@your-server-ip <<EOF
+        cd /path/to/your/project
+        git pull origin main
+        source venv/bin/activate
+        pip install -r requirements.txt
+        python manage.py migrate
+        python manage.py collectstatic --noinput
+        sudo systemctl restart gunicorn
+        sudo systemctl restart nginx
+        EOF
+      env:
+        SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}  # Set up secret in GitHub
