@@ -1,0 +1,29 @@
+{% extends 'hrms_app/wizard/form-wizard.html' %}
+
+{% block content %}
+  <div class="mx-auto" data-role="panel" data-collapsible="true" data-cls-panel="shadow-1" data-cls-title="bg-yellow fg-dark" data-cls-collapse-toggle="bg-dark fg-white marker-light" data-role="panel" data-title-caption="Step 2: Personal Details" data-title-icon="<span class='mif-apps'></span>">
+    <div class="row">
+      {% for field in wizard.form %}
+        <div class="cell-12 cell-md-4 cell-lg-3 cell-sm-12">
+          <label for="{{ field.id_for_label }}">
+            {{ field.label_tag }}
+            {% if field.field.required %}
+              <span class="text-danger">*</span> <!-- Red asterisk for required fields -->
+            {% endif %}
+          </label>
+          {{ field }}
+          {% if field.help_text %}
+            <small class="form-text text-muted">{{ field.help_text }}</small>
+          {% endif %}
+          {% if field.errors %}
+            <div class="text-alert">
+              {% for error in field.errors %}
+                <span>{{ error }}</span>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% endblock %}

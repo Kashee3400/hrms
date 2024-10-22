@@ -1,0 +1,109 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag %}
+{{ form.media }}
+{% block title %}
+  {{ request.user.first_name }} | Apply Tour
+{% endblock %}
+
+{% block xtra_css %}
+  <link rel="stylesheet" href="{% static 'css/status.css' %}" />
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.13.18/jquery.timepicker.min.css" />
+  <style>
+    .required {
+      color: red;
+    }
+  </style>
+{% endblock %}
+
+{% block content_main %}
+  {% render_breadcrumb 'Tour Applcation' urls %}
+
+  <div class="container bg-light m-2">
+    <h6 class="m-5">Note: All <span style="color: red;">*</span> marked are required.</h6>
+    <form id="apply-tour-form" method="post">
+      {% csrf_token %}
+      <div class="row">
+        {% for field in form %}
+          {% if field.name != 'remarks' %}
+            <div class="cell-md-4 cell-12">
+              {{ field.label_tag }}<span class="required">*</span>
+              {{ field }}
+              {% if field.errors %}
+                <div class="fg-red">{{ field.errors }}</div>
+              {% endif %}
+              <small class="help-text">{{ field.help_text }}</small>
+            </div>
+          {% endif %}
+        {% endfor %}
+
+        <div class="cell-12">
+          {{ form.remarks.label_tag }}<span class="required">*</span>
+          {{ form.remarks }}
+          {% if form.remarks.errors %}
+            <div class="fg-red">{{ form.remarks.errors }}</div>
+          {% endif %}
+          <small class="help-text">{{ form.remarks.help_text }}</small>
+        </div>
+      </div>
+
+      <div class="row mt-2 mx-2">
+        <div class="cell-12">
+          <button type="button" class="button alert" onclick="Metro.dialog.open('#openDailog')">Apply Tour</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="dialog" data-role="dialog" id="openDailog">
+    <div class="dialog-title bg-alert">Are you sure?</div>
+    <div class="dialog-content">You want to apply for tour. Please Check details before you submit.</div>
+    <div class="dialog-actions">
+      <div class="row">
+        <div class="dialog-actions">
+          <button type="reset" class="button js-dialog-close">Cancel</button>
+          <button type="button" class="button primary js-dialog-close" onclick="submitForm()">Submit</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block xtra_js %}
+  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.13.18/jquery.timepicker.min.js"></script>
+  <script>
+    ClassicEditor.create(document.querySelector('#id_remarks'))
+      .then((editor) => {
+        window.editor = editor
+      })
+      .catch((error) => {
+        console.error(error)
+      })
+    function submitForm() {
+      $('#apply-tour-form').submit()
+    }
+  </script>
+  <script>
+    $(document).ready(function () {
+      // Optional: Add change event for start_date to update min date dynamically
+      $('#id_start_date').change(function () {
+        var startDate = $('#id_start_date').val()
+        $('#id_end_date').val('')
+        if (startDate) {
+          var startDateObj = new Date(startDate)
+          startDateObj.setDate(startDateObj.getDate() - 1)
+          var minDate = startDateObj.toISOString().split('T')[0]
+          $('#id_end_date').attr('data-min-date', minDate)
+        }
+      })
+      $('#start_time').timepicker({
+        // Configure timepicker options here
+        change: function (selectedTime) {
+          $('#end_time').timepicker('option', 'minTime', selectedTime)
+        }
+      })
+    
+      $('#end_time').timepicker()
+    })
+  </script>
+{% endblock %}

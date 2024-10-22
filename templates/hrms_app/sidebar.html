@@ -1,0 +1,113 @@
+{% load static %}
+<div class="navview-pane shadowed-2">
+  <div class="bg-cyan d-flex flex-align-center">
+    <button class="pull-button m-0 bg-darkCyan-hover"><span class="mif-menu fg-white"></span></button>
+    <h2 class="text-light m-0 fg-white pl-7" style="line-height: 52px">HRMS</h2>
+  </div>
+  
+  <div class="suggest-box">
+    <div class="data-box">
+      <span class="ml-2 app-bar-name"></span>
+      <img src="{% if user.personal_detail.avatar %}
+          {{ user.personal_detail.avatar.url }}
+        {% else %}
+          {% static 'hrms_app/source/images/jek_vorobey.jpg ' %}
+        {% endif %}"
+        class="avatar" />
+      <div class="ml-4 avatar-title flex-column">
+        <a href="#" class="d-block fg-white text-medium no-decor">
+          <span class="reduce-1">
+            {% if user.first_name %}
+              {{ user.first_name }} {{ user.last_name }}
+            {% else %}
+              {{ user.username }}
+            {% endif %}
+          </span>
+        </a>
+        <p class="m-0">
+          <span class="fg-green mr-2">&#x25cf;</span><span class="text-small">online</span>
+        </p>
+      </div>
+    </div>
+    <img src="{% if user.personal_detail.avatar %}
+        {{ user.personal_detail.avatar.url }}
+      {% else %}
+        {% static 'hrms_app/source/images/jek_vorobey.jpg ' %}
+      {% endif %}"
+      class="avatar holder ml-2" />
+  </div>
+
+  <hr />
+
+  <ul class="navview-menu mt-4" id="side-menu">
+    <li class="item-header">MAIN NAVIGATION</li>
+    {% url 'dashboard' as dashboard %}
+    <li class="{% if request.path == dashboard %}active{% endif %}">
+      <a href="{{ dashboard }}">
+        <span class="icon"><span class="mif-meter"></span></span>
+        <span class="caption">Dashboard</span>
+      </a>
+    </li>
+    {% url 'calendar' as calendar %}
+    <li class="{% if request.path == calendar %}active{% endif %}">
+      <a href="{{ calendar }}">
+        <span class="icon"><span class="mif-calendar"></span></span>
+        <span class="caption">Attendance</span>
+      </a>
+    </li>
+
+    {% url 'leave_tracker' as leave_tracker %}
+    <li class="{% if request.path == leave_tracker %}active{% endif %}">
+      <a href="{{ leave_tracker }}">
+        <span class="icon"><span class="mif-widgets"></span></span>
+        <span class="caption">Leave Tracker</span>
+      </a>
+    </li>
+    {% url 'tour_tracker' as tour_tracker %}
+    <li class="{% if request.path == tour_tracker %}active{% endif %}">
+      <a href="{{ tour_tracker }}">
+        <span class="icon"><i class="fa-solid fa-person-walking-luggage"></i></span></span>
+        <span class="caption">Tour Tracker</span>
+      </a>
+    </li>
+
+    <li class="active-container">
+      <a href="#" class="dropdown-toggle dropdown-toggle active-toggle active-control">
+        <span class="icon"><span class="mif-users"></span></span>
+        <span class="caption">Employee</span>
+      </a>
+      <ul class="navview-menu stay-open" style="display: block;" data-role="dropdown">
+        <li class="item-header">Pages</li>
+        <li>
+          <a href="{% url 'employees' %}">
+            <span class="icon"><span class="mif-users"></span></span>
+            <span class="caption">Employees</span>
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'create_user' %}">
+            <span class="icon"><span class="mif-user-plus"></span></span>
+            <span class="caption">Register Employee</span>
+          </a>
+        </li>
+      </ul>
+    </li>
+
+    <li class="item-header">Documentation</li>
+    <li>
+      <a href="https://metroui.org.ua/intro.html">
+        <span class="icon"><span class="mif-brightness-auto fg-red"></span></span>
+        <span class="caption">Metro 4</span>
+      </a>
+    </li>
+  </ul>
+
+  <div class="w-100 text-center text-small data-box p-2 border-top bd-grayMouse" style="position: absolute; bottom: 0">
+    <div>
+      &copy; 2024 <a href="divyanshurock39@gmail.com" class="text-muted fg-white-hover no-decor">Divyanshu</a>
+    </div>
+    <div>
+      Created with <a href="#" class="text-muted fg-white-hover no-decor">India</a>
+    </div>
+  </div>
+</div>

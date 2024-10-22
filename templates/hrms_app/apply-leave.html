@@ -1,0 +1,211 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag %}
+{{ form.media }}
+{% block title %}
+  HRMS | Apply leave
+{% endblock %}
+{% block xtra_css %}
+  <style>
+    @keyframes zoomInOut {
+      0% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.2);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+    .zoom-animation {
+      animation: zoomInOut 1s ease-in-out infinite;
+    }
+    @keyframes fadeInOut {
+      0% {
+        opacity: 0;
+      }
+      50% {
+        opacity: 1;
+      }
+      100% {
+        opacity: 0;
+      }
+    }
+    .fade-animation {
+      animation: fadeInOut 2s ease-in-out infinite;
+    }
+  </style>
+{% endblock %}
+{% block content_main %}
+  {% render_breadcrumb 'Apply Leave' urls %}
+
+  {% if form.non_field_errors %}
+    <div class="notifications">
+      {% for error in form.non_field_errors %}
+        <div class="notification error">{{ error }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+  <div class="container bg-light" style="margin: 10px; padding: 10px;">
+    <form method="post">
+      {% csrf_token %}
+      {{ form.leave_type }}
+      <div class="row no-gap">
+        <div class="cell-md-6 order-1">
+          <div id="dates" class="row m-2">
+            <div class="cell">
+              <div class="form-group">
+                <label for="{{ form.startDate.id_for_label }}">{{ form.startDate.label }}<span style="color: red;">*</span></label>
+                {{ form.startDate }}
+                {% if form.startDate.errors %}
+                  <ul class="errorlist">
+                    {% for error in form.startDate.errors %}
+                      <li>{{ error }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="cell">
+              <div class="form-group">
+                <label for="{{ form.endDate.id_for_label }}">{{ form.endDate.label }}<span style="color: red;">*</span></label>
+                {{ form.endDate }}
+                {% if form.endDate.errors %}
+                  <ul class="errorlist">
+                    {% for error in form.endDate.errors %}
+                      <li>{{ error }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <div id="choices" class="row m-2">
+            <div class="cell">
+              <div class="form-group">
+                <label for="{{ form.startDayChoice.id_for_label }}">{{ form.startDayChoice.label }}<span style="color: red;">*</span></label>
+                {{ form.startDayChoice }}
+                {% if form.startDayChoice.errors %}
+                  <ul class="errorlist">
+                    {% for error in form.startDayChoice.errors %}
+                      <li>{{ error }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="cell">
+              <div class="form-group">
+                <label for="{{ form.endDayChoice.id_for_label }}">{{ form.endDayChoice.label }}<span style="color: red;">*</span></label>
+                {{ form.endDayChoice }}
+                {% if form.endDayChoice.errors %}
+                  <ul class="errorlist">
+                    {% for error in form.endDayChoice.errors %}
+                      <li>{{ error }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <div id="balances" class="row m-2">
+            <div class="cell">
+              <div class="form-group">
+                <label for="{{ form.usedLeave.id_for_label }}">{{ form.usedLeave.label }}</label>
+                {{ form.usedLeave }}
+              </div>
+            </div>
+            <input type="hidden" id="leaveId" value="{{ leave_balance.leave_type.pk }}" />
+            <div class="cell">
+              <div class="form-group">
+                <label for="{{ form.balanceLeave.id_for_label }}">{{ form.balanceLeave.label }}</label>
+                {{ form.balanceLeave }}
+              </div>
+            </div>
+          </div>
+          <div class="form-group m-2">
+            <label for="{{ form.reason.id_for_label }}">{{ form.reason.label }}<span style="color: red;">*</span></label>
+            {{ form.reason }}
+            {% if form.reason.errors %}
+              <ul class="errorlist">
+                {% for error in form.reason.errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="cell-md-6 order-2">
+          <h4 style="background-color: {{ leave_balance.leave_type.color_hex }}; 
+              color:{{ leave_balance.leave_type.text_color_hex }};" class="mt-5 p-3 fade-animation">Applying for {{ leave_balance.leave_type }}</h4>
+          <div id="balanceSummary" class="border p-3 bg-white">
+            <div class="card-primary">
+              <table class="table">
+                <tbody>
+                  <tr>
+                    <td id="td_date" class="font-weight-bold">---------------</td>
+                    <td>Day(s)</td>
+                  </tr>
+                  <tr style="background-color: #f2f2f2;">
+                    <td>
+                      <strong>Available balance</strong>
+                    </td>
+                    <td id="balance">{{ leave_balance.remaining_leave_balances }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>Currently booked</strong>
+                    </td>
+                    <td id="currentlyBooked"></td>
+                  </tr>
+                  <tr style="background-color:#f2f2f2;">
+                    <td>
+                      <strong>Balance after this leave</strong>
+                    </td>
+                    <td id="remainingBal"></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div id="leaveDates" class="row bg-light">
+            <div class="cell-8 card border-primary">
+              <div id="dateOptions"></div>
+              <div style="background-color: #f2f2f2;" class="row m-1">
+                <div class="cell-8 text-dark font-weight-bold">Total Days</div>
+                <div id="totalDays" class="cell-4 days text-dark font-weight-bold"></div>
+              </div>
+            </div>
+          </div>
+          <div class="row mt-2 mx-2 d-flex justify-content-center align-items-center">
+            <div class="cell-12">
+              <button type="submit" class="button success drop-shadow mt-1">Apply Leave</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+  </div>
+{% endblock %}
+
+{% block xtra_js %}
+  <script>
+    var leaveBalance = `{{leave_balance.remaining_leave_balances}}`
+    var totalDays = 0
+    var bookedBalance = 0
+    var endDay = 0
+    var startDay = 0
+    ClassicEditor.create(document.querySelector('#id_reason'))
+      .then((editor) => {
+        window.editor = editor
+      })
+      .catch((error) => {
+        console.error(error)
+      })
+  </script>
+  <script src="{% static 'js/apply_leave.js' %}"></script>
+  <script src="{% static 'source/js/charts.js' %}"></script>
+{% endblock %}

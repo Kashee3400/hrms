@@ -1,0 +1,39 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag %}
+{% block title %}{{ user }} | Attendance Logs{% endblock %}
+
+{% block xtra_css %}
+    <link rel="stylesheet" type="text/css" href="{% static 'hrms_app/source/vendors/fullcalendar/dist/fullcalendar.css' %}"/>
+{% endblock %}
+
+{% block content_main %}
+    {% render_breadcrumb 'Attendance' urls %}
+    <div class="loader-overlay" style="display:none;">
+        <div class="mx-auto color-style activity-atom" data-role-activity="true">
+            <span class="electron"></span>
+            <span class="electron"></span>
+            <span class="electron"></span>
+        </div>
+    </div>
+    <div style="padding: 1.2rem;" class="container bg-light p-1">
+        <div id="calendar"></div>
+    </div>
+{% endblock %}
+{% block xtra_js %}
+    <script type="text/javascript" src="{% static 'hrms_app/source/vendors/moment/moment.js' %}"></script>
+    <script type="text/javascript" src="{% static 'hrms_app/source/vendors/fullcalendar/dist/fullcalendar.js' %}"></script>
+    <script type="text/javascript" src="{% static 'hrms_app/source/vendors/fullcalendar/dist/locale-all.js' %}"></script>
+    <script type="text/javascript" src="{% static 'hrms_app/source/vendors/fullcalendar/dist/gcal.js' %}"></script>
+    <script type="text/javascript" src="{% static 'hrms_app/source/vendors/fullcalendar/dist/gcal.min.js' %}"></script>
+    <script>
+        $(document).ready(function () {
+            var loader = $('.loader-overlay')
+            $('#calendar').fullCalendar({
+                events: '{% url "event_list" %}',  // URL for fetching events
+                editable: true,
+                eventLimit: true // allow "more" link when too many events
+            });
+            loader.css('display', 'none')
+        });
+    </script>
+{% endblock %}

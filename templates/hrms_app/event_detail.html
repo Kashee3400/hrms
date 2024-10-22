@@ -1,0 +1,174 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag humanize %}
+
+{% block title %}
+  {{ user }} | {{ object.title }}
+{% endblock %}
+
+{% block xtra_css %}
+  <style>
+    .center-row {
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+  <link rel="stylesheet" href="{% static 'css/status.css' %}" />
+{% endblock %}
+
+{% block content_main %}
+  {% render_breadcrumb 'Attendance' urls %}
+  <div class="container">
+    <div class="row" style="display: flex; justify-content: center;">
+      <div class="cell-md-6 cell-sm-12 mt-4">
+        <div data-role="panel" data-title-caption="{{ object.title }}" data-title-icon="<span class='mif-apps'></span>">
+          <div class="bg-white p-4">
+            <div class="skill-box mt-4-minus">
+              <ul class="skills">
+                <li>
+                  <span>Login Time:</span>
+                  <span class="badge">{{ object.start_date }}</span>
+                </li>
+                <li>
+                  <span>Logout Time:</span>
+                  <span class="badge">{{ object.end_date }}</span>
+                </li>
+                <li>
+                  <span>Working Hours:</span>
+                  <span class="badge">{{ object.duration.hour }} Hrs and {{ object.duration.minute }} Mins</span>
+                </li>
+                <li>
+                  <span>Status:</span>
+                  <span class="badge bg-green fg-white">{{ object.att_status }}</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+          {% if object.actions.all %}
+            <div data-role="panel" data-title-caption="Follow ups" data-collapsed="false" data-collapsible="true">
+              <ul>
+                {% for log in object.actions.all|dictsortreversed:'timestamp' %}
+                  <li style="background-color: azure; padding: 0.5rem; margin: 0.5rem;">
+                    <strong class="{{ log.action }}">{{ log.action|capfirst }}</strong> by {{ log.action_by_name }} - {{ log.timestamp|naturaltime }}
+                  </li>
+                {% empty %}
+                  <li>No logs available.</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+      {% if object.is_regularisation %}
+        <div class="cell-md-6 cell-sm-12 mt-4">
+          <div data-role="panel" data-title-caption="{{ object.reg_status }}" data-title-icon="<span class='mif-apps'></span>">
+            <div class="row">
+              <div class="cell-lg-6">
+                <div class="bg-white p-1 m-1">
+                  <div class="form-group">
+                    <label for="from_date">From :</label>
+                    <input type="text" id="from_date" data-role="input" value="{{ object.from_date }}" readonly />
+                  </div>
+                </div>
+              </div>
+              <div class="cell-lg-6">
+                <div class="bg-white p-1 m-1">
+                  <div class="form-group">
+                    <label for="to_date">To :</label>
+                    <input type="text" data-role="input" id="to_date" value="{{ object.to_date }}" readonly />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="cell-lg-6 cell-sm-12 cell-md-6">
+                <div class="bg-white p-1">
+                  <div class="form-group">
+                    <label for="reg_duration">Duration :</label>
+                    <input type="text" id="reg_duration" data-role="input" value="{{ object.reg_duration }}" readonly />
+                  </div>
+                </div>
+              </div>
+              <div class="cell-lg-6 cell-sm-12 cell-md-6">
+                <div class="bg-white p-1 m-1">
+                  <label for="status">Status :</label>
+                  <select data-role="select" id="status" disabled>
+                    <option>{{ object.status|capfirst }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            {% if object.is_submitted %}
+              <input type="checkbox" data-role="checkbox" data-caption="Submitted" checked disabled />
+            {% endif %}
+            <form id="reg-application-form" method="post">
+              {% csrf_token %}
+              <div class="row">
+                {% if form.reason %}
+                  <div class="cell-lg-12 cell-sm-12 cell-md-12">
+                    <div class="bg-white p-1 m-1">
+                      <div class="form-group">
+                        <label for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+                        {{ form.reason }}
+                        {% if form.reason.errors %}
+                          <div class="form-error">
+                            {% for error in form.reason.errors %}
+                              <ul>{{ error }}</ul>
+                            {% endfor %}
+                          </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                {% endif %}
+                {% if form.status %}
+                  <div class="cell-lg-12 cell-sm-12 cell-md-12">
+                    <div class="bg-white p-1 m-1">
+                      <div class="form-group">
+                        <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+                        {{ form.status }}
+                        {% if form.status.errors %}
+                          <div class="notification error">
+                            {% for error in form.status.errors %}
+                              <p>{{ error }}</p>
+                            {% endfor %}
+                          </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+              <hr />
+              <div class="container">
+                <button type="button" class="button {% if user == object.applied_by and not object.status == 'pending' %}disabled{% endif %} primary" onclick="Metro.dialog.open('#updateDailog')">
+                  <img src="{% static 'source/images/checkmark.png' %}" />
+                  {% if not is_manager %}
+                    Submit For Regularization
+                  {% else %}
+                    Approve Regularization
+                  {% endif %}
+                </button>
+              </div>
+            </form>
+          </div>
+          <div class="dialog" data-role="dialog" id="updateDailog">
+            <div class="dialog-title">Are you sure?</div>
+            <div class="dialog-content">You want to update the {{ object.reg_status|upper }} duration {{ object.reg_duration }}</div>
+            <div class="dialog-actions">
+              <button type="reset" class="button js-dialog-close">Cancel</button>
+              <button type="button" class="button primary js-dialog-close" onclick="submitForm()">Submit</button>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block xtra_js %}
+  <script>
+    function submitForm() {
+      document.getElementById('reg-application-form').submit()
+    }
+  </script>
+{% endblock %}

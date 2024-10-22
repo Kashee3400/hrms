@@ -1,0 +1,193 @@
+{% extends 'hrms_app/base.html' %}
+{% load static %}
+{% load hrms_tag humanize %}
+{{ form.media }}
+{% block title %}
+  {{ user.get_full_name }} | {{ tour_application.from_destination }}
+{% endblock %}
+{% block xtra_css %}
+  <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+{% endblock %}
+{% block content_main %}
+  {% render_breadcrumb 'Tour Detail' urls %}
+
+  {% if form.non_field_errors %}
+    <div class="notifications">
+      {% for error in form.non_field_errors %}
+        <div class="notification error">{{ error }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="container bg-light" style="margin: 10px; padding: 10px;">
+    <div class="row">
+      <div class="cell">
+        <div class="skill-box">
+          <div class="header bg-green fg-white">
+            {% if tour_application.applied_by.personal_detail.avatar %}
+              <img src="{{ tour_application.applied_by.personal_detail.avatar.url }}" class="avatar" alt="Avatar" />
+            {% endif %}
+            <div class="title">{{ tour_application.applied_by }}</div>
+            <div class="subtitle">{{ tour_application.slug|upper }}</div>
+          </div>
+          <ul class="skills">
+            <li class="tour-step">
+              <span class="step-label">Boarding</span>
+              <span class="badge">{{ tour_application.from_destination }} ({{ tour_application.start_date }} - {{ tour_application.start_time }})</span>
+              <span class="arrow"><i class="fas fa-arrow-right"></i></span>
+              <span class="step-label">Destination</span>
+              <span class="badge">{{ tour_application.to_destination }} ({{ tour_application.end_date }} - {{ tour_application.end_time }})</span>
+            </li>
+
+            <li>
+              <span>Status</span>
+              <span class="badge">{{ tour_application.status|upper }}</span>
+            </li>
+            <li>
+              <span>Applied At</span>
+              <span class="badge">{{ tour_application.updatedAt }}</span>
+            </li>
+            {% if tour_application.createdAt %}
+              <li>
+                <span>Last Updated At</span>
+                <span class="badge">{{ tour_application.createdAt }}</span>
+              </li>
+            {% endif %}
+
+            <li>
+              <div>{{ tour_application.remarks|safe }}</div>
+            </li>
+          </ul>
+        </div>
+        <div class="container bg-white mt-5">
+          <form id="tour-update-form" method="post" action="{% url 'tour_application_update' tour_application.slug %}">
+            {% csrf_token %}
+            <div class="row">
+              <div class="cell-lg-12 cell-sm-12 cell-md-12">
+                <div class="bg-white p-1 m-1">
+                  <div class="form-group">
+                    <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+                    {{ form.status }}
+                    {% if form.status.errors %}
+                      <div class="notification error">
+                        {% for error in form.status.errors %}
+                          <p>{{ error }}</p>
+                        {% endfor %}
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+              {% if not is_manager %}
+                <div id="datetime">
+                  <div id="id_status-wrapper" class="cell-md-6">{{ status_form.extended_end_date.label_tag }}
+                    {{ status_form.extended_end_date }}</div>
+                  <div id="id_status-wrapper" class="cell-md-6">{{ status_form.extended_end_time.label_tag }}
+                    {{ status_form.extended_end_time }}</div>
+                </div>
+              {% endif %}
+
+              <div id="id_status-wrapper" class="cell-md-12">{{ status_form.reason.label_tag }}
+                {{ status_form.reason }}</div>
+              <div class="cell-md-12">
+                <button type="button"
+                  class="button 
+                {% if user == tour_application.applied_by and tour_application.status == 'cancelled' %}
+                    
+                 disabled 
+
+                  {% elif user == tour_application.applied_by and tour_application.status == 'rejected' %}
+                    
+                 disabled
+
+                  {% endif %} 
+                 primary"
+                  onclick="Metro.dialog.open('#updateDailog')">
+                  <img src="{% static 'source/images/checkmark.png' %}" />
+                  {% if is_manager %}
+                    Update
+                  {% else %}
+                    Submit Request
+                  {% endif %}
+                </button>
+                {% if not is_manager %}
+                  <button type="button" class="button alert" onclick="Metro.dialog.open('#deleteDailog')">Delete</button>
+                {% endif %}
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="dialog" data-role="dialog" id="updateDailog">
+        <div class="dialog-title">Are you sure?</div>
+        <div class="dialog-content">
+          {% if is_manager %}
+            You want to update the tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }} of {{ tour_application.applied_by }}
+          {% else %}
+            You want to cancel your tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }}.
+          {% endif %}
+        </div>
+        <div class="dialog-actions">
+          <button type="reset" class="button js-dialog-close">Cancel</button>
+          <button type="button" class="button primary js-dialog-close" onclick="submitForm()">Submit</button>
+        </div>
+      </div>
+
+      <div class="dialog" data-role="dialog" id="deleteDailog">
+        <div class="dialog-title bg-alert">Are you sure?</div>
+        <div class="dialog-content">You want to delete the tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }}</div>
+        <div class="dialog-actions">
+          <div class="row">
+            <div class="cell">
+              <button type="reset" class="button secondary js-dialog-close">Cancel</button>
+            </div>
+            <div class="cell">
+              <form method="POST" action="{% url 'tour_application_delete' tour_application.id %}">
+                {% csrf_token %}
+                <button class="button alert js-dialog-close" type="submit">Go</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cell">
+        <div data-role="panel" data-title-caption="Follow ups" data-collapsed="false" data-collapsible="true">
+          <ul>
+            {% for log in tour_application.logs.all|dictsortreversed:'timestamp' %}
+              <div style="background-color: azure; padding: 0.5rem; margin: 0.5rem;">
+                <li>{{ log.action }} by {{ log.action_by_name }} - {{ log.timestamp }} ({{ log.timestamp|naturaltime }})</li>
+                <li>{{ log.comments }}</li>
+              </div>
+            {% empty %}
+              <li>No logs available.</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block xtra_js %}
+  <script>
+    function submitForm() {
+      document.getElementById('tour-update-form').submit()
+    }
+  </script>
+  <script>
+    $(document).ready(function () {
+      $('#datetime').hide()
+      $('#id_status').change(function () {
+        var selectedStatus = $(this).val()
+        if (selectedStatus === 'extended') {
+          $('#datetime').show()
+        } else {
+          $('#datetime').hide()
+        }
+      })
+    })
+  </script>
+{% endblock %}

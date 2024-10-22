@@ -1,0 +1,52 @@
+{% extends 'hrms_app/wizard/form-wizard.html' %}
+
+{% block content %}
+  <div data-role="panel" data-title-caption="Step 1: User Details" data-cls-panel="shadow-1" class="mt-5" data-title-icon="<span class='mif-user'></span>"
+  data-collapsible="true" data-cls-collapse-toggle="bg-dark fg-white marker-light" data-cls-title="bg-yellow fg-dark" data-cls-title-icon="bg-green fg-white">
+    <div class="row">
+      {% for field in form %}
+        {% if field.name != 'permissions' %}
+          <div class="cell-12 cell-md-4 cell-lg-3 cell-sm-12">
+            <label for="{{ field.id_for_label }}">
+              {{ field.label_tag }}
+              {% if field.field.required %}
+                <span class="fg-red"><strong>*</strong></span> <!-- Red asterisk for required fields -->
+              {% endif %}
+            </label>
+            {{ field }}
+            {% if field.help_text %}
+              <small class="form-text text-muted">{{ field.help_text }}</small>
+            {% endif %}
+            {% if field.errors %}
+              <div class="fg-red">
+                {% for error in field.errors %}
+                  <span>{{ error }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div data-role="panel" data-title-caption="User Permissions" data-cls-panel="shadow-1" class="mt-5" data-title-icon="<span class='mif-apps'></span>"
+  data-collapsible="true" data-cls-collapse-toggle="bg-dark fg-white marker-light" data-cls-title="bg-yellow fg-dark" data-cls-title-icon="bg-green fg-white">
+    <div class="cell-12">
+      <label for="{{ form.permissions.id_for_label }}">{{ form.permissions.label_tag }}</label>
+      {{ form.permissions }}
+
+      {% if form.permissions.help_text %}
+        <small class="form-text text-muted">{{ form.permissions.help_text }}</small>
+      {% endif %}
+
+      {% if form.permissions.errors %}
+        <div class="fg-red">
+          {% for error in form.permissions.errors %}
+            <span>{{ error }}</span>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,1164 @@
+from rest_framework import filters
+from django_filters.rest_framework import DjangoFilterBackend
+from django.utils.timezone import now
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.views import APIView
+from hrms_app.hrms.serializers import *
+from rest_framework import status
+from django.utils.translation import gettext_lazy as _
+from rest_framework.generics import (
+    RetrieveAPIView,
+    ListAPIView,
+    UpdateAPIView,
+    CreateAPIView,
+    DestroyAPIView,
+)
+from rest_framework.exceptions import ValidationError
+
+from rest_framework import viewsets
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from hrms_app.hrms.utils import *
+from rest_framework import viewsets
+from rest_framework.decorators import action
+from django.shortcuts import get_object_or_404
+from django.core.exceptions import ValidationError
+from django.db.models import Q
+
+
+###########################################################################
+########   User Attendance Log modules
+########   By Divyanshu
+###########################################################################
+
+
+class AttendanceSettingViewSet(viewsets.ModelViewSet):
+
+    queryset = AttendanceSetting.objects.all()
+    serializer_class = AttendanceSettingSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            # Custom response
+            return create_response(
+                status="error",
+                message=_("Attendance Setting created successfully"),
+                data=serializer.data,
+                status_code=status.HTTP_201_CREATED,
+            )
+        return create_response(
+            status="error",
+            message=_("Error creating Attendance Setting"),
+            data=serializer.errors,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return create_response(
+            status="success",
+            message=_("Attendance Settings fetched successfully"),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return create_response(
+            status="success",
+            message=_("Attendance Setting details"),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
+        )
+
+
+class AttendanceStatusColorViewSet(viewsets.ModelViewSet):
+    queryset = AttendanceStatusColor.objects.all()
+    serializer_class = AttendanceStatusColorSerializer
+    permission_classes = [AllowAny]
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            self.perform_create(serializer)
+            # Custom response
+            return create_response(
+                status="error",
+                message=_("Attendance Status Color created successfully"),
+                data=serializer.data,
+                status_code=status.HTTP_201_CREATED,
+            )
+        return create_response(
+            status="error",
+            message=_("Error creating Attendance Status Color"),
+            data=serializer.errors,
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # Override the list method
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return create_response(
+            status="success",
+            message=_("Attendance Status Colors fetched successfully"),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
+        )
+
+    # Override the retrieve method
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return create_response(
+            status="success",
+            message=_("Attendance Status Color details"),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
+        )
+
+
+class AttendanceLogViewSet(viewsets.ModelViewSet):
+    queryset = AttendanceLog.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = AttendanceLogSerializer
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter,
+    ]
+    ordering_fields = ['start_date', 'end_date', 'created_at']  # Add the fields you want to allow ordering on
+    search_fields = ['title', 'reason']  # Fields for searching
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = AttendanceLog.objects.filter(applied_by=user)
+        
+        # Get the current month and year
+        current_month = now().month
+        current_year = now().year
+
+        # Handle from_date query param
+        from_date = self.request.query_params.get("from_date")
+        if from_date:
+            try:
+                parsed_date = datetime.strptime(from_date, "%Y-%m-%d %H:%M:%S.%f")
+                month = parsed_date.month
+                year = parsed_date.year
+            except ValueError:
+                month = current_month
+                year = current_year
+        else:
+            month = current_month
+            year = current_year
+
+        queryset = queryset.filter(start_date__year=year, start_date__month=month)
+
+        from_param = self.request.query_params.get("from", None)
+        to_param = self.request.query_params.get("to", None)
+        if from_param and to_param:
+            queryset = queryset.filter(start_date__gte=from_param, end_date__lte=to_param)
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return create_response(
+            status="success",
+            message=_("Attendance logs retrieved successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        return create_response(
+            status="success",
+            message=_("Attendance log created successfully."),
+            data=response.data,
+            status_code=status.HTTP_201_CREATED
+        )
+
+    def update(self, request, *args, **kwargs):
+        response = super().update(request, *args, **kwargs)
+        return create_response(
+            status="success",
+            message=_("Attendance log updated successfully."),
+            data=response.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        super().destroy(request, *args, **kwargs)
+        return create_response(
+            status="success",
+            message=_("Attendance log deleted successfully."),
+            status_code=status.HTTP_204_NO_CONTENT
+        )
+
+    @action(detail=True, methods=['post'])
+    def approve(self, request, pk=None):
+        attendance_log = self.get_object()
+        reason = request.data.get('reason', None)
+        attendance_log.approve(action_by=request.user, reason=reason)
+        return Response({'status': 'approved'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        attendance_log = self.get_object()
+        reason = request.data.get('reason', None)
+        attendance_log.reject(action_by=request.user, reason=reason)
+        return Response({'status': 'rejected'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def recommend(self, request, pk=None):
+        attendance_log = self.get_object()
+        reason = request.data.get('reason', None)
+        attendance_log.recommend(action_by=request.user, reason=reason)
+        return Response({'status': 'recommended'}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'])
+    def notrecommend(self, request, pk=None):
+        attendance_log = self.get_object()
+        reason = request.data.get('reason', None)
+        attendance_log.notrecommend(action_by=request.user, reason=reason)
+        return Response({'status': 'not recommended'}, status=status.HTTP_200_OK)
+
+
+
+#################  End Attendance Logs Modules  ############################
+
+class UserViewSet(viewsets.ModelViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializer
+    lookup_field = "id"
+
+
+class CustomUserDetailAPIView(RetrieveAPIView):
+    queryset = CustomUser.objects.all()
+    serializer_class = CustomUserSerializer
+
+
+class CurrentUserAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        serializer = CustomUserSerializer(user)
+        return Response(serializer.data)
+
+
+
+class PersonalDetailsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            personal_details = PersonalDetails.objects.get(user=request.user)
+            serializer = PersonalDetailsSerializer(personal_details)
+            return create_response(
+                status="success",
+                message="Personal details fetched successfully.",
+                data=serializer.data,
+            )
+        except PersonalDetails.DoesNotExist:
+            return create_response(
+                status="error",
+                message="Personal details not found.",
+                data=None,
+                status_code=404,
+            )
+        except Exception as e:
+            return create_response(
+                status="error",
+                message=f"An error occurred: {str(e)}",
+                data=None,
+                status_code=500,
+            )
+
+
+class EmployeeShiftView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Fetch shifts for the authenticated user
+            shifts = EmployeeShift.objects.filter(employee=request.user)
+            serializer = EmployeeShiftSerializer(shifts, many=True)
+            response_data = {
+                "status": "success",
+                "message": _("Employee shifts fetched successfully."),
+                "data": serializer.data,
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            response_data = {
+                "status": "error",
+                "message": f"An error occurred: {str(e)}",
+                "data": None,
+            }
+            return Response(response_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AttendanceChoicesView(APIView):
+
+    def get(self, request):
+        choices = {
+            "attendance_regularity_status": [
+                {"key": key, "value": value}
+                for key, value in settings.ATTENDANCE_REGULARISED_STATUS_CHOICES
+            ],
+            "attendance_status": [
+                {"key": key, "value": value}
+                for key, value in settings.ATTENDANCE_STATUS_CHOICES
+            ],
+            "attendance_log_status": [
+                {"key": key, "value": value}
+                for key, value in settings.ATTENDANCE_LOG_STATUS_CHOICES
+            ],
+            "tour_status": [
+                {"key": key, "value": value}
+                for key, value in settings.TOUR_STATUS_CHOICES
+            ],
+            "approval_type": [
+                {"key": key, "value": value}
+                for key, value in settings.APPROVAL_TYPE_CHOICES
+            ],
+            "leave_status": [
+                {"key": key, "value": value}
+                for key, value in settings.LEAVE_STATUS_CHOICES
+            ],
+            "start_leave_type": [
+                {"key": key, "value": value}
+                for key, value in settings.START_LEAVE_TYPE_CHOICES
+            ],
+        }
+        return create_response(
+            status="success",
+            message="Success",
+            data=choices,
+            status_code=status.HTTP_200_OK,
+        )
+
+class LeaveApplicationViewSet(viewsets.ModelViewSet):
+    """
+    A viewset for viewing and editing leave application instances.
+    """
+    queryset = LeaveApplication.objects.all()
+    serializer_class = LeaveApplicationSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            return create_response(
+                status="success",
+                message=_("Leave sent to manager. Wait for approval"),
+                data=serializer.data,
+                status_code=status.HTTP_201_CREATED
+            )
+        except serializers.ValidationError as e:
+            return create_response(
+                status="error",
+                message=_("There was an error with your leave application."),
+                data={'non_field_errors': e.detail.get('non_field_errors', [])},
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    def update(self, request, *args, **kwargs):
+        """Update the leave application with special handling for status updates."""
+        leave_application = self.get_object()
+        serializer = self.get_serializer(leave_application, data=request.data, partial=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+
+            action_by = request.user
+            if leave_application.status in [settings.APPROVED, settings.REJECTED, settings.CANCELLED]:
+                LeaveLog.create_log(leave_application, action_by, leave_application.status)
+            else:
+                LeaveLog.create_log(leave_application, action_by, "Updated")
+
+            return create_response(
+                status="success",
+                message=_("Leave application updated successfully."),
+                data=serializer.data,
+                status_code=status.HTTP_200_OK,
+            )
+        except serializers.ValidationError as e:
+            return create_response(
+                status="error",
+                message=_("There was an error updating your leave application."),
+                data={'non_field_errors': e.detail.get('non_field_errors', [])},
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+    
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()  # Get the LeaveApplication instance
+        serializer = self.get_serializer(instance)
+        return create_response(
+            status="success",
+            message=_("Success"),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        leave_application = self.get_object()
+        leave_application.delete()
+        return create_response(
+            status="success",
+            message=_("Leave application deleted successfully"),
+            data=None,
+            status_code=status.HTTP_200_OK,
+        )
+        
+    def list(self, request, *args, **kwargs):
+        leave_applications = self.filter_queryset(self.get_queryset())
+        
+        return self._paginate_results(leave_applications, request)
+        
+    def _paginate_results(self, queryset, request):
+        """Helper method to paginate and serialize the results."""
+        paginator = PageNumberPagination()
+        paginated_queryset = paginator.paginate_queryset(queryset, request)
+        request_type = self.request.query_params.get("type", "")
+        is_manager = request_type == "requested"
+        serializer = LeaveApplicationSerializer(
+            paginated_queryset, many=True, context={"request": request, "isManager":is_manager}
+        )
+        return paginator.get_paginated_response(serializer.data)
+    
+    def get_queryset(self):
+        """Restricts the returned leave applications based on the user type."""
+        user = self.request.user
+        queryset = LeaveApplication.objects.all()
+
+        # Determine the type of request
+        request_type = self.request.query_params.get("type")
+
+        # Set the isManager flag based on the request type
+        self.request.is_manager = request_type == "requested"
+
+        if request_type == "requested" and hasattr(user, 'employees') and user.employees.exists():
+            queryset = queryset.filter(appliedBy__in=user.employees.all())
+        else:
+            queryset = queryset.filter(appliedBy=user)
+
+        from_date = self.request.query_params.get("from_date")
+        to_date = self.request.query_params.get("to_date")
+        status_filter = self.request.query_params.get("status")
+
+        if from_date:
+            try:
+                from_date = timezone.datetime.strptime(from_date, "%Y-%m-%d").date()
+                queryset = queryset.filter(startDate__gte=from_date)
+            except ValueError:
+                raise ValueError("Invalid date format for from_date. Use YYYY-MM-DD.")
+
+        if to_date:
+            try:
+                to_date = timezone.datetime.strptime(to_date, "%Y-%m-%d").date()
+                queryset = queryset.filter(endDate__lte=to_date)
+            except ValueError:
+                raise ValueError("Invalid date format for to_date. Use YYYY-MM-DD.")
+
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+
+        return queryset.distinct()
+
+
+class UserLeaveOpeningsViewSet(viewsets.ModelViewSet):
+    """
+    A viewset for managing user-specific Leave Balance Openings.
+    """
+
+    permission_classes = [IsAuthenticated]
+    serializer_class = LeaveBalanceOpeningSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        year = self.request.query_params.get("year", timezone.now().year)
+        return LeaveBalanceOpenings.objects.filter(user=user, year=year)
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return create_response(
+            status="success",
+            message=_("Leave openings retrieved successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return create_response(
+            status="success",
+            message=_("Leave opening retrieved successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
+        )
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return create_response(
+            status="success",
+            message=_("Leave opening created successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_201_CREATED,
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        create_response(
+            status="success",
+            message=_("Leave opening updated successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        create_response(
+            status="success",
+            message=_("Leave opening deleted successfully."),
+            status_code=status.HTTP_204_NO_CONTENT,
+        )
+
+
+class LeaveTypeViewSet(viewsets.ModelViewSet):
+    queryset = LeaveType.objects.all()
+    serializer_class = LeaveTypeSerializer
+    permission_classes = [AllowAny]  # Set your permission classes
+
+    def list(self, request, *args, **kwargs):
+        # You can override the list method if you want custom behavior
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(
+            {
+                "status": "success",
+                "message": _("Success"),
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+from rest_framework.decorators import action
+
+class HolidayViewSet(viewsets.ModelViewSet):
+    queryset = Holiday.objects.all()
+    serializer_class = HolidaySerializer
+    permission_classes = [AllowAny]
+    filter_backends = [filters.OrderingFilter]  # Add other filter backends if needed
+    ordering_fields = ['start_date', 'end_date']  # Fields that can be used for ordering
+
+    def get_queryset(self):
+        """
+        Optionally restricts the returned holidays to a given date range
+        by filtering against `start_date` and `end_date` query parameters.
+        """
+        queryset = super().get_queryset()
+        start_date_str = self.request.query_params.get('start_date', None)
+        end_date_str = self.request.query_params.get('end_date', None)
+
+        # Parse the date strings and handle any errors
+        try:
+            start_date = self._validate_date_format(start_date_str)
+            end_date = self._validate_date_format(end_date_str)
+        except ValidationError as e:
+            raise ValidationError({"error": str(e)})
+
+        # Apply filtering based on valid dates
+        if start_date and end_date:
+            queryset = queryset.filter(start_date__gte=start_date, end_date__lte=end_date)
+        elif start_date:
+            queryset = queryset.filter(start_date__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(end_date__lte=end_date)
+
+        return queryset
+
+    def _validate_date_format(self, date_str):
+        """
+        Validates the format of the given date string.
+        Raises a ValidationError if the format is invalid.
+        """
+        if not date_str:
+            return None  # Return None if no date is provided
+        try:
+            # Try to parse the date using `datetime.strptime` for stricter validation
+            return datetime.strptime(date_str, '%Y-%m-%d').date()
+        except ValueError:
+            raise ValidationError(f"Invalid date format for '{date_str}'. Expected format is 'YYYY-MM-DD'.")
+        
+    def create(self, request, *args, **kwargs):
+        """
+        Handle creation of a new Holiday record.
+        Returns a custom response with holiday details and message.
+        """
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Holiday created successfully!",
+                "data": serializer.data,
+            },
+            status=status.HTTP_201_CREATED,
+            headers=headers,
+        )
+
+    def update(self, request, *args, **kwargs):
+        """
+        Handle updating a holiday record.
+        Returns a custom response with updated holiday details.
+        """
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(
+            {
+                "status": "success",
+                "message": "Holiday updated successfully!",
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def list(self, request, *args, **kwargs):
+        """
+        Handle listing all holiday records.
+        Returns a custom response with the list of holidays.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(
+                {
+                    "status": "success",
+                    "message": "Holiday list retrieved successfully!",
+                    "data": serializer.data,
+                }
+            )
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(
+            {
+                "status": "success",
+                "message": "Holiday list retrieved successfully!",
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Handle retrieving a single holiday record.
+        Returns a custom response with the holiday details.
+        """
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(
+            {
+                "status": "success",
+                "message": "Holiday retrieved successfully!",
+                "data": serializer.data,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Handle deleting a holiday record.
+        Returns a custom response confirming deletion.
+        """
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response(
+            {"status": "success", "message": "Holiday deleted successfully!"},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user, updated_by=self.request.user)
+
+    def perform_update(self, serializer):
+        serializer.save(updated_by=self.request.user)
+
+
+###########################################################################
+########   User Notification modules
+########   By Divyanshu
+###########################################################################
+
+
+class UserMonthlyNotificationsListView(ListAPIView):
+    """
+    API view to fetch notifications for the authenticated user within the last month,
+    grouped by time periods like 'Today', 'This Week', and 'This Month'.
+    """
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        """
+        Get notifications for the authenticated user that are within the past month.
+        """
+        user = self.request.user
+
+        # Calculate the date one month ago from today
+        one_month_ago = timezone.now() - timedelta(days=30)
+
+        # Filter notifications for the past month and order them by timestamp
+        return Notification.objects.filter(receiver=user, timestamp__gte=one_month_ago).order_by('-timestamp')
+
+    def list(self, request, *args, **kwargs):
+        """
+        Override the list method to return grouped notifications for the past month.
+        """
+        queryset = self.get_queryset()
+        grouped_notifications = self.group_notifications_by_time_period(queryset)
+        
+        # Structure the response using `create_response` function
+        response_data = {
+            "grouped_notifications": grouped_notifications
+        }
+
+        return create_response(
+            status='success',
+            message='Notifications from the past month fetched successfully.',
+            data=response_data,
+            status_code=status.HTTP_200_OK
+        )
+
+    def group_notifications_by_time_period(self, notifications):
+        """
+        Group notifications based on the time period for the past month.
+        """
+        grouped_data = defaultdict(list)
+        current_time = timezone.now()
+
+        # Categorize notifications into time periods for the past month
+        for notification in notifications:
+            delta = (current_time - notification.timestamp).days
+
+            # Group by 'Today'
+            if delta == 0:
+                grouped_data['Today'].append(NotificationSerializer(notification).data)
+            # Group by 'This Week'
+            elif delta < 7:
+                grouped_data['This Week'].append(NotificationSerializer(notification).data)
+            # Group by 'This Month'
+            else:
+                grouped_data['This Month'].append(NotificationSerializer(notification).data)
+
+        # Sort the dictionary for consistency (optional)
+        sorted_grouped_data = dict(sorted(grouped_data.items()))
+        return sorted_grouped_data
+
+
+class UpdateNotificationStatusView(UpdateAPIView):
+    queryset = Notification.objects.all()
+    serializer_class = NotificationSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+
+    def update(self, request, *args, **kwargs):
+        try:
+            # Get the notification object based on the provided ID
+            notification = self.get_object()
+
+            # Mark the notification as read
+            notification.is_read = True
+            notification.save()
+
+            # Serialize and return the updated notification data
+            serializer = self.get_serializer(notification)
+            response_data = serializer.data
+
+            # Return the custom centralized response
+            return create_response(
+                status="success",
+                message="Notification marked as read successfully.",
+                data=response_data,
+                status_code=status.HTTP_200_OK,
+            )
+
+        except Notification.DoesNotExist:
+            return create_response(
+                status="error",
+                message="Notification not found.",
+                data=None,
+                status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        except ValidationError as ve:
+            return create_response(
+                status="error",
+                message="Validation error occurred.",
+                data=ve.detail,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        except Exception as e:
+            return create_response(
+                status="error",
+                message=f"An unexpected error occurred: {str(e)}",
+                data=None,
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+            
+##############  Notification Ends  ######################################
+
+
+###########################################################################
+########   User Tour modules
+########   By Divyanshu
+###########################################################################
+
+class UserTourViewSet(viewsets.ModelViewSet):
+    serializer_class = UserTourSerializer
+    permission_classes = [AllowAny]
+    lookup_field = 'slug' 
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            return create_response(
+                status="success",
+                message=_("User tour created successfully."),
+                data=serializer.data,
+                status_code=status.HTTP_201_CREATED
+            )
+        except ValidationError as e:
+            return create_response(
+                status="error",
+                message=_("Failed to create user tour."),
+                data=e.detail,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    def retrieve(self, request, slug=None, *args, **kwargs):
+        try:
+            tour = self.get_object()
+            serializer = self.get_serializer(tour)
+            return create_response(
+                status="success",
+                message=_("User tour retrieved successfully."),
+                data=serializer.data,
+                status_code=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return create_response(
+                status="error",
+                message=_("User tour not found."),
+                data=str(e),
+                status_code=status.HTTP_404_NOT_FOUND
+            )
+
+    def update(self, request, slug=None, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        try:
+            tour = self.get_object()
+            serializer = self.get_serializer(tour, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            return create_response(
+                status="success",
+                message=_("User tour updated successfully."),
+                data=serializer.data,
+                status_code=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return create_response(
+                status="error",
+                message=_("Failed to update user tour."),
+                data=e.detail,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    def partial_update(self, request, slug=None, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, slug, *args, **kwargs)
+
+    def destroy(self, request, slug=None, *args, **kwargs):
+        try:
+            tour = self.get_object()
+            self.perform_destroy(tour)
+            return create_response(
+                status="success",
+                message=_("User tour deleted successfully."),
+                status_code=status.HTTP_204_NO_CONTENT
+            )
+        except Exception as e:
+            return create_response(
+                status="error",
+                message=_("Failed to delete user tour."),
+                data=str(e),
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = UserTour.objects.all()
+        request_type = self.request.query_params.get("type")
+        if request_type == "requested" and hasattr(user, 'employees') and user.employees.exists():
+            queryset = queryset.filter(applied_by__in=user.employees.all())
+        else:
+            queryset = queryset.filter(applied_by=user)
+            
+        from_date = self.request.query_params.get("from_date")
+        to_date = self.request.query_params.get("to_date")
+        tour_status = self.request.query_params.get("status")
+        if from_date:
+            from_date = datetime.strptime(from_date, "%Y-%m-%d").date()
+            queryset = queryset.filter(start_date__gte=from_date)
+        if to_date:
+            to_date = datetime.strptime(to_date, "%Y-%m-%d").date()
+            queryset = queryset.filter(end_date__lte=to_date)
+
+        # Apply status filtering if provided
+        if tour_status:
+            queryset = queryset.filter(status=tour_status)
+
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        request_type = self.request.query_params.get("type", "")
+        is_manager = request_type == "requested"
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True, context={"request": request, "isManager": is_manager})
+            return self.get_paginated_response(serializer.data)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return create_response(
+            status="success",
+            message=_("User tours retrieved successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def approved(self, request, slug=None):
+        tour = get_object_or_404(UserTour, slug=slug)
+        action_by = request.user
+        tour.approve(action_by)
+
+        serializer = self.get_serializer(tour,context={"request": request, "isManager": True})
+        return create_response(
+            status="success",
+            message=_("Tour approved."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def rejected(self, request, slug=None):
+        tour = get_object_or_404(UserTour, slug=slug)
+        action_by = self.request.user
+        reason = request.data.get('reason', None)
+        tour.reject(action_by, reason)
+
+        serializer = self.get_serializer(tour,context={"request": request, "isManager": True})
+        return create_response(
+            status="success",
+            message=_("Tour rejected."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def cancelled(self, request, slug=None):
+        tour = get_object_or_404(UserTour, slug=slug)
+        action_by = self.request.user
+        reason = request.data.get('reason', None)
+        tour.cancel(action_by, reason)
+
+        serializer = self.get_serializer(tour,context={"request": request, "isManager": True})
+        return create_response(
+            status="success",
+            message=_("Tour cancelled."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def pending_cancellation(self, request, slug=None):
+        tour = get_object_or_404(UserTour, slug=slug)
+        action_by = self.request.user
+        reason = request.data.get('reason', None)
+        tour.pending_cancel(action_by, reason)
+
+        serializer = self.get_serializer(tour,context={"request": request, "isManager": False})
+        return create_response(
+            status="success",
+            message=_("Tour cancellation is pending."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def completed(self, request, slug=None):
+        tour = get_object_or_404(UserTour, slug=slug)
+        action_by = self.request.user
+        reason = request.data.get('reason', None)
+        tour.complete(action_by, reason)
+
+        serializer = self.get_serializer(tour,context={"request": request, "isManager": False})
+        return create_response(
+            status="success",
+            message=_("Tour completed."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    @action(detail=True, methods=['post'])
+    def extended(self, request, slug=None):
+        tour = get_object_or_404(UserTour, slug=slug)
+        action_by = self.request.user
+        new_end_date = request.data.get('new_end_date')
+        new_end_time = request.data.get('new_end_time')
+        reason = request.data.get('reason', None)
+
+        if not new_end_date or not new_end_time:
+            return create_response(
+                status="error",
+                message=_("New end date and time are required."),
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+        tour.extend(action_by, new_end_date, new_end_time, reason)
+
+        serializer = self.get_serializer(tour,context={"request": request, "isManager": False})
+        return create_response(
+            status="success",
+            message=_("Tour extended successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+
+##############  Tour Module Ends  ######################################
+
+
+###########################################################################
+########   Device Information modules
+########   By Divyanshu
+###########################################################################
+
+class DeviceInformationViewSet(viewsets.ModelViewSet):
+    serializer_class = DeviceInformationSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        queryset = DeviceInformation.objects.all()
+
+        device_location = self.request.query_params.get("status", None)
+        
+        if device_location:
+            queryset = queryset.filter(device_location__id=device_location)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            return create_response(
+                status="success",
+                message=_("Device information created successfully."),
+                data=serializer.data,
+                status_code=status.HTTP_201_CREATED
+            )
+        except IntegrityError:
+            return create_response(
+                status="error",
+                message=_("Device with this serial number already exists."),
+                data=None,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+        except ValidationError as e:
+            return create_response(
+                status="error",
+                message=_("Validation error."),
+                data=e.detail,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return create_response(
+            status="success",
+            message=_("Device information retrieved successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            return create_response(
+                status="success",
+                message=_("Device information updated successfully."),
+                data=serializer.data,
+                status_code=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return create_response(
+                status="error",
+                message=_("Validation error."),
+                data=e.detail,
+                status_code=status.HTTP_400_BAD_REQUEST
+            )
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.delete()
+        return create_response(
+            status="success",
+            message=_("Device information deleted successfully."),
+            data=None,
+            status_code=status.HTTP_204_NO_CONTENT
+        )
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
+        return create_response(
+            status="success",
+            message=_("Device information retrieved successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK
+        )

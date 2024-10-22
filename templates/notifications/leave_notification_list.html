@@ -1,0 +1,31 @@
+<!-- templates/notifications/leave_notification_list.html -->
+
+<a href="#" class="app-bar-item">
+  <span class="mif-bell"></span>
+  <span class="badge bg-orange fg-white mt-2 mr-1">{{ count }}</span>
+</a>
+<div style="background-color: aliceblue;" class="user-block shadow-1" data-role="collapse" data-collapsed="true">
+  <ul class="items-list">
+    {% for leave in pending_leaves %}
+      <li>
+        <img class="avatar" src="{{ leave.leaveApplication.appliedBy.personal_detail.avatar.url }}" />
+        <span style="color: black;" class="label"><a href="{% url 'leave_application_detail' leave.leaveApplication.slug %}">{{ leave.leaveApplication.appliedBy.get_full_name }}</a></span>
+        <span class="second-label">Applied for {{ leave.leaveApplication.applicationNo }}</span>
+      </li>
+    {% endfor %}
+    {% for tour in pending_tours %}
+      <li>
+        <img class="avatar" src="{{ tour.applied_by.personal_detail.avatar.url }}" />
+        <span style="color: black;" class="label"><a href="{% url 'tour_application_detail' tour.slug %}">{{ tour.applied_by.get_full_name }}</a></span>
+        <span class="second-label">Applied for tour from <br>{{tour.from_destination}} --> {{tour.to_destination}}</span>
+      </li>
+    {% endfor %}
+    {% for reg in pending_reg %}
+      <li>
+        <img class="avatar" src="{{ reg.applied_by.personal_detail.avatar.url }}" />
+        <span style="color: black;" class="label"><a href="{% url 'event_detail' reg.slug %}">{{ reg.applied_by.get_full_name }}</a></span>
+        <span class="second-label">Applied regularization for {{ reg.reg_status }}</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>

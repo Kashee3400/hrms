@@ -1,0 +1,72 @@
+{% extends 'hrms_app/base.html' %}
+{% load hrms_tag humanize i18n static %}
+{{ wizard.form.media }}
+{% block title %}
+    HRMS | Register Employee
+{% endblock %}
+
+{% block xtra_css %}
+    <link rel="stylesheet" href="{% static 'css/status.css' %}}"/>
+{% endblock %}
+
+{% block content_main %}
+    {% render_breadcrumb 'Register Employee' urls %}
+
+    <div class="container bg-light">
+        <div class="row">
+            <div class="container mt-5">
+                <div class="container m-5">
+                    <div data-role="stepper" data-steps="{{ wizard.steps.count }}" data-step="{{ wizard.steps.step1 }}"
+                         data-view="cycle" data-cls-complete="bg-green" data-cls-current="bg-red"></div>
+                </div>
+                <form id="creation_form" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ wizard.management_form }}
+
+                    <div class="container">
+                        {% block content %}
+
+                        {% endblock %}
+                    </div>
+
+                    <div class="row m-3">
+                        <div class="cell">
+                            {% if wizard.steps.prev %}
+                                <input type="hidden" name="is_navigation" value="true"/>
+                                <button name="wizard_goto_step" type="submit"
+                                        value="{{ wizard.steps.first }}">{% translate 'First step' %}</button>
+                                <button name="wizard_goto_step" type="submit"
+                                        value="{{ wizard.steps.prev }}">{% translate 'Previous step' %}</button>
+                            {% endif %}
+                        </div>
+                        <div class="cell">
+                            <button type="button" class="button primary" onclick="Metro.dialog.open('#submitDailog')">
+                                <img src="{% static 'source/images/checkmark.png' %}" alt="Check"/>
+                                {% translate 'Submit' %}
+                            </button>
+                        </div>
+                        <div class="cell">
+                            <a href="{% url 'cancel_user_creation' %}" class="button alert">Cancel</a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="dialog" data-role="dialog" id="submitDailog">
+        <div class="dialog-title">Are you sure?</div>
+        <div class="dialog-content">You want to submit the details. Please Check carefully</div>
+        <div class="dialog-actions">
+            <button type="reset" class="button js-dialog-close">Cancel</button>
+            <button type="button" class="button primary js-dialog-close" onclick="submitForm()">Submit</button>
+        </div>
+    </div>
+{% endblock %}
+
+{% block xtra_js %}
+    <script>
+        function submitForm() {
+            document.getElementById('creation_form').submit()
+        }
+    </script>
+{% endblock %}
