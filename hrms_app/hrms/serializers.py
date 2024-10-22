@@ -36,12 +36,6 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
         return obj.leave_detail.usedLeave if obj.leave_detail else 0
 
 
-class EmployeeImageSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = EmployeeImage
-        fields = ["employee_code", "image", "email"]
-
-
 class AttendanceLogActionSerializer(serializers.ModelSerializer):
     
     class Meta:

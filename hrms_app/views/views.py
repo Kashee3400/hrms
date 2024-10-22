@@ -902,7 +902,6 @@ FORMS = [
     ("personal", PersonalDetailsForm),
     ("paddress", PermanentAddressForm),
     ("caddress", CorrespondingAddressForm),
-    ("salary", SalaryDetailsForm),
 ]
 
 TEMPLATES = {
@@ -910,7 +909,6 @@ TEMPLATES = {
     "personal": "hrms_app/wizard/personal_details_form.html",
     "paddress": "hrms_app/wizard/paddress_form.html",
     "caddress": "hrms_app/wizard/caddress_form.html",
-    "salary": "hrms_app/wizard/salary_form.html",
 }
 
 
@@ -945,11 +943,7 @@ class UserCreationWizard(SessionWizardView):
             model_class = self.form_list[step]._meta.model
             instance = None
 
-            if model_class == SalaryDetails and hasattr(user, "personal_detail"):
-                instance = model_class.objects.filter(
-                    employee=user.personal_detail
-                ).first()
-            elif model_class == CustomUser:
+            if model_class == CustomUser:
                 instance = model_class.objects.filter(pk=user.pk).first()
             else:
                 instance = model_class.objects.filter(user_id=user.pk).first()

@@ -14,60 +14,9 @@ from django.db import transaction, IntegrityError
 from django.utils import timezone
 from datetime import timedelta
 import uuid
+from django.core.validators import MinValueValidator
 
 
-class CustomUser(AbstractUser):
-    official_email = models.EmailField(
-        blank=True, null=True, verbose_name=_("Official E-mail")
-    )
-    is_rm = models.BooleanField(default=False, verbose_name=_("Is Manager"))
-    reports_to = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="employees",
-        verbose_name=_("Reports To"),
-    )
-    role = models.ForeignKey(
-        "Role", on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Role")
-    )
-    device_location = models.ForeignKey(
-        "OfficeLocation",
-        blank=True,
-        null=True,
-        on_delete=models.SET_NULL,
-        verbose_name=_("Device Location"),
-        help_text=_(
-            "Where this device is located. For ex: - MCC or Cluster office location"
-        ),
-    )
-
-    def __str__(self):
-        if not self.first_name:
-            return self.username
-        return f"{self.first_name} {self.last_name}"
-
-    def toggle_manager_status(self):
-        """
-        Toggle the manager status of the employee.
-        """
-        self.is_rm = not self.is_rm
-        self.save()
-
-    class Meta:
-        db_table = "tbl_user"
-        managed = True
-        verbose_name = _("User")
-        verbose_name_plural = _("Users")
-
-
-from django.db import models
-from django.contrib.auth.models import AbstractUser
-from django.utils.translation import gettext_lazy as _
-from django.core.exceptions import ValidationError
-from django.utils.text import slugify
-from django.conf import settings
 
 
 class Role(models.Model):
@@ -152,10 +101,6 @@ class CustomUser(AbstractUser):
         verbose_name = _("User")
         verbose_name_plural = _("Users")
         ordering = ["username"]
-        permissions = [
-            ("can_view_customuser", _("Can view user")),
-            ("can_edit_customuser", _("Can edit user")),
-        ]
 
 
 class Logo(models.Model):
@@ -1565,26 +1510,6 @@ class LeaveType(models.Model):
         verbose_name_plural = _("Leave Types")
 
 
-from django.core.validators import MinValueValidator
-
-
-class LeaveType(models.Model):
-    name = models.CharField(max_length=50, verbose_name=_("Leave Type"))
-    default_allocation = models.FloatField(
-        verbose_name=_("Default Allocation"), validators=[MinValueValidator(0)]
-    )
-    carry_forward = models.BooleanField(default=False, verbose_name=_("Carry Forward"))
-    max_carry_forward = models.PositiveIntegerField(
-        blank=True,
-        null=True,
-        validators=[MinValueValidator(0)],
-        verbose_name=_("Max Carry Forward"),
-    )
-
-    def __str__(self):
-        return self.name
-
-
 class LeaveTransaction(models.Model):
     user = models.ForeignKey(
         CustomUser,
@@ -1644,7 +1569,6 @@ class LeaveTransaction(models.Model):
             "-transaction_date"
         ]  # Orders by transaction date in descending order
 
-
 class LeaveBalanceOpenings(models.Model):
     user = models.ForeignKey(
         CustomUser,
@@ -1662,6 +1586,22 @@ class LeaveBalanceOpenings(models.Model):
         default=timezone.now().year,
         verbose_name=_("Year"),
         help_text=_("The year for which the leave balance is applicable."),
+    )
+    no_of_leaves = models.FloatField(
+        blank=True,
+        null=True,
+        verbose_name=_("Number of Leaves"),
+        help_text=_(
+            "The total number of leaves allocated to the user for this leave type."
+        ),
+    )
+    remaining_leave_balances = models.FloatField(
+        blank=True,
+        null=True,
+        verbose_name=_("Remaining Leave Balance"),
+        help_text=_(
+            "The remaining balance of leaves available to the user for this leave type."
+        ),
     )
     opening_balance = models.FloatField(
         default=0,
@@ -1683,6 +1623,22 @@ class LeaveBalanceOpenings(models.Model):
         auto_now=True,
         verbose_name=_("Updated At"),
     )
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name="leave_balance_creators",
+        null=True,
+        verbose_name=_("Created By"),
+        help_text=_("User who created this leave balance entry."),
+    )
+    updated_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name="leave_balance_updaters",
+        null=True,
+        verbose_name=_("Updated By"),
+        help_text=_("User who last updated this leave balance entry."),
+    )
 
     class Meta:
         db_table = "tbl_leave_balance_openings"
@@ -1699,7 +1655,7 @@ class LeaveBalanceOpenings(models.Model):
         )
 
     @classmethod
-    def initialize_leave_balances(cls, user, leave_types, year):
+    def initialize_leave_balances(cls, user, leave_types, year, created_by):
         """
         Initialize leave balances for a user with multiple leave types in bulk.
         """
@@ -1710,15 +1666,17 @@ class LeaveBalanceOpenings(models.Model):
                 leave_type=leave_type,
                 year=year,
                 opening_balance=0,
+                created_by=created_by,  # Set created_by field
             )
             leave_balances.append(leave_balance)
         with transaction.atomic():
             cls.objects.bulk_create(leave_balances)
 
-    def update_balance(self, days_approved):
+    def update_balance(self, days_approved, updated_by):
         """Update the closing balance based on approved days."""
         self.closing_balance = self.opening_balance + days_approved
-        self.save(update_fields=["closing_balance", "updated_at"])
+        self.updated_by = updated_by  # Set updated_by field
+        self.save(update_fields=["closing_balance", "updated_at", "updated_by"])
 
 
 from django.db.models import Sum
@@ -1948,102 +1906,102 @@ class Notification(models.Model):
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
 
+
 class NotificationSetting(models.Model):
     user = models.OneToOneField(
         CustomUser,
         on_delete=models.CASCADE,
         verbose_name=_("User"),
-        help_text=_("The user to whom these notification settings apply.")
+        help_text=_("The user to whom these notification settings apply."),
     )
 
     receive_notifications = models.BooleanField(
         default=True,
         verbose_name=_("Receive Notifications"),
-        help_text=_("Enable or disable all notifications.")
+        help_text=_("Enable or disable all notifications."),
     )
     receive_sound_notifications = models.BooleanField(
         default=True,
         verbose_name=_("Receive Sound Notifications"),
-        help_text=_("Enable or disable sound for notifications.")
+        help_text=_("Enable or disable sound for notifications."),
     )
     receive_desktop_notifications = models.BooleanField(
         default=True,
         verbose_name=_("Receive Desktop Notifications"),
-        help_text=_("Enable or disable notifications on desktop.")
+        help_text=_("Enable or disable notifications on desktop."),
     )
     receive_mobile_notifications = models.BooleanField(
         default=True,
         verbose_name=_("Receive Mobile Notifications"),
-        help_text=_("Enable or disable notifications on mobile.")
+        help_text=_("Enable or disable notifications on mobile."),
     )
 
     receive_message_notifications = models.BooleanField(
         default=True,
         verbose_name=_("Receive Message Notifications"),
-        help_text=_("Enable or disable notifications for new messages.")
+        help_text=_("Enable or disable notifications for new messages."),
     )
     receive_mention_notifications = models.BooleanField(
         default=True,
         verbose_name=_("Receive Mention Notifications"),
-        help_text=_("Enable or disable notifications when you are mentioned.")
+        help_text=_("Enable or disable notifications when you are mentioned."),
     )
     receive_like_notifications = models.BooleanField(
         default=True,
         verbose_name=_("Receive Like Notifications"),
-        help_text=_("Enable or disable notifications for likes.")
+        help_text=_("Enable or disable notifications for likes."),
     )
     receive_comment_notifications = models.BooleanField(
         default=True,
         verbose_name=_("Receive Comment Notifications"),
-        help_text=_("Enable or disable notifications for new comments.")
+        help_text=_("Enable or disable notifications for new comments."),
     )
 
     notification_frequency = models.CharField(
         max_length=20,
         choices=[
-            ('immediate', _('Immediate')),
-            ('hourly', _('Hourly')),
-            ('daily', _('Daily')),
-            ('weekly', _('Weekly')),
+            ("immediate", _("Immediate")),
+            ("hourly", _("Hourly")),
+            ("daily", _("Daily")),
+            ("weekly", _("Weekly")),
         ],
-        default='immediate',
+        default="immediate",
         verbose_name=_("Notification Frequency"),
-        help_text=_("Choose how often to receive notifications.")
+        help_text=_("Choose how often to receive notifications."),
     )
 
     notification_importance = models.CharField(
         max_length=20,
         choices=[
-            ('high', _('High')),
-            ('medium', _('Medium')),
-            ('low', _('Low')),
+            ("high", _("High")),
+            ("medium", _("Medium")),
+            ("low", _("Low")),
         ],
-        default='medium',
+        default="medium",
         verbose_name=_("Notification Importance"),
-        help_text=_("Set the importance level for notifications.")
+        help_text=_("Set the importance level for notifications."),
     )
 
-    
     desktop_notification_sound = models.CharField(
         max_length=100,
         null=True,
         blank=True,
         verbose_name=_("Desktop Notification Sound"),
-        help_text=_("Specify the sound file for desktop notifications.")
+        help_text=_("Specify the sound file for desktop notifications."),
     )
     mobile_notification_sound = models.CharField(
         max_length=100,
         null=True,
         blank=True,
         verbose_name=_("Mobile Notification Sound"),
-        help_text=_("Specify the sound file for mobile notifications.")
+        help_text=_("Specify the sound file for mobile notifications."),
     )
 
     # Do Not Disturb mode
     do_not_disturb_mode = models.BooleanField(
         default=False,
         verbose_name=_("Do Not Disturb Mode"),
-        help_text=_("Enable to mute notifications during specified hours.")
+        help_text=_("Enable to mute notifications during specified hours."),
     )
 
     # Notification history
@@ -2051,7 +2009,7 @@ class NotificationSetting(models.Model):
         null=True,
         blank=True,
         verbose_name=_("Notification History"),
-        help_text=_("Log of previous notifications sent to the user.")
+        help_text=_("Log of previous notifications sent to the user."),
     )
 
     def __str__(self):
@@ -2062,17 +2020,21 @@ class NotificationSetting(models.Model):
         managed = True
         verbose_name = _("Notification Setting")
         verbose_name_plural = _("Notification Settings")
-        ordering = ['user']  # Orders settings by user
-        unique_together = ('user',)  # Ensure only one notification setting per user
+        ordering = ["user"]  # Orders settings by user
+        unique_together = ("user",)  # Ensure only one notification setting per user
         indexes = [
-            models.Index(fields=['user'], name='user_idx'),  # Index for faster lookups by user
+            models.Index(
+                fields=["user"], name="user_idx"
+            ),  # Index for faster lookups by user
         ]
+
 
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
 
 class Holiday(models.Model):
     title = models.CharField(max_length=100, verbose_name=_("Title"))
@@ -2104,14 +2066,16 @@ class Holiday(models.Model):
         verbose_name=_("Updated By"),
     )
 
-    is_yearly_recurring = models.BooleanField(default=False, verbose_name=_("Is Yearly Recurring"))
+    is_yearly_recurring = models.BooleanField(
+        default=False, verbose_name=_("Is Yearly Recurring")
+    )
     year = models.PositiveIntegerField(null=True, blank=True, verbose_name=_("Year"))
     recurrence_pattern = models.CharField(
         max_length=50,
         choices=[
-            ('fixed', _('Fixed Date')),
-            ('relative', _('Relative to a Date')),
-            ('custom', _('Custom Recurrence')),
+            ("fixed", _("Fixed Date")),
+            ("relative", _("Relative to a Date")),
+            ("custom", _("Custom Recurrence")),
         ],
         blank=True,
         null=True,
@@ -2147,10 +2111,11 @@ class Holiday(models.Model):
         verbose_name = _("Holiday")
         verbose_name_plural = _("Holidays")
         indexes = [
-            models.Index(fields=['start_date']),
-            models.Index(fields=['end_date']),
-            models.Index(fields=['is_yearly_recurring']),
+            models.Index(fields=["start_date"]),
+            models.Index(fields=["end_date"]),
+            models.Index(fields=["is_yearly_recurring"]),
         ]
+
 
 class UserTour(models.Model):
     applied_by = models.ForeignKey(
@@ -2160,80 +2125,74 @@ class UserTour(models.Model):
         verbose_name=_("Applied By"),
     )
     from_destination = models.CharField(
-        max_length=255, 
+        max_length=255,
         verbose_name=_("From Destination"),
-        help_text=_("Enter the location from which the tour starts.")
+        help_text=_("Enter the location from which the tour starts."),
     )
     to_destination = models.CharField(
-        max_length=255, 
+        max_length=255,
         verbose_name=_("To Destination"),
-        help_text=_("Enter the destination where the tour ends.")
+        help_text=_("Enter the destination where the tour ends."),
     )
     start_date = models.DateField(
         verbose_name=_("Start Date"),
         help_text=_("Select the start date of the tour."),
     )
     start_time = models.TimeField(
-        verbose_name=_("Start Time"), 
-        blank=True, 
+        verbose_name=_("Start Time"),
+        blank=True,
         null=True,
-        help_text=_("Select the start time of the tour.")
+        help_text=_("Select the start time of the tour."),
     )
     end_date = models.DateField(
         verbose_name=_("End Date"),
         help_text=_("Select the end date of the tour."),
     )
     end_time = models.TimeField(
-        verbose_name=_("End Time"), 
-        blank=True, 
+        verbose_name=_("End Time"),
+        blank=True,
         null=True,
-        help_text=_("Select the end time of the tour.")
+        help_text=_("Select the end time of the tour."),
     )
-    updated_at = models.DateTimeField(
-        auto_now=True, 
-        verbose_name=_("Updated At")
-    )
-    created_at = models.DateTimeField(
-        auto_now_add=True, 
-        verbose_name=_("Created At")
-    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("Updated At"))
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Created At"))
     remarks = models.TextField(
-        null=True, 
-        blank=True, 
+        null=True,
+        blank=True,
         verbose_name=_("Remarks"),
-        help_text=_("Any additional notes or comments about the tour.")
+        help_text=_("Any additional notes or comments about the tour."),
     )
     status = models.CharField(
         max_length=50,
         choices=settings.TOUR_STATUS_CHOICES,
         default=settings.PENDING,
         verbose_name=_("Status"),
-        help_text=_("Current status of the tour.")
+        help_text=_("Current status of the tour."),
     )
     extended_end_date = models.DateField(
-        null=True, 
-        blank=True, 
+        null=True,
+        blank=True,
         verbose_name=_("Extended End Date"),
-        help_text=_("If applicable, enter the new end date after extension.")
+        help_text=_("If applicable, enter the new end date after extension."),
     )
     extended_end_time = models.TimeField(
-        null=True, 
-        blank=True, 
+        null=True,
+        blank=True,
         verbose_name=_("Extended End Time"),
-        help_text=_("If applicable, enter the new end time after extension.")
+        help_text=_("If applicable, enter the new end time after extension."),
     )
     bills_submitted = models.BooleanField(
-        default=False, 
+        default=False,
         verbose_name=_("Bills Submitted"),
-        help_text=_("Indicate whether bills related to the tour have been submitted.")
+        help_text=_("Indicate whether bills related to the tour have been submitted."),
     )
     slug = models.SlugField(
-        max_length=255, 
-        blank=True, 
-        null=True, 
-        unique=True, 
+        max_length=255,
+        blank=True,
+        null=True,
+        unique=True,
         verbose_name=_("Slug"),
-        help_text=_("A unique identifier for the tour, used in URLs.")
+        help_text=_("A unique identifier for the tour, used in URLs."),
     )
     approval_type = models.CharField(
         max_length=100,
@@ -2241,14 +2200,21 @@ class UserTour(models.Model):
         null=True,
         choices=settings.APPROVAL_TYPE_CHOICES,
         verbose_name=_("Approval Type"),
-        help_text=_("Select the type of approval required for this tour.")
+        help_text=_("Select the type of approval required for this tour."),
     )
 
     def clean(self):
         if self.start_date > self.end_date:
             raise ValidationError(_("End date must be after start date."))
-        if self.start_date == self.end_date and self.start_time and self.end_time and self.start_time >= self.end_time:
-            raise ValidationError(_("End time must be after start time on the same day."))
+        if (
+            self.start_date == self.end_date
+            and self.start_time
+            and self.end_time
+            and self.start_time >= self.end_time
+        ):
+            raise ValidationError(
+                _("End time must be after start time on the same day.")
+            )
 
     def __str__(self):
         return f"Tour {self.id} by {self.applied_by.username}"
@@ -2326,12 +2292,15 @@ class UserTour(models.Model):
         verbose_name = _("User Tour")
         verbose_name_plural = _("Users' Tours")
         indexes = [
-            models.Index(fields=['status']),
-            models.Index(fields=['start_date']),
-            models.Index(fields=['end_date']),
-            models.Index(fields=['slug']),
+            models.Index(fields=["status"]),
+            models.Index(fields=["start_date"]),
+            models.Index(fields=["end_date"]),
+            models.Index(fields=["slug"]),
         ]
-        unique_together = ('applied_by', 'slug')  # Prevents duplicate slugs for the same user
+        unique_together = (
+            "applied_by",
+            "slug",
+        )  # Prevents duplicate slugs for the same user
 
 
 class TourStatusLog(models.Model):
@@ -2442,53 +2411,55 @@ class AttendanceLog(models.Model):
     )
     start_date = models.DateTimeField(
         verbose_name=_("Start Date"),
-        help_text=_("The date and time when attendance starts.")
+        help_text=_("The date and time when attendance starts."),
     )
     end_date = models.DateTimeField(
         verbose_name=_("End Date"),
-        help_text=_("The date and time when attendance ends.")
+        help_text=_("The date and time when attendance ends."),
     )
     from_date = models.DateTimeField(
-        blank=True, 
-        null=True, 
+        blank=True,
+        null=True,
         verbose_name=_("From Date"),
-        help_text=_("Optional field for specifying a starting date for regularization.")
+        help_text=_(
+            "Optional field for specifying a starting date for regularization."
+        ),
     )
     to_date = models.DateTimeField(
-        blank=True, 
-        null=True, 
+        blank=True,
+        null=True,
         verbose_name=_("To Date"),
-        help_text=_("Optional field for specifying an ending date for regularization.")
+        help_text=_("Optional field for specifying an ending date for regularization."),
     )
     reg_duration = models.CharField(
-        max_length=100, 
-        blank=True, 
-        null=True, 
+        max_length=100,
+        blank=True,
+        null=True,
         verbose_name=_("Regularization Duration"),
-        help_text=_("Specify the duration for which regularization is requested.")
+        help_text=_("Specify the duration for which regularization is requested."),
     )
     slug = models.SlugField(
-        max_length=255, 
-        unique=True, 
-        blank=True, 
+        max_length=255,
+        unique=True,
+        blank=True,
         verbose_name=_("Slug"),
-        help_text=_("A unique slug generated from the title, used for URL routing.")
+        help_text=_("A unique slug generated from the title, used for URL routing."),
     )
     title = models.CharField(
-        max_length=255, 
+        max_length=255,
         verbose_name=_("Title"),
-        help_text=_("Enter a title for the attendance log.")
+        help_text=_("Enter a title for the attendance log."),
     )
     is_regularisation = models.BooleanField(
-        default=False, 
+        default=False,
         verbose_name=_("Is Regularisation"),
-        help_text=_("Indicate whether this entry is for regularization.")
+        help_text=_("Indicate whether this entry is for regularization."),
     )
     duration = models.TimeField(
-        blank=True, 
-        null=True, 
+        blank=True,
+        null=True,
         verbose_name=_("Duration"),
-        help_text=_("Specify the duration of attendance.")
+        help_text=_("Specify the duration of attendance."),
     )
     reg_status = models.CharField(
         max_length=20,
@@ -2496,7 +2467,7 @@ class AttendanceLog(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Regularization Status"),
-        help_text=_("The current status of the regularization request.")
+        help_text=_("The current status of the regularization request."),
     )
     status = models.CharField(
         max_length=20,
@@ -2504,27 +2475,27 @@ class AttendanceLog(models.Model):
         null=True,
         choices=settings.ATTENDANCE_LOG_STATUS_CHOICES,
         verbose_name=_("Status"),
-        help_text=_("Current status of the attendance log.")
+        help_text=_("Current status of the attendance log."),
     )
     att_status = models.CharField(
         max_length=20,
         choices=settings.ATTENDANCE_STATUS_CHOICES,
         verbose_name=_("Attendance Status"),
-        help_text=_("Indicate the attendance status for this log entry.")
+        help_text=_("Indicate the attendance status for this log entry."),
     )
     att_status_short_code = models.CharField(
         max_length=20,
         verbose_name=_("Short Code"),
         blank=True,
         null=True,
-        help_text=_("A short code representing the attendance status.")
+        help_text=_("A short code representing the attendance status."),
     )
     color_hex = models.CharField(
-        max_length=7, 
-        blank=True, 
-        null=True, 
+        max_length=7,
+        blank=True,
+        null=True,
         verbose_name=_("Color Hex Code"),
-        help_text=_("Optional: Color code associated with this attendance entry.")
+        help_text=_("Optional: Color code associated with this attendance entry."),
     )
     created_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
@@ -2533,20 +2504,20 @@ class AttendanceLog(models.Model):
         verbose_name=_("Updated By"),
         blank=True,
         null=True,
-        help_text=_("User who last updated this attendance log entry.")
+        help_text=_("User who last updated this attendance log entry."),
     )
     updated_at = models.DateTimeField(auto_now=True)
     reason = models.CharField(
-        max_length=100, 
-        verbose_name=_("Reason"), 
-        blank=True, 
+        max_length=100,
+        verbose_name=_("Reason"),
+        blank=True,
         null=True,
-        help_text=_("Reason for the attendance entry.")
+        help_text=_("Reason for the attendance entry."),
     )
     is_submitted = models.BooleanField(
         default=False,
         verbose_name=_("Is Submitted"),
-        help_text=_("Indicate if the regularization has been submitted.")
+        help_text=_("Indicate if the regularization has been submitted."),
     )
 
     def clean(self):
@@ -2590,10 +2561,10 @@ class AttendanceLog(models.Model):
         verbose_name_plural = _("Attendance Logs")
         ordering = ["-created_at"]  # Default ordering by creation date
         indexes = [
-            models.Index(fields=['applied_by']),
-            models.Index(fields=['status']),
-            models.Index(fields=['start_date']),
-            models.Index(fields=['end_date']),
+            models.Index(fields=["applied_by"]),
+            models.Index(fields=["status"]),
+            models.Index(fields=["start_date"]),
+            models.Index(fields=["end_date"]),
         ]
 
     def add_action(self, action, performed_by, comment=None):

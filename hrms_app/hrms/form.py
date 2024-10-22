@@ -1186,7 +1186,7 @@ class PersonalDetailsForm(forms.ModelForm):
 
 class PermanentAddressForm(forms.ModelForm):
     class Meta:
-        model = ParmanentAddress
+        model = PermanentAddress
         fields = [
             "address_line_1",
             "address_line_2",
@@ -1287,128 +1287,5 @@ class CorrespondingAddressForm(forms.ModelForm):
         validators = {
             "zipcode": RegexValidator(
                 r"^\d{5}(?:[-\s]\d{4})?$", _("Enter a valid ZIP code")
-            ),
-        }
-
-
-class SalaryDetailsForm(forms.ModelForm):
-    class Meta:
-        model = SalaryDetails
-        fields = [
-            "basic_salary",
-            "ta",
-            "da",
-            "hra",
-            "conveyance_allowance",
-            "medical_allowance",
-            "lta",
-            "esi_employer_contribution",
-            "esi_employee_contribution",
-            "pf_employer_contribution",
-            "pf_employee_contribution",
-            "professional_tax",
-            "labor_welfare_fund",
-            "special_allowance",
-            "net_salary",
-        ]
-
-        # Custom labels
-        labels = {
-            "basic_salary": _("Basic Salary"),
-            "ta": _("Transport Allowance"),
-            "da": _("Dearness Allowance"),
-            "hra": _("House Rent Allowance"),
-            "conveyance_allowance": _("Conveyance Allowance"),
-            "medical_allowance": _("Medical Allowance"),
-            "lta": _("Leave Travel Allowance"),
-            "esi_employer_contribution": _("ESI Employer Contribution"),
-            "esi_employee_contribution": _("ESI Employee Contribution"),
-            "pf_employer_contribution": _("PF Employer Contribution"),
-            "pf_employee_contribution": _("PF Employee Contribution"),
-            "professional_tax": _("Professional Tax"),
-            "labor_welfare_fund": _("Labor Welfare Fund"),
-            "special_allowance": _("Special Allowance"),
-            "net_salary": _("Net Salary"),
-        }
-
-        # Define widgets with placeholders
-        widgets = {
-            "basic_salary": forms.NumberInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Basic Salary")}
-            ),
-            "ta": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter Transport Allowance"),
-                }
-            ),
-            "da": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter Dearness Allowance"),
-                }
-            ),
-            "hra": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter House Rent Allowance"),
-                }
-            ),
-            "conveyance_allowance": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter Conveyance Allowance"),
-                }
-            ),
-            "medical_allowance": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter Medical Allowance"),
-                }
-            ),
-            "lta": forms.NumberInput(
-                attrs={"data-role": "input", "placeholder": _("Enter LTA")}
-            ),
-            "esi_employer_contribution": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter ESI Employer Contribution"),
-                }
-            ),
-            "esi_employee_contribution": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter ESI Employee Contribution"),
-                }
-            ),
-            "pf_employer_contribution": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter PF Employer Contribution"),
-                }
-            ),
-            "pf_employee_contribution": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter PF Employee Contribution"),
-                }
-            ),
-            "professional_tax": forms.NumberInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Professional Tax")}
-            ),
-            "labor_welfare_fund": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter Labor Welfare Fund"),
-                }
-            ),
-            "special_allowance": forms.NumberInput(
-                attrs={
-                    "data-role": "input",
-                    "placeholder": _("Enter Special Allowance"),
-                }
-            ),
-            "net_salary": forms.NumberInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Net Salary")}
             ),
         }
