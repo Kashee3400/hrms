@@ -1,30 +1,19 @@
 from django.db import models
 from django.utils.text import slugify
 from django.contrib.auth.models import AbstractUser
-from django.db import models
-import random
 from django.template.defaultfilters import filesizeformat
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.utils.timesince import timesince
 import random
 import string
+from .middleware import CurrentUserMiddleware
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction, IntegrityError
-
-
-class Role(models.Model):
-    name = models.CharField(max_length=50, choices=settings.ROLE_CHOICES, verbose_name=_("Role Name"))
-    description = models.TextField(blank=True, null=True, verbose_name=_("Description"))
-    
-    def __str__(self):
-        return self.get_name_display()
-
-    class Meta:
-        db_table = "tbl_role"
-        verbose_name = _("Role")
-        verbose_name_plural = _("Roles")
+from django.utils import timezone
+from datetime import timedelta
+import uuid
 
 
 class CustomUser(AbstractUser):
@@ -40,9 +29,20 @@ class CustomUser(AbstractUser):
         related_name="employees",
         verbose_name=_("Reports To"),
     )
-    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Role"))
-    device_location = models.ForeignKey('OfficeLocation',blank=True,null=True,on_delete=models.SET_NULL,verbose_name=_('Device Location'),help_text=_('Where this device is located. For ex: - MCC or Cluster office location'))
-    
+    role = models.ForeignKey(
+        "Role", on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Role")
+    )
+    device_location = models.ForeignKey(
+        "OfficeLocation",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name=_("Device Location"),
+        help_text=_(
+            "Where this device is located. For ex: - MCC or Cluster office location"
+        ),
+    )
+
     def __str__(self):
         if not self.first_name:
             return self.username
@@ -62,10 +62,114 @@ class CustomUser(AbstractUser):
         verbose_name_plural = _("Users")
 
 
+from django.db import models
+from django.contrib.auth.models import AbstractUser
+from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
+from django.utils.text import slugify
+from django.conf import settings
+
+
+class Role(models.Model):
+    name = models.CharField(
+        max_length=50,
+        choices=settings.ROLE_CHOICES,
+        verbose_name=_("Role Name"),
+        help_text=_("Select a role for the user. This field is required."),
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name=_("Description"),
+        help_text=_("Optional: Provide a brief description of the role."),
+    )
+
+    def __str__(self):
+        return self.get_name_display()
+
+    class Meta:
+        db_table = "tbl_role"
+        verbose_name = _("Role")
+        verbose_name_plural = _("Roles")
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(fields=["name"], name="unique_role_name")
+        ]
+
+
+class CustomUser(AbstractUser):
+    official_email = models.EmailField(
+        blank=True,
+        null=True,
+        verbose_name=_("Official E-mail"),
+        help_text=_("Optional: Enter the user's official email address."),
+    )
+    is_rm = models.BooleanField(
+        default=False,
+        verbose_name=_("Is Manager"),
+        help_text=_("Indicates whether the user is a manager."),
+    )
+    reports_to = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="employees",
+        verbose_name=_("Reports To"),
+        help_text=_("Select the manager this user reports to."),
+    )
+    role = models.ForeignKey(
+        Role,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Role"),
+        help_text=_("Select a role for the user."),
+    )
+    device_location = models.ForeignKey(
+        "OfficeLocation",
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name=_("Device Location"),
+        help_text=_(
+            "Specify the location where this device is located. Example: MCC or Cluster office location."
+        ),
+    )
+
+    def __str__(self):
+        if not self.first_name:
+            return self.username
+        return f"{self.first_name} {self.last_name}"
+
+    def toggle_manager_status(self):
+        self.is_rm = not self.is_rm
+        self.save()
+
+    class Meta:
+        db_table = "tbl_user"
+        managed = True
+        verbose_name = _("User")
+        verbose_name_plural = _("Users")
+        ordering = ["username"]
+        permissions = [
+            ("can_view_customuser", _("Can view user")),
+            ("can_edit_customuser", _("Can edit user")),
+        ]
+
+
 class Logo(models.Model):
-    logo = models.CharField(max_length=100, verbose_name=_("Logo"))
+    logo = models.CharField(
+        max_length=100,
+        verbose_name=_("Logo"),
+        help_text=_("Provide the name of the logo."),
+    )
     logo_image = models.ImageField(
-        upload_to="logos/", blank=True, null=True, verbose_name=_("Logo Image")
+        upload_to="logos/",
+        blank=True,
+        null=True,
+        verbose_name=_("Logo Image"),
+        help_text=_("Optional: Upload an image for the logo."),
     )
 
     def __str__(self):
@@ -74,22 +178,47 @@ class Logo(models.Model):
     class Meta:
         db_table = "tbl_logo"
         managed = True
-        verbose_name = "Logo"
-        verbose_name_plural = "Logos"
+        verbose_name = _("Logo")
+        verbose_name_plural = _("Logos")
+        ordering = ["logo"]
 
 
 class Department(models.Model):
-    department = models.CharField(max_length=100, verbose_name=_("Department"))
-    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
-    slug = models.SlugField(unique=True, max_length=100, verbose_name=_("Slug"))
-    created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created At"))
-    updated_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Updated At"))
+    department = models.CharField(
+        max_length=100,
+        verbose_name=_("Department"),
+        help_text=_("Enter the name of the department."),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Indicates whether the department is active."),
+    )
+    slug = models.SlugField(
+        unique=True,
+        max_length=100,
+        verbose_name=_("Slug"),
+        help_text=_(
+            "Unique slug for the department. Automatically generated if left blank."
+        ),
+    )
+    created_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when the department was created."),
+    )
+    updated_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Updated At"),
+        help_text=_("The date and time when the department was last updated."),
+    )
     created_by = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
         related_name="department_updated_by",
         null=True,
         verbose_name=_("Created By"),
+        help_text=_("The user who created this department."),
     )
     updated_by = models.ForeignKey(
         CustomUser,
@@ -97,39 +226,77 @@ class Department(models.Model):
         related_name="department_created_by",
         null=True,
         verbose_name=_("Updated By"),
+        help_text=_("The user who last updated this department."),
     )
-    description = models.TextField(blank=True, null=True)
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text=_("Optional: Provide a description of the department."),
+    )
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.dept)
+            self.slug = slugify(self.department)
         super(Department, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return self.department
 
     class Meta:
         db_table = "tbl_department"
         managed = True
         verbose_name = _("Department")
         verbose_name_plural = _("Departments")
-
-    def __str__(self):
-        return self.department
+        ordering = ["department"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["department"], name="unique_department_name"
+            )
+        ]
 
 
 class Designation(models.Model):
     department = models.ForeignKey(
-        Department, on_delete=models.CASCADE, verbose_name=_("Department")
+        Department,
+        on_delete=models.CASCADE,
+        verbose_name=_("Department"),
+        help_text=_("Select the department for this designation."),
     )
-    slug = models.SlugField(unique=True, max_length=100, verbose_name=_("Slug"))
-    designation = models.CharField(max_length=100, verbose_name=_("Designation"))
-    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Created At"))
-    updated_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Updated At"))
+    slug = models.SlugField(
+        unique=True,
+        max_length=100,
+        verbose_name=_("Slug"),
+        help_text=_(
+            "Unique slug for the designation. Automatically generated if left blank."
+        ),
+    )
+    designation = models.CharField(
+        max_length=100,
+        verbose_name=_("Designation"),
+        help_text=_("Enter the name of the designation."),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Indicates whether the designation is active."),
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when the designation was created."),
+    )
+    updated_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Updated At"),
+        help_text=_("The date and time when the designation was last updated."),
+    )
     created_by = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
         null=True,
         related_name="designation_created_by",
         verbose_name=_("Created By"),
+        help_text=_("The user who created this designation."),
     )
     updated_by = models.ForeignKey(
         CustomUser,
@@ -137,43 +304,72 @@ class Designation(models.Model):
         null=True,
         related_name="designation_updated_by",
         verbose_name=_("Updated By"),
+        help_text=_("The user who last updated this designation."),
     )
-    description = models.TextField(blank=True, null=True)
-
-    def __str__(self):
-        return f"{self.designation}"
+    description = models.TextField(
+        blank=True,
+        null=True,
+        help_text=_("Optional: Provide a description of the designation."),
+    )
 
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.designation)
         super(Designation, self).save(*args, **kwargs)
 
+    def __str__(self):
+        return f"{self.designation}"
+
     class Meta:
         db_table = "tbl_designation"
         managed = True
         verbose_name = _("Designation")
         verbose_name_plural = _("Designations")
+        ordering = ["designation"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["designation"], name="unique_designation_name"
+            )
+        ]
 
 
 class Gender(models.Model):
-    gender = models.CharField(max_length=30)
-    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
-    updated_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Updated At"))
+    gender = models.CharField(
+        max_length=30,
+        verbose_name=_("Gender"),
+        help_text=_("Enter the gender value (e.g., Male, Female, etc.)."),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Indicates whether the gender is active."),
+    )
+    updated_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Updated At"),
+        help_text=_("The date and time when this record was last updated."),
+    )
     created_by = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         related_name="gender_created_by",
         verbose_name=_("Created By"),
+        help_text=_("The user who created this record."),
     )
     updated_by = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         related_name="gender_updated_by",
         verbose_name=_("Updated By"),
+        help_text=_("The user who last updated this record."),
     )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Created At"))
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when this record was created."),
+    )
 
     def __str__(self):
         return f"{self.gender}"
@@ -191,12 +387,27 @@ class Gender(models.Model):
         managed = True
         verbose_name = _("Gender")
         verbose_name_plural = _("Genders")
+        indexes = [
+            models.Index(fields=["gender"], name="idx_gender_gender"),
+        ]
 
 
 class MaritalStatus(models.Model):
-    marital_status = models.CharField(max_length=30)
-    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
-    created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created AT"))
+    marital_status = models.CharField(
+        max_length=30,
+        verbose_name=_("Marital Status"),
+        help_text=_("Enter the marital status value (e.g., Single, Married, etc.)."),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Indicates whether the marital status is active."),
+    )
+    created_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when this record was created."),
+    )
 
     def __str__(self):
         return f"{self.marital_status}"
@@ -206,27 +417,63 @@ class MaritalStatus(models.Model):
         managed = True
         verbose_name = _("Marital Status")
         verbose_name_plural = _("Marital Statuses")
+        indexes = [
+            models.Index(fields=["marital_status"], name="idx_marital_status"),
+        ]
 
 
-class ParmanentAddress(models.Model):
+class PermanentAddress(models.Model):
     user = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="permanent_addresses",
         verbose_name=_("Employee"),
         blank=True,
         null=True,
+        help_text=_("Select the employee to associate with this permanent address."),
     )
-    address_line_1 = models.CharField(max_length=100, verbose_name=_("Address Line 1"))
+    address_line_1 = models.CharField(
+        max_length=100,
+        verbose_name=_("Address Line 1"),
+        help_text=_("Enter the first line of the address."),
+    )
     address_line_2 = models.CharField(
-        max_length=100, blank=True, null=True, verbose_name=_("Address Line 2")
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name=_("Address Line 2"),
+        help_text=_("Optional: Enter the second line of the address."),
     )
-    country = models.CharField(max_length=50, verbose_name=_("Country"))
-    district = models.CharField(max_length=50, verbose_name=_("District"))
-    state = models.CharField(max_length=50, verbose_name=_("State"))
-    zipcode = models.CharField(max_length=10, verbose_name=_("ZIP Code"))
-    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
-    created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created AT"))
+    country = models.CharField(
+        max_length=50,
+        verbose_name=_("Country"),
+        help_text=_("Enter the country for this address."),
+    )
+    district = models.CharField(
+        max_length=50,
+        verbose_name=_("District"),
+        help_text=_("Enter the district for this address."),
+    )
+    state = models.CharField(
+        max_length=50,
+        verbose_name=_("State"),
+        help_text=_("Enter the state for this address."),
+    )
+    zipcode = models.CharField(
+        max_length=10,
+        verbose_name=_("ZIP Code"),
+        help_text=_("Enter the postal code for this address."),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Indicates whether this address is active."),
+    )
+    created_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when this record was created."),
+    )
 
     def __str__(self):
         return f"{self.user.get_full_name()} {self.address_line_1}, {self.state}, {self.zipcode}"
@@ -236,34 +483,64 @@ class ParmanentAddress(models.Model):
         managed = True
         verbose_name = _("Permanent Address")
         verbose_name_plural = _("Permanent Addresses")
+        indexes = [
+            models.Index(fields=["zipcode"], name="idx_permanent_zipcode"),
+        ]
 
 
 class CorrespondingAddress(models.Model):
     user = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="corres_addresses",
         verbose_name=_("Employee"),
         blank=True,
         null=True,
+        help_text=_(
+            "Select the employee to associate with this corresponding address."
+        ),
     )
     address_line_1 = models.CharField(
-        max_length=100, blank=True, null=True, verbose_name=_("Address Line 1")
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name=_("Address Line 1"),
+        help_text=_("Optional: Enter the first line of the address."),
     )
     address_line_2 = models.CharField(
-        max_length=100, blank=True, null=True, verbose_name=_("Address Line 2")
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name=_("Address Line 2"),
+        help_text=_("Optional: Enter the second line of the address."),
     )
     country = models.CharField(
-        max_length=50, blank=True, null=True, verbose_name=_("Country")
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name=_("Country"),
+        help_text=_("Optional: Enter the country for this address."),
     )
     district = models.CharField(
-        max_length=50, blank=True, null=True, verbose_name=_("District")
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name=_("District"),
+        help_text=_("Optional: Enter the district for this address."),
     )
     state = models.CharField(
-        max_length=50, blank=True, null=True, verbose_name=_("State")
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name=_("State"),
+        help_text=_("Optional: Enter the state for this address."),
     )
     zipcode = models.CharField(
-        max_length=10, blank=True, null=True, verbose_name=_("ZIP Code")
+        max_length=10,
+        blank=True,
+        null=True,
+        verbose_name=_("ZIP Code"),
+        help_text=_("Optional: Enter the postal code for this address."),
     )
 
     def __str__(self):
@@ -274,12 +551,28 @@ class CorrespondingAddress(models.Model):
         managed = True
         verbose_name = _("Corresponding Address")
         verbose_name_plural = _("Corresponding Addresses")
+        indexes = [
+            models.Index(fields=["zipcode"], name="idx_corresponding_zipcode"),
+        ]
 
 
 class Religion(models.Model):
-    religion = models.CharField(max_length=100, unique=True, verbose_name=_("Religion"))
-    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
-    created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created AT"))
+    religion = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name=_("Religion"),
+        help_text=_("Enter the religion (e.g., Christianity, Islam, Hinduism, etc.)."),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Indicates whether this religion is active."),
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when this record was created."),
+    )
 
     def __str__(self):
         return self.religion
@@ -289,13 +582,12 @@ class Religion(models.Model):
         managed = True
         verbose_name = _("Religion")
         verbose_name_plural = _("Religions")
+        indexes = [
+            models.Index(fields=["religion"], name="idx_religion"),
+        ]
 
 
 class Family(models.Model):
-    SPOUSE = "Spouse"
-    CHILD = "Child"
-    PARENT = "Parent"
-
     EMPLOYEE_RELATIONSHIP_CHOICES = [
         ("Spouse", "Spouse"),
         ("Child", "Child"),
@@ -304,16 +596,29 @@ class Family(models.Model):
         ("Other", "Other"),
     ]
     user = models.ForeignKey(
-        CustomUser, on_delete=models.CASCADE, related_name="families"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="families",
+        verbose_name=_("Employee"),
+        help_text=_("Select the employee associated with this family member."),
     )
-    member_name = models.CharField(max_length=100, verbose_name=_("Member Name"))
+    member_name = models.CharField(
+        max_length=100,
+        verbose_name=_("Member Name"),
+        help_text=_("Enter the name of the family member."),
+    )
     relationship = models.CharField(
         max_length=20,
         choices=EMPLOYEE_RELATIONSHIP_CHOICES,
         verbose_name=_("Relationship"),
+        help_text=_("Select the relationship of the family member to the employee."),
     )
     contact_number = models.CharField(
-        max_length=15, blank=True, null=True, verbose_name=_("Contact Number")
+        max_length=15,
+        blank=True,
+        null=True,
+        verbose_name=_("Contact Number"),
+        help_text=_("Enter the contact number of the family member (optional)."),
     )
 
     def __str__(self):
@@ -324,73 +629,69 @@ class Family(models.Model):
         managed = True
         verbose_name = _("Family Detail")
         verbose_name_plural = _("Family Details")
-
-
-class Deduction(models.Model):
-    user = models.ForeignKey(
-        CustomUser, on_delete=models.CASCADE, related_name="deductions"
-    )
-    amount = models.DecimalField(
-        max_digits=10, decimal_places=2, verbose_name=_("Amount")
-    )
-    reason = models.CharField(max_length=100, verbose_name=_("Reason"))
-    date = models.DateField(verbose_name=_("Date"))
-
-    def __str__(self):
-        return f"Deduction of {self.amount} for {self.reason} on {self.date}"
-
-    class Meta:
-        db_table = "tbl_deduction"
-        managed = True
-        verbose_name = _("Deduction")
-        verbose_name_plural = _("Deductions")
+        indexes = [
+            models.Index(fields=["relationship"], name="idx_family_relationship"),
+        ]
 
 
 class PersonalDetails(models.Model):
     employee_code = models.CharField(
         max_length=100,
         unique=True,
-        help_text=_(
-            "Enter the employee code with company short code prefix, For example: 65"
-        ),
         verbose_name=_("Employee Code"),
+        help_text=_("Enter the employee code with company short code prefix."),
     )
     user = models.OneToOneField(
-        CustomUser, default=0, on_delete=models.CASCADE, related_name="personal_detail"
+        settings.AUTH_USER_MODEL,
+        default=0,
+        on_delete=models.CASCADE,
+        related_name="personal_detail",
+        verbose_name=_("Employee"),
     )
     avatar = models.FileField(
-        upload_to="avatar/", blank=True, null=True, verbose_name=_("Avatar")
+        upload_to="avatar/",
+        blank=True,
+        null=True,
+        verbose_name=_("Avatar"),
+        help_text=_("Upload a profile picture for the employee."),
     )
     mobile_number = models.CharField(
         max_length=15,
         unique=True,
-        help_text=_("Employee person mobile number"),
         verbose_name=_("Mobile Number"),
+        help_text=_("Enter the employee's personal mobile number."),
     )
     alt_mobile_number = models.CharField(
         max_length=15,
         blank=True,
-        help_text=_("Employee person alternate mobile number"),
         verbose_name=_("Alternative Mobile Number"),
+        help_text=_("Enter an alternate mobile number for the employee (optional)."),
     )
     cug_mobile_number = models.CharField(
         max_length=15,
         blank=True,
-        help_text=_("Employee company provided mobile number if any"),
         verbose_name=_("Company Mobile Number"),
+        help_text=_("Enter the company's mobile number for the employee (optional)."),
     )
     gender = models.ForeignKey(
-        Gender,
+        "Gender",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
         verbose_name=_("Gender"),
+        help_text=_("Select the employee's gender."),
     )
     designation = models.ForeignKey(
-        Designation, on_delete=models.CASCADE, verbose_name=_("Designation")
+        "Designation",
+        on_delete=models.CASCADE,
+        verbose_name=_("Designation"),
+        help_text=_("Select the employee's designation."),
     )
     official_mobile_number = models.CharField(
-        max_length=15, unique=True, verbose_name=_("Official Mobile Number")
+        max_length=15,
+        unique=True,
+        verbose_name=_("Official Mobile Number"),
+        help_text=_("Enter the employee's official mobile number."),
     )
     religion = models.ForeignKey(
         Religion,
@@ -398,48 +699,98 @@ class PersonalDetails(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Religion"),
+        help_text=_("Select the employee's religion (optional)."),
     )
     marital_status = models.ForeignKey(
-        MaritalStatus,
+        "MaritalStatus",
         on_delete=models.CASCADE,
         blank=True,
         null=True,
         verbose_name=_("Marital Status"),
+        help_text=_("Select the employee's marital status (optional)."),
     )
-    birthday = models.DateField(null=True, blank=True, verbose_name=_("Birthday"))
+    birthday = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_("Birthday"),
+        help_text=_("Enter the employee's birthday (optional)."),
+    )
     marriage_ann = models.DateField(
-        null=True, blank=True, verbose_name=_("Marriage Anniversary")
+        null=True,
+        blank=True,
+        verbose_name=_("Marriage Anniversary"),
+        help_text=_("Enter the employee's marriage anniversary (optional)."),
     )
     ctc = models.DecimalField(
-        null=True, blank=True, max_digits=10, decimal_places=2, verbose_name=_("CTC")
+        null=True,
+        blank=True,
+        max_digits=10,
+        decimal_places=2,
+        verbose_name=_("CTC"),
+        help_text=_("Enter the employee's Cost to Company (CTC) (optional)."),
     )
     ann_date = models.DateField(
-        null=True, blank=True, verbose_name=_("Job Anniversary")
+        null=True,
+        blank=True,
+        verbose_name=_("Job Anniversary"),
+        help_text=_("Enter the employee's job anniversary (optional)."),
     )
-    doj = models.DateField(verbose_name=_("Date of Joining"))
-    dol = models.DateField(null=True, blank=True, verbose_name=_("Date of Leaving"))
-    dor = models.DateField(null=True, blank=True, verbose_name=_("Date of Resignation"))
+    doj = models.DateField(
+        verbose_name=_("Date of Joining"),
+        help_text=_("Enter the employee's date of joining."),
+    )
+    dol = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_("Date of Leaving"),
+        help_text=_("Enter the employee's date of leaving (if applicable)."),
+    )
+    dor = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_("Date of Resignation"),
+        help_text=_("Enter the employee's date of resignation (if applicable)."),
+    )
+    dot = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_("Date of Transfer"),
+        help_text=_(
+            "Enter the employee's date of transfer (if transferred to other location)."
+        ),
+    )
     dof = models.DateField(
-        null=True, blank=True, verbose_name=_("Date of Final Settlement")
+        null=True,
+        blank=True,
+        verbose_name=_("Date of Final Settlement"),
+        help_text=_("Enter the employee's final settlement date (if applicable)."),
     )
     updated_at = models.DateTimeField(
-        null=True, blank=True, auto_now_add=True, verbose_name=_("Updated At")
+        auto_now=True,
+        verbose_name=_("Updated At"),
+        help_text=_("The date and time when this record was last updated."),
     )
     created_by = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         related_name="pd_created_by",
         verbose_name=_("Created By"),
+        help_text=_("The user who created this record."),
     )
     updated_by = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         related_name="pd_updated_by",
         verbose_name=_("Updated By"),
+        help_text=_("The user who last updated this record."),
     )
-    created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created At"))
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when this record was created."),
+    )
 
     def __str__(self):
         return f"Personal Details of {self.user.first_name} - {self.mobile_number}"
@@ -449,33 +800,79 @@ class PersonalDetails(models.Model):
         managed = True
         verbose_name = _("Personal Detail")
         verbose_name_plural = _("Personal Details")
+        indexes = [
+            models.Index(fields=["employee_code"], name="idx_employee_code"),
+        ]
 
-
-from django.utils import timezone
-from datetime import timedelta
 
 class ShiftTiming(models.Model):
-    start_time = models.TimeField(verbose_name=_("Start Time"))
-    end_time = models.TimeField(verbose_name=_("End Time"))
-    grace_time = models.IntegerField(blank=True, null=True, verbose_name=_("Grace Time"))
-    grace_start_time = models.TimeField(blank=True, null=True, verbose_name=_("Grace Start Time"))
-    grace_end_time = models.TimeField(blank=True, null=True, verbose_name=_("Grace End Time"))
-
-    # Break time range fields
-    break_start_time = models.TimeField(blank=True, null=True, verbose_name=_("Break Start Time"))
-    break_end_time = models.TimeField(blank=True, null=True, verbose_name=_("Break End Time"))
-
-    # Field to store break duration
+    start_time = models.TimeField(
+        verbose_name=_("Start Time"), help_text=_("Enter the start time for the shift.")
+    )
+    end_time = models.TimeField(
+        verbose_name=_("End Time"), help_text=_("Enter the end time for the shift.")
+    )
+    grace_time = models.IntegerField(
+        blank=True,
+        null=True,
+        verbose_name=_("Grace Time (minutes)"),
+        help_text=_("Enter the grace time for late arrivals (in minutes, optional)."),
+    )
+    grace_start_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name=_("Grace Start Time"),
+        help_text=_("Enter the start time for the grace period (optional)."),
+    )
+    grace_end_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name=_("Grace End Time"),
+        help_text=_("Enter the end time for the grace period (optional)."),
+    )
+    break_start_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name=_("Break Start Time"),
+        help_text=_("Enter the start time for the break (optional)."),
+    )
+    break_end_time = models.TimeField(
+        blank=True,
+        null=True,
+        verbose_name=_("Break End Time"),
+        help_text=_("Enter the end time for the break (optional)."),
+    )
     break_duration = models.IntegerField(
-        blank=True, null=True, verbose_name=_("Break Duration (minutes)")
+        blank=True,
+        null=True,
+        verbose_name=_("Break Duration (minutes)"),
+        help_text=_(
+            "The calculated break duration in minutes, automatically set when both start and end times are provided."
+        ),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Indicates whether this shift timing is active."),
+    )
+    role = models.ForeignKey(
+        "Role",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name=_("Role"),
+        help_text=_("Assign this shift to a specific role (optional)."),
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when this record was created."),
     )
 
-    is_active = models.BooleanField(default=True, verbose_name=_("Is Active"))
-    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True, verbose_name=_("Role"))
-    created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created At"))
-
     def __str__(self):
-        return f"{self.start_time.strftime('%H:%M')} - {self.end_time.strftime('%H:%M')}"
+        return (
+            f"{self.start_time.strftime('%H:%M')} - {self.end_time.strftime('%H:%M')}"
+        )
 
     def save(self, *args, **kwargs):
         """
@@ -483,13 +880,22 @@ class ShiftTiming(models.Model):
         when break_start_time and break_end_time are provided.
         """
         if self.break_start_time and self.break_end_time:
-            # Convert times to datetime objects for subtraction
-            break_start = timezone.datetime.combine(timezone.now().date(), self.break_start_time)
-            break_end = timezone.datetime.combine(timezone.now().date(), self.break_end_time)
+            break_start = timezone.datetime.combine(
+                timezone.now().date(), self.break_start_time
+            )
+            break_end = timezone.datetime.combine(
+                timezone.now().date(), self.break_end_time
+            )
 
-            # Calculate the difference and store the duration in minutes
+            # Validate that break_end_time is after break_start_time
+            if break_start >= break_end:
+                raise ValidationError(
+                    _("Break end time must be after break start time.")
+                )
+
+            # Calculate and set break duration in minutes
             duration = break_end - break_start
-            self.break_duration = duration.total_seconds() // 60  # Convert seconds to minutes
+            self.break_duration = duration.total_seconds() // 60
         else:
             self.break_duration = None  # Reset if break times are not provided
 
@@ -499,170 +905,125 @@ class ShiftTiming(models.Model):
         db_table = "tbl_shift_timing"
         verbose_name = _("Shift Timing")
         verbose_name_plural = _("Shift Timings")
+        indexes = [
+            models.Index(fields=["start_time", "end_time"], name="idx_shift_timing"),
+        ]
 
+
+from django.db import models
+from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
+from django.conf import settings
 
 
 class EmployeeShift(models.Model):
     employee = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="shifts",
         verbose_name=_("Employee"),
+        help_text=_("Select the employee associated with this shift."),
     )
     shift_timing = models.ForeignKey(
-        ShiftTiming, on_delete=models.CASCADE, verbose_name=_("Shift Timing")
+        "ShiftTiming",
+        on_delete=models.CASCADE,
+        verbose_name=_("Shift Timing"),
+        help_text=_("Select the shift timing for the employee."),
     )
-    created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created At"))
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At"),
+        help_text=_("The date and time when this record was created."),
+    )
     created_by = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         verbose_name=_("Created By"),
         related_name="shift_created",
+        help_text=_("The user who created this shift record."),
     )
 
     class Meta:
         db_table = "tbl_employee_shift"
-
-    def __str__(self):
-        return f"{self.employee.username}:  {self.shift_timing}"
-
-
-class SalaryDetails(models.Model):
-    employee = models.OneToOneField(PersonalDetails, on_delete=models.CASCADE)
-    basic_salary = models.DecimalField(max_digits=10, decimal_places=2)
-    ta = models.DecimalField(max_digits=10, decimal_places=2)
-    da = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    hra = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    conveyance_allowance = models.DecimalField(
-        max_digits=10, decimal_places=2, default=0
-    )
-    medical_allowance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    lta = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    esi_employer_contribution = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True
-    )
-    esi_employee_contribution = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True
-    )
-    pf_employer_contribution = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True
-    )
-    pf_employee_contribution = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True
-    )
-    professional_tax = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True
-    )
-    labor_welfare_fund = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True
-    )
-    special_allowance = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True
-    )
-    net_salary = models.DecimalField(
-        max_digits=10, decimal_places=2, blank=True, null=True
-    )
-
-    def generate_salary(self):
-        # Basic
-        basic_percentage_range = getattr(settings, "BASIC_PERCENTAGE_RANGE", (0.4, 0.5))
-        basic_percentage = random.uniform(*basic_percentage_range)
-        self.basic_salary = self.employee.ctc * basic_percentage
-
-        # DA
-        da_percentage = getattr(settings, "DA_PERCENTAGE", 0.05)
-        self.da = self.employee.ctc * da_percentage
-
-        # HRA
-        hra_percentage_metro = getattr(settings, "HRA_PERCENTAGE_METRO", 0.5)
-        hra_percentage_non_metro = getattr(settings, "HRA_PERCENTAGE_NON_METRO", 0.4)
-        if self.employee.location == "metro":
-            self.hra = (self.basic_salary + self.da) * hra_percentage_metro
-        else:
-            self.hra = (self.basic_salary + self.da) * hra_percentage_non_metro
-
-        # LTA
-        lta_percentage = getattr(settings, "LTA_PERCENTAGE", 0.10)
-        self.lta = self.basic_salary * lta_percentage
-
-        esi_employer_percentage = getattr(settings, "ESI_EMPLOYER_PERCENTAGE", 0.0475)
-        esi_employee_percentage = getattr(settings, "ESI_EMPLOYEE_PERCENTAGE", 0.0175)
-        self.esi_employer_contribution = (
-            self.basic_salary + self.da + self.hra
-        ) * esi_employer_percentage
-        self.esi_employee_contribution = (
-            self.basic_salary + self.da + self.hra
-        ) * esi_employee_percentage
-
-        # PF
-        pf_employer_percentage = getattr(settings, "PF_EMPLOYER_PERCENTAGE", 0.12)
-        pf_employee_percentage = getattr(settings, "PF_EMPLOYEE_PERCENTAGE", 0.12)
-        self.pf_employer_contribution = (
-            self.basic_salary + self.da
-        ) * pf_employer_percentage
-        self.pf_employee_contribution = (
-            self.basic_salary + self.da
-        ) * pf_employee_percentage
-
-        # Professional Tax
-        professional_tax = getattr(settings, "PROFESSIONAL_TAX", 0)
-        self.professional_tax = professional_tax
-
-        # Labor Welfare Fund
-        labor_welfare_fund = getattr(settings, "LABOR_WELFARE_FUND", 0)
-        self.labor_welfare_fund = labor_welfare_fund
-
-        # Special Allowance (Balancing component)
-        total_earnings = (
-            self.basic_salary
-            + self.da
-            + self.hra
-            + self.conveyance_allowance
-            + self.medical_allowance
-            + self.lta
-            + self.special_allowance
-        )
-        total_deductions = (
-            self.esi_employer_contribution
-            + self.pf_employer_contribution
-            + self.professional_tax
-            + self.labor_welfare_fund
-        )
-        self.special_allowance = total_earnings - total_deductions
-
-        self.net_salary = total_earnings - total_deductions
-
-    def __str__(self):
-        return f"Salary Details {self.basic_salary}"
-
-    class Meta:
-        db_table = "tbl_sal_detail"
         managed = True
-        verbose_name = "Salary Detail"
-        verbose_name_plural = "Salary Details"
+        verbose_name = _("Employee Shift")
+        verbose_name_plural = _("Employee Shifts")
+        indexes = [
+            models.Index(
+                fields=["employee", "shift_timing"], name="idx_employee_shift"
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["employee", "shift_timing"], name="unique_employee_shift"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.employee.username}: {self.shift_timing}"
+
+    def clean(self):
+        if self.employee.shifts.filter(shift_timing=self.shift_timing).exists():
+            raise ValidationError(
+                _("This employee already has a shift with the selected timing.")
+            )
 
 
 class BankDetails(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
-    account_number = models.CharField(max_length=50)
-    bank_name = models.CharField(max_length=100)
-    branch_name = models.CharField(max_length=100)
-    IFSC_code = models.CharField(max_length=20)
-    pan_number = models.CharField(max_length=10)
-
-    def __str__(self):
-        return f"Bank Details of {self.user.first_name} - {self.bank_name} , {self.IFSC_code}, {self.branch_name}"
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name=_("User"),
+        help_text=_("Select the user associated with these bank details."),
+    )
+    account_number = models.CharField(
+        max_length=50,
+        verbose_name=_("Account Number"),
+        help_text=_("Enter the bank account number."),
+    )
+    bank_name = models.CharField(
+        max_length=100,
+        verbose_name=_("Bank Name"),
+        help_text=_("Enter the name of the bank."),
+    )
+    branch_name = models.CharField(
+        max_length=100,
+        verbose_name=_("Branch Name"),
+        help_text=_("Enter the name of the bank branch."),
+    )
+    ifsc_code = models.CharField(
+        max_length=20,
+        verbose_name=_("IFSC Code"),
+        help_text=_("Enter the IFSC code of the bank."),
+    )
+    pan_number = models.CharField(
+        max_length=10,
+        verbose_name=_("PAN Number"),
+        help_text=_("Enter the PAN number of the user."),
+    )
 
     class Meta:
         db_table = "tbl_bank_detail"
         managed = True
-        verbose_name = "Bank Detail"
-        verbose_name_plural = "Bank Details"
+        verbose_name = _("Bank Detail")
+        verbose_name_plural = _("Bank Details")
+        indexes = [
+            models.Index(fields=["user", "account_number"], name="idx_user_account"),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "account_number"], name="unique_user_account"
+            ),
+        ]
 
+    def __str__(self):
+        return f"Bank Details of {self.user.first_name} - {self.bank_name}, {self.IFSC_code}, {self.branch_name}"
 
-from django.utils import timezone
+    def clean(self):
+        if len(self.pan_number) != 10:
+            raise ValidationError(_("PAN number must be exactly 10 characters long."))
 
 
 class LeaveLog(models.Model):
@@ -680,7 +1041,7 @@ class LeaveLog(models.Model):
     action = models.CharField(max_length=100, verbose_name=_("Action"))
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name=_("Timestamp"))
     notes = models.TextField(blank=True, verbose_name=_("Notes"))
-    
+
     def __str__(self):
         return f"{self.action} by {self.action_by_name} on {self.timestamp}"
 
@@ -713,64 +1074,91 @@ class LeaveApplication(models.Model):
         verbose_name=_("Leave Type"),
     )
     applicationNo = models.CharField(
-        max_length=200, unique=True, verbose_name=_("Application No")
+        max_length=200,
+        unique=True,
+        verbose_name=_("Application No"),
+        help_text=_("Unique identifier for the leave application."),
     )
     appliedBy = models.ForeignKey(
-        CustomUser,
+        settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name="leaves",
         verbose_name=_("Applied By"),
     )
     applyingDate = models.DateTimeField(auto_now=True, verbose_name=_("Applying Date"))
-    startDate = models.DateTimeField(verbose_name=_("Start Date"))
-    endDate = models.DateTimeField(blank=True, null=True, verbose_name=_("End Date"))
-    usedLeave = models.FloatField(verbose_name=_("Used Leave"))
-    balanceLeave = models.FloatField(verbose_name=_("Balance Leave"))
-    reason = models.TextField(blank=True, verbose_name=_("Reason"))
+    startDate = models.DateTimeField(
+        verbose_name=_("Start Date"), help_text=_("The date when the leave begins.")
+    )
+    endDate = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name=_("End Date"),
+        help_text=_(
+            "The date when the leave ends. Leave can be of a single day or multiple days."
+        ),
+    )
+    usedLeave = models.FloatField(
+        verbose_name=_("Used Leave"),
+        help_text=_("Total leave days used for this application."),
+    )
+    balanceLeave = models.FloatField(
+        verbose_name=_("Balance Leave"),
+        help_text=_("Remaining leave days available after this application."),
+    )
+    reason = models.TextField(
+        blank=True, verbose_name=_("Reason"), help_text=_("Reason for applying leave.")
+    )
     status = models.CharField(
         max_length=30,
         choices=settings.LEAVE_STATUS_CHOICES,
         default=settings.PENDING,
         verbose_name=_("Status"),
+        help_text=_("Current status of the leave application."),
     )
     startDayChoice = models.CharField(
         max_length=20,
         default=settings.FULL_DAY,
         choices=settings.START_LEAVE_TYPE_CHOICES,
         verbose_name=_("Start Day Choice"),
+        help_text=_(
+            "Choose whether the leave starts at the beginning or the end of the day."
+        ),
     )
     endDayChoice = models.CharField(
         max_length=20,
         default=settings.FULL_DAY,
         choices=settings.START_LEAVE_TYPE_CHOICES,
         verbose_name=_("End Day Choice"),
+        help_text=_(
+            "Choose whether the leave ends at the beginning or the end of the day."
+        ),
     )
-    updatedAt = models.DateTimeField(auto_now_add=True, verbose_name=_("Updated At"))
+    updatedAt = models.DateTimeField(auto_now=True, verbose_name=_("Updated At"))
     slug = models.SlugField(
-        max_length=255, unique=True, blank=True, editable=False, verbose_name=_("Slug")
+        max_length=255,
+        unique=True,
+        blank=True,
+        editable=False,
+        verbose_name=_("Slug"),
+        help_text=_(
+            "Automatically generated unique identifier for the leave application."
+        ),
     )
 
     def save(self, *args, **kwargs):
-        # Generate unique application number
+        if self.startDate and self.endDate and self.startDate > self.endDate:
+            raise ValidationError(_("Start date cannot be after end date."))
         if not self.applicationNo:
             self.applicationNo = self.generate_unique_application_no()
 
-        # Generate the slug
         if not self.slug:
-            base_slug = f"{self.appliedBy.get_full_name()}-{self.startDate.strftime('%Y-%m-%d')}-{self.startDayChoice}"
-            unique_slug = slugify(base_slug)
-            num = 1
-            while LeaveApplication.objects.filter(slug=unique_slug).exists():
-                unique_slug = f"{slugify(base_slug)}-{num}"
-                num += 1
-            self.slug = unique_slug
+            self.slug = self.generate_unique_slug()
 
         super().save(*args, **kwargs)
 
     def generate_unique_application_no(self):
         """Generate a unique application number."""
         while True:
-            # Generate a random application number
             random_str = "".join(
                 random.choices(string.ascii_uppercase + string.digits, k=4)
             )
@@ -780,32 +1168,41 @@ class LeaveApplication(models.Model):
             ).exists():
                 return application_no
 
+    def generate_unique_slug(self):
+        """Generate a unique slug based on the applicant's name and dates."""
+        base_slug = f"{self.appliedBy.get_full_name()}-{self.startDate.strftime('%Y-%m-%d')}-{self.startDayChoice}"
+        unique_slug = slugify(base_slug)
+        num = 1
+        while LeaveApplication.objects.filter(slug=unique_slug).exists():
+            unique_slug = f"{slugify(base_slug)}-{num}"
+            num += 1
+        return unique_slug
+
     def __str__(self):
         return f"Leave Application {self.applicationNo} for {self.appliedBy}"
 
     def approve_leave(self, action_by):
-        if self.status == settings.PENDING:
-            self.status = settings.APPROVED
-            self.save(update_fields=["status", "updatedAt"])
-            LeaveLog.create_log(self, action_by, settings.APPROVED)
+        return self.update_status(action_by, settings.APPROVED)
 
     def reject_leave(self, action_by):
-        if self.status == settings.PENDING:
-            self.status = settings.REJECTED
-            self.save(update_fields=["status", "updatedAt"])
-            LeaveLog.create_log(self, action_by, settings.REJECTED)
+        return self.update_status(action_by, settings.REJECTED)
 
     def cancel_leave(self, action_by):
-        if self.status == settings.APPROVED:
-            self.status = settings.CANCELLED
+        return self.update_status(action_by, settings.CANCELLED)
+
+    def update_status(self, action_by, new_status):
+        if (
+            self.status in [settings.PENDING, settings.APPROVED]
+            and new_status != settings.PENDING
+        ):
+            self.status = new_status
             self.save(update_fields=["status", "updatedAt"])
-            LeaveLog.create_log(self, action_by, settings.CANCELLED)
+            LeaveLog.create_log(self, action_by, new_status)
 
     @classmethod
     def create_leave_application(
         cls,
         applied_by,
-        application_no,
         start_date,
         end_date,
         used_leave,
@@ -813,10 +1210,11 @@ class LeaveApplication(models.Model):
         reason,
         start_day_choice,
         end_day_choice,
+        leave_type=None,
     ):
         leave_application = cls.objects.create(
             appliedBy=applied_by,
-            applicationNo=application_no,
+            leave_type=leave_type,
             startDate=start_date,
             endDate=end_date,
             usedLeave=used_leave,
@@ -839,82 +1237,84 @@ class LeaveApplication(models.Model):
         managed = True
         verbose_name = _("Leave Application")
         verbose_name_plural = _("Leave Applications")
+        indexes = [
+            models.Index(
+                fields=["appliedBy", "status"], name="idx_leave_application_status"
+            ),
+        ]
 
-import uuid
 
 class OfficeLocation(models.Model):
-    # Using UUID as the primary key
     id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
         verbose_name="Unique Identifier",
-        help_text="Unique ID for this location, generated automatically."
+        help_text="Unique ID for this location, generated automatically.",
     )
-
-    # Name and type of the location
     location_name = models.CharField(
         max_length=100,
         verbose_name="Location Name",
-        help_text="Enter the name of the location (e.g., Head Office, Cluster Office, etc.)"
+        help_text="Enter the name of the location (e.g., Head Office, Cluster Office, etc.)",
     )
     office_type = models.CharField(
         max_length=50,
         choices=settings.OFFICE_TYPE_CHOICES,
         verbose_name="Office Type",
-        help_text="Specify the type of office (Head Office, Cluster Office, MCC, BMC, MPP)."
+        help_text="Specify the type of office (Head Office, Cluster Office, MCC, BMC, MPP).",
     )
-
-    # Address and coordinates
     address = models.TextField(
-        verbose_name="Address",
-        help_text="Enter the complete address of the location."
+        verbose_name="Address", help_text="Enter the complete address of the location."
     )
-    
     latitude = models.DecimalField(
-        max_digits=9, decimal_places=6,
+        max_digits=9,
+        decimal_places=6,
         verbose_name="Latitude",
         help_text="Enter the latitude of the location.",
         blank=True,
-        null=True
+        null=True,
     )
-    
     longitude = models.DecimalField(
-        max_digits=9, decimal_places=6,
+        max_digits=9,
+        decimal_places=6,
         verbose_name="Longitude",
         help_text="Enter the longitude of the location.",
         blank=True,
-        null=True
+        null=True,
     )
-
-    # Metadata fields
     created_at = models.DateTimeField(
         auto_now=True,
         verbose_name="Created At",
-        help_text="The date and time when this record was created."
+        help_text="The date and time when this record was created.",
     )
     updated_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Updated At",
-        help_text="The date and time when this record was last updated."
+        help_text="The date and time when this record was last updated.",
     )
     created_by = models.ForeignKey(
-        CustomUser, related_name='location_created_by',
-        on_delete=models.SET_NULL, null=True, blank=True,
+        CustomUser,
+        related_name="location_created_by",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         verbose_name="Created By",
-        help_text="The user who created this record."
+        help_text="The user who created this record.",
     )
     updated_by = models.ForeignKey(
-        CustomUser, related_name='location_updated_by',
-        on_delete=models.SET_NULL, null=True, blank=True,
+        CustomUser,
+        related_name="location_updated_by",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         verbose_name="Updated By",
-        help_text="The user who last updated this record."
+        help_text="The user who last updated this record.",
     )
 
     class Meta:
         verbose_name = "Office Location"
         verbose_name_plural = "Office Locations"
-        ordering = ['location_name']
+        ordering = ["location_name"]
 
     def __str__(self):
         return f"{self.location_name} ({self.office_type})"
@@ -925,47 +1325,57 @@ class OfficeLocation(models.Model):
         `created_by` and `updated_by` fields based on the authenticated user.
         """
         # Expecting 'user' to be passed in kwargs when calling save()
-        user = kwargs.pop('user', None)
+        user = kwargs.pop("user", None)
         if user:
             if not self.pk:  # If the object is being created
                 self.created_by = user
             self.updated_by = user  # Always set updated_by
 
         super(OfficeLocation, self).save(*args, **kwargs)
-        
+
+
 class DeviceInformation(models.Model):
-    device_location = models.ForeignKey(OfficeLocation,blank=True,null=True,on_delete=models.SET_NULL,verbose_name=_('Device Location'),help_text=_('Where this device is located. For ex: - MCC or Cluster office location'))
+    device_location = models.ForeignKey(
+        OfficeLocation,
+        blank=True,
+        null=True,
+        on_delete=models.SET_NULL,
+        verbose_name=_("Device Location"),
+        help_text=_(
+            "Where this device is located. For ex: - MCC or Cluster office location"
+        ),
+    )
     from_date = models.DateTimeField(
         verbose_name=_("From Date"),
-        help_text=_("Enter the start date and time for the transaction log.")
+        help_text=_("Enter the start date and time for the transaction log."),
     )
     to_date = models.DateTimeField(
         verbose_name=_("To Date"),
-        help_text=_("Enter the end date and time for the transaction log.")
+        help_text=_("Enter the end date and time for the transaction log."),
     )
     serial_number = models.CharField(
         max_length=50,
         verbose_name=_("Serial Number"),
         help_text=_("Enter the device serial number."),
-        unique=True  # Ensure serial numbers are unique
+        unique=True,  # Ensure serial numbers are unique
     )
     username = models.CharField(
         max_length=30,
         verbose_name=_("Username"),
-        help_text=_("Enter the API username for authentication.")
+        help_text=_("Enter the API username for authentication."),
     )
     password = models.CharField(
         max_length=50,
         verbose_name=_("Password"),
-        help_text=_("Enter the API password for authentication.")
+        help_text=_("Enter the API password for authentication."),
     )
     api_link = models.URLField(
         max_length=200,  # Increase if necessary to accommodate long URLs
         verbose_name=_("API Link"),
         help_text=_("Enter the API link for the device."),
-        default="http://1.22.197.176:99/iclock/WebAPIService.asmx"  # Default link can be modified if needed
+        default="http://1.22.197.176:99/iclock/WebAPIService.asmx",  # Default link can be modified if needed
     )
-    
+
     def __str__(self):
         return f"{self.serial_number} from {self.from_date} to {self.to_date}"
 
@@ -980,11 +1390,16 @@ class LeaveDayChoiceAdjustment(models.Model):
     """
     Store different combinations of start and end day choices along with adjustment values.
     """
+
     start_day_choice = models.CharField(
-        max_length=20, choices=settings.START_LEAVE_TYPE_CHOICES, verbose_name="Start Day Choice"
+        max_length=20,
+        choices=settings.START_LEAVE_TYPE_CHOICES,
+        verbose_name="Start Day Choice",
     )
     end_day_choice = models.CharField(
-        max_length=20, choices=settings.START_LEAVE_TYPE_CHOICES, verbose_name="End Day Choice"
+        max_length=20,
+        choices=settings.START_LEAVE_TYPE_CHOICES,
+        verbose_name="End Day Choice",
     )
     adjustment_value = models.FloatField(verbose_name="Adjustment Value")
 
@@ -992,9 +1407,10 @@ class LeaveDayChoiceAdjustment(models.Model):
         return f"{self.start_day_choice} to {self.end_day_choice} adjustment: {self.adjustment_value}"
 
     class Meta:
-        unique_together = ('start_day_choice', 'end_day_choice')
+        unique_together = ("start_day_choice", "end_day_choice")
         verbose_name = "Leave Day Choice Adjustment"
         verbose_name_plural = "Leave Day Choice Adjustments"
+
 
 class LeaveType(models.Model):
     leave_type = models.CharField(
@@ -1002,7 +1418,9 @@ class LeaveType(models.Model):
         unique=True,
         choices=settings.LEAVE_TYPE_CHOICES,
         verbose_name=_("Leave Type"),
-        help_text=_("Select the type of leave (e.g., Sick Leave, Casual Leave). This must be unique.")
+        help_text=_(
+            "Select the type of leave (e.g., Sick Leave, Casual Leave). This must be unique."
+        ),
     )
     leave_type_short_code = models.CharField(
         max_length=100,
@@ -1010,57 +1428,88 @@ class LeaveType(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Leave Type Short Code"),
-        help_text=_("Provide a short code for the leave type (optional). This must be unique if provided.")
+        help_text=_(
+            "Provide a short code for the leave type (optional). This must be unique if provided."
+        ),
     )
     default_allocation = models.FloatField(
-        blank=True, null=True, 
+        blank=True,
+        null=True,
         verbose_name=_("Default Allocation"),
-        help_text=_("Set the default number of days allocated for this leave type.")
+        help_text=_("Set the default number of days allocated for this leave type."),
     )
     min_notice_days = models.FloatField(
-        blank=True, null=True,
+        blank=True,
+        null=True,
         verbose_name=_("Minimum Notice Days"),
-        help_text=_("Specify the minimum number of days notice required before applying for this leave.")
+        help_text=_(
+            "Specify the minimum number of days notice required before applying for this leave."
+        ),
     )
     max_days_limit = models.FloatField(
-        blank=True, null=True,
+        blank=True,
+        null=True,
         verbose_name=_("Maximum Days Limit"),
-        help_text=_("Set the maximum number of consecutive days that can be taken for this leave type.")
+        help_text=_(
+            "Set the maximum number of consecutive days that can be taken for this leave type."
+        ),
     )
     min_days_limit = models.FloatField(
-        blank=True, null=True,
+        blank=True,
+        null=True,
         verbose_name=_("Minimum Days Limit"),
-        help_text=_("Set the minimum number of consecutive days that can be taken for this leave type.")
+        help_text=_(
+            "Set the minimum number of consecutive days that can be taken for this leave type."
+        ),
     )
     allowed_days_per_year = models.FloatField(
-        blank=True, null=True,
+        blank=True,
+        null=True,
         verbose_name=_("Allowed Days Per Year"),
-        help_text=_("Specify the total number of days allowed for this leave type per year.")
+        help_text=_(
+            "Specify the total number of days allowed for this leave type per year."
+        ),
     )
     leave_fy_start = models.DateField(
-        blank=True, null=True,
+        blank=True,
+        null=True,
         verbose_name="Leave FY Start",
-        help_text=_("Define the start of the financial year for leave calculations (optional).")
+        help_text=_(
+            "Define the start of the financial year for leave calculations (optional)."
+        ),
     )
     leave_fy_end = models.DateField(
-        blank=True, null=True,
+        blank=True,
+        null=True,
         verbose_name="Leave FY End",
-        help_text=_("Define the end of the financial year for leave calculations (optional).")
+        help_text=_(
+            "Define the end of the financial year for leave calculations (optional)."
+        ),
     )
     color_hex = models.CharField(
-        max_length=7, blank=True, null=True,
+        max_length=7,
+        blank=True,
+        null=True,
         verbose_name=_("Color Hex Code"),
-        help_text=_("Enter a hex color code to represent this leave type in the system.")
+        help_text=_(
+            "Enter a hex color code to represent this leave type in the system."
+        ),
     )
     text_color_hex = models.CharField(
-        max_length=7, blank=True, null=True,
+        max_length=7,
+        blank=True,
+        null=True,
         verbose_name=_("Text Color Hex Code"),
-        help_text=_("Enter a hex color code for the text color to be used with this leave type.")
+        help_text=_(
+            "Enter a hex color code for the text color to be used with this leave type."
+        ),
     )
     created_at = models.DateTimeField(
         auto_now=True,
         verbose_name=_("Created At"),
-        help_text=_("The date and time when this leave type was created (automatically set).")
+        help_text=_(
+            "The date and time when this leave type was created (automatically set)."
+        ),
     )
     created_by = models.ForeignKey(
         CustomUser,
@@ -1069,12 +1518,14 @@ class LeaveType(models.Model):
         null=True,
         blank=True,
         verbose_name=_("Created By"),
-        help_text=_("The user who created this leave type (set automatically).")
+        help_text=_("The user who created this leave type (set automatically)."),
     )
     updated_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name=_("Updated At"),
-        help_text=_("The date and time when this leave type was last updated (automatically set).")
+        help_text=_(
+            "The date and time when this leave type was last updated (automatically set)."
+        ),
     )
     updated_by = models.ForeignKey(
         CustomUser,
@@ -1083,13 +1534,15 @@ class LeaveType(models.Model):
         null=True,
         blank=True,
         verbose_name=_("Updated By"),
-        help_text=_("The user who last updated this leave type (set automatically).")
+        help_text=_("The user who last updated this leave type (set automatically)."),
     )
 
     consecutive_restriction = models.BooleanField(
         default=False,
         verbose_name=_("Consecutive Leave Restriction"),
-        help_text=_("Check if consecutive leave applications are not allowed for this leave type.")
+        help_text=_(
+            "Check if consecutive leave applications are not allowed for this leave type."
+        ),
     )
     restricted_after_leave_types = models.ManyToManyField(
         "self",
@@ -1097,9 +1550,10 @@ class LeaveType(models.Model):
         symmetrical=False,
         related_name="restricted_by_leave_types",
         verbose_name=_("Restricted After Leave Types"),
-        help_text=_("Select leave types after which this leave type cannot be applied consecutively.")
+        help_text=_(
+            "Select leave types after which this leave type cannot be applied consecutively."
+        ),
     )
-
 
     def __str__(self):
         return f"{self.leave_type}"
@@ -1111,129 +1565,193 @@ class LeaveType(models.Model):
         verbose_name_plural = _("Leave Types")
 
 
-class LeaveBalanceOpenings(models.Model):
+from django.core.validators import MinValueValidator
+
+
+class LeaveType(models.Model):
+    name = models.CharField(max_length=50, verbose_name=_("Leave Type"))
+    default_allocation = models.FloatField(
+        verbose_name=_("Default Allocation"), validators=[MinValueValidator(0)]
+    )
+    carry_forward = models.BooleanField(default=False, verbose_name=_("Carry Forward"))
+    max_carry_forward = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Max Carry Forward"),
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class LeaveTransaction(models.Model):
     user = models.ForeignKey(
-        CustomUser, 
-        on_delete=models.CASCADE, 
+        CustomUser,
+        on_delete=models.CASCADE,
         verbose_name=_("User"),
-        help_text=_("The user for whom this leave balance is being recorded.")
+        help_text=_("The user for whom the leave transaction is recorded."),
     )
-    no_of_leaves = models.FloatField(
-        blank=True, 
-        null=True, 
-        verbose_name=_("Number of Leaves"),
-        help_text=_("The total number of leaves allocated to the user for this leave type.")
-    )
-    remaining_leave_balances = models.FloatField(
-        blank=True, 
-        null=True, 
-        verbose_name=_("Remaining Leave Balance"),
-        help_text=_("The remaining balance of leaves available to the user for this leave type.")
+    leave_balance = models.ForeignKey(
+        "LeaveBalanceOpenings",
+        on_delete=models.CASCADE,
+        verbose_name=_("Leave Balance"),
+        help_text=_("The leave balance associated with this transaction."),
     )
     leave_type = models.ForeignKey(
-        LeaveType, 
-        on_delete=models.CASCADE, 
-        null=True, 
+        LeaveType,
+        on_delete=models.CASCADE,
         verbose_name=_("Leave Type"),
-        help_text=_("The type of leave for which the balance is being recorded.")
+        help_text=_("The type of leave being requested (e.g., sick leave, vacation)."),
+    )
+    transaction_date = models.DateField(
+        default=timezone.now,
+        verbose_name=_("Transaction Date"),
+        help_text=_("The date when the leave transaction is recorded."),
+    )
+    days_applied = models.FloatField(
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Days Applied"),
+        help_text=_("Number of leave days applied for in this transaction."),
+    )
+    days_approved = models.FloatField(
+        validators=[MinValueValidator(0)],
+        default=0,
+        verbose_name=_("Days Approved"),
+        help_text=_("Number of leave days that have been approved."),
+    )
+    remarks = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name=_("Remarks"),
+        help_text=_("Any additional remarks regarding the leave transaction."),
+    )
+
+    def __str__(self):
+        return f"Leave Transaction for {self.user.username} - {self.leave_type.name} on {self.transaction_date}"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Update the leave balance after the transaction is saved
+        self.leave_balance.update_balance(self.days_approved)
+
+    class Meta:
+        db_table = "tbl_leave_transaction"
+        managed = True
+        verbose_name = _("Leave Transaction")
+        verbose_name_plural = _("Leave Transactions")
+        ordering = [
+            "-transaction_date"
+        ]  # Orders by transaction date in descending order
+
+
+class LeaveBalanceOpenings(models.Model):
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        verbose_name=_("User"),
+        help_text=_("The user whose leave balance is being tracked."),
+    )
+    leave_type = models.ForeignKey(
+        LeaveType,
+        on_delete=models.CASCADE,
+        verbose_name=_("Leave Type"),
+        help_text=_("The type of leave associated with this balance."),
     )
     year = models.PositiveIntegerField(
-        default=timezone.now().year, 
+        default=timezone.now().year,
         verbose_name=_("Year"),
-        help_text=_("The year for which the leave balance applies.")
+        help_text=_("The year for which the leave balance is applicable."),
+    )
+    opening_balance = models.FloatField(
+        default=0,
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Opening Balance"),
+        help_text=_("Initial balance of leave days for the year."),
+    )
+    closing_balance = models.FloatField(
+        default=0,
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Closing Balance"),
+        help_text=_("Final balance of leave days for the year."),
     )
     created_at = models.DateTimeField(
-        auto_now=True, 
+        auto_now_add=True,
         verbose_name=_("Created At"),
-        help_text=_("The date and time when this leave balance record was created.")
-    )
-    created_by = models.ForeignKey(
-        CustomUser,
-        on_delete=models.SET_NULL,
-        related_name="created_leave_balances",
-        null=True,
-        blank=True,
-        verbose_name=_("Created By"),
-        help_text=_("The user who created this leave balance record.")
     )
     updated_at = models.DateTimeField(
-        auto_now_add=True, 
+        auto_now=True,
         verbose_name=_("Updated At"),
-        help_text=_("The date and time when this leave balance record was last updated.")
-    )
-    updated_by = models.ForeignKey(
-        CustomUser,
-        on_delete=models.SET_NULL,
-        related_name="updated_leave_balances",
-        null=True,
-        blank=True,
-        verbose_name=_("Updated By"),
-        help_text=_("The user who last updated this leave balance record.")
     )
 
     class Meta:
-        db_table = "tbl_leave_bal"
+        db_table = "tbl_leave_balance_openings"
         managed = True
         verbose_name = _("Leave Balance")
         verbose_name_plural = _("Leave Balances")
         unique_together = ("leave_type", "user", "year")
+        ordering = ["year", "leave_type"]
 
     def __str__(self):
-        return f"Leave Balance for {self.user.first_name} {self.user.last_name} - {self.leave_type} ({self.remaining_leave_balances})"
+        return (
+            f"Leave Balance for {self.user.first_name} {self.user.last_name} - "
+            f"{self.leave_type.name} (Opening: {self.opening_balance}, Closing: {self.closing_balance})"
+        )
 
     @classmethod
-    def initialize_leave_balances(cls, user, leave_types, year, created_by):
+    def initialize_leave_balances(cls, user, leave_types, year):
         """
         Initialize leave balances for a user with multiple leave types in bulk.
         """
         leave_balances = []
-
-        # Iterate through leave types to create LeaveBalanceOpening instances
         for leave_type in leave_types:
             leave_balance = cls(
                 user=user,
                 leave_type=leave_type,
                 year=year,
-                no_of_leaves=leave_type.default_allocation,
-                remaining_leave_balances=leave_type.default_allocation,
-                created_by=created_by,
-                updated_by=created_by,
+                opening_balance=0,
             )
             leave_balances.append(leave_balance)
-        
-        # Bulk create to insert multiple records in a single query
-        with transaction.atomic():  # Ensure atomic transaction
+        with transaction.atomic():
             cls.objects.bulk_create(leave_balances)
+
+    def update_balance(self, days_approved):
+        """Update the closing balance based on approved days."""
+        self.closing_balance = self.opening_balance + days_approved
+        self.save(update_fields=["closing_balance", "updated_at"])
+
+
+from django.db.models import Sum
 
 
 class CompensatoryOff(models.Model):
-    # Primary key as UUID
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        editable=False,
-        verbose_name="Unique ID"
-    )
+    id = models.UUIDField(primary_key=True, editable=False, verbose_name="Unique ID")
 
     user = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
-        related_name='compensatory_offs',
+        related_name="compensatory_offs",
         verbose_name="User",
-        help_text="The employee who earned this compensatory off."
+        help_text="The employee who earned this compensatory off.",
     )
     worked_on = models.DateField(
-        verbose_name="Worked On",
-        help_text="The date on which the employee worked to earn the compensatory off."
+        verbose_name="Worked On", help_text="Date the employee worked."
     )
     expiry_date = models.DateField(
-        verbose_name="Expiry Date",
-        help_text="The date on which the compensatory off expires."
+        verbose_name="Expiry Date", help_text="Date the compensatory off expires."
     )
     reason = models.TextField(
-        null=True, blank=True,
+        null=True,
+        blank=True,
         verbose_name="Reason",
-        help_text="Reason for working on the day and earning compensatory off."
+        help_text="Reason for working on the day and earning compensatory off.",
+    )
+    hours_earned = models.FloatField(
+        validators=[MinValueValidator(0.5)],
+        null=True,
+        blank=True,
+        verbose_name="Hours Earned",
+        default=1.0,
     )
 
     status = models.CharField(
@@ -1241,107 +1759,184 @@ class CompensatoryOff(models.Model):
         choices=settings.CO_STATUS_CHOICES,
         default=settings.OPEN,
         verbose_name="Status",
-        help_text="The current status of the compensatory off."
+        help_text="The current status of the compensatory off.",
+    )
+
+    # Additional fields for advanced management
+    leave_type = models.ForeignKey(
+        LeaveType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="Leave Type",
+    )
+    approved_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="approved_comp_offs",
+        verbose_name="Approved By",
+    )
+    comments = models.TextField(
+        null=True, blank=True, verbose_name="Comments", help_text="Additional notes"
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def save(self, *args, **kwargs):
-        # Automatically set the expiry date if it's not provided
+        # Automatically set expiry date if not provided (customizable logic)
         if not self.expiry_date:
-            self.expiry_date = self.worked_on + timedelta(days=30)
-        
+            self.expiry_date = self.worked_on + timedelta(
+                days=settings.CO_EXPIRY_DAYS
+            )  # Replace with your logic
+
         # Update status to 'expired' if expiry date has passed and status is still 'open'
-        if self.status == 'open' and self.expiry_date < timezone.now().date():
-            self.status = 'expired'
-            
+        if self.status == "open" and self.expiry_date < timezone.now().date():
+            self.status = "expired"
+
         super(CompensatoryOff, self).save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.user} - CO on {self.worked_on} (Status: {self.status})"
+        return f"{self.user} - CO on {self.worked_on} ({self.hours_earned} hours) - (Status: {self.status})"
+
+    @classmethod
+    def get_available_balance(cls, user):
+        """
+        Calculates the total available compensatory off hours for a user.
+        """
+        approved_comp_offs = cls.objects.filter(user=user, status="open")
+        total_hours = (
+            approved_comp_offs.aggregate(total_hours=Sum("hours_earned"))["total_hours"]
+            or 0.0
+        )
+        return total_hours
+
+
+class CompensatoryOffLog(models.Model):
+    compensatory_off = models.ForeignKey(
+        "CompensatoryOff",
+        on_delete=models.CASCADE,
+        related_name="logs",
+        verbose_name=_("Compensatory Off"),
+    )
+    action_by = models.ForeignKey(
+        CustomUser, on_delete=models.SET_NULL, null=True, verbose_name=_("Action By")
+    )
+    action_by_name = models.CharField(max_length=255, verbose_name=_("Action By Name"))
+    action_by_email = models.EmailField(verbose_name=_("Action By Email"))
+    action = models.CharField(max_length=100, verbose_name=_("Action"))
+    timestamp = models.DateTimeField(auto_now_add=True, verbose_name=_("Timestamp"))
+    notes = models.TextField(blank=True, verbose_name=_("Notes"))
+
+    def __str__(self):
+        return f"{self.action} by {self.action_by_name} on {self.timestamp}"
+
+    @classmethod
+    def create_log(cls, compensatory_off, action_by, action, notes=""):
+        cls.objects.create(
+            compensatory_off=compensatory_off,
+            action_by=action_by,
+            action_by_name=f"{action_by.first_name} {action_by.last_name}",
+            action_by_email=action_by.email,
+            action=action,
+            notes=notes,
+        )
+
+    class Meta:
+        db_table = "tbl_compensatory_off_log"
+        managed = True
+        verbose_name = _("Compensatory Off Log")
+        verbose_name_plural = _("Compensatory Off Logs")
+        ordering = ["-timestamp"]
 
 
 class Notification(models.Model):
-
     sender = models.ForeignKey(
-        'CustomUser',
+        CustomUser,
         on_delete=models.CASCADE,
         verbose_name="Sender",
-        related_name='notifications_sent',
-        help_text="The user who sent the notification."
+        related_name="notifications_sent",
+        help_text="The user who sent the notification.",
     )
-    
+
     receiver = models.ForeignKey(
-        'CustomUser',
-        related_name='notifications',
+        CustomUser,
+        related_name="notifications",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         verbose_name="Receiver",
-        help_text="The user who receives the notification."
+        help_text="The user who receives the notification.",
     )
-    
+
     message = models.CharField(
         max_length=255,
         verbose_name="Notification Message",
-        help_text="The content of the notification."
+        help_text="The content of the notification.",
     )
-    
+
     notification_type = models.CharField(
         max_length=50,
         choices=settings.NOTIFICATION_TYPES,
         null=True,
         blank=True,
         verbose_name="Notification Type",
-        help_text="The type of notification being sent."
+        help_text="The type of notification being sent.",
     )
-    
+
     # Fields to store related object information
     related_object_id = models.PositiveIntegerField(
         null=True,
         blank=True,
         verbose_name="Related Object ID",
-        help_text="The ID of the related object associated with this notification."
+        help_text="The ID of the related object associated with this notification.",
     )
-    
+
     related_content_type = models.ForeignKey(
         ContentType,
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         verbose_name="Related Content Type",
-        help_text="The type of the related object (model) this notification is linked to."
+        help_text="The type of the related object (model) this notification is linked to.",
     )
-    
-    related_object = GenericForeignKey('related_content_type', 'related_object_id')
+
+    related_object = GenericForeignKey("related_content_type", "related_object_id")
 
     target_url = models.URLField(
         max_length=500,
         null=True,
         blank=True,
         verbose_name="Target URL",
-        help_text="The URL for web navigation related to this notification."
+        help_text="The URL for web navigation related to this notification.",
     )
-    
+
+    payload_data = models.JSONField(
+        null=True, blank=True, verbose_name="Payload Data"
+    )  # Additional data for custom platform notification formats
     go_route_mobile = models.CharField(
         max_length=255,
         null=True,
         blank=True,
         verbose_name="Mobile Deep Link",
-        help_text="The mobile deep link for navigating to the related content."
+        help_text="The mobile deep link for navigating to the related content.",
     )
+    desktop_notification_data = models.JSONField(
+        null=True, blank=True, verbose_name="Desktop Notification Data"
+    )  # Data for specific desktop notification libraries
 
     timestamp = models.DateTimeField(
         default=timezone.now,
         verbose_name="Timestamp",
-        help_text="The time when the notification was created."
+        help_text="The time when the notification was created.",
     )
-    
+
     is_read = models.BooleanField(
         default=False,
         verbose_name="Read Status",
-        help_text="Indicates whether the notification has been read."
+        help_text="Indicates whether the notification has been read.",
     )
 
     def __str__(self):
@@ -1353,28 +1948,137 @@ class Notification(models.Model):
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
 
-
 class NotificationSetting(models.Model):
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
-    receive_notifications = models.BooleanField(default=True)
-    receive_sound_notifications = models.BooleanField(default=True)
-    receive_desktop_notifications = models.BooleanField(default=True)
-    receive_mobile_notifications = models.BooleanField(default=True)
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        verbose_name=_("User"),
+        help_text=_("The user to whom these notification settings apply.")
+    )
+
+    receive_notifications = models.BooleanField(
+        default=True,
+        verbose_name=_("Receive Notifications"),
+        help_text=_("Enable or disable all notifications.")
+    )
+    receive_sound_notifications = models.BooleanField(
+        default=True,
+        verbose_name=_("Receive Sound Notifications"),
+        help_text=_("Enable or disable sound for notifications.")
+    )
+    receive_desktop_notifications = models.BooleanField(
+        default=True,
+        verbose_name=_("Receive Desktop Notifications"),
+        help_text=_("Enable or disable notifications on desktop.")
+    )
+    receive_mobile_notifications = models.BooleanField(
+        default=True,
+        verbose_name=_("Receive Mobile Notifications"),
+        help_text=_("Enable or disable notifications on mobile.")
+    )
+
+    receive_message_notifications = models.BooleanField(
+        default=True,
+        verbose_name=_("Receive Message Notifications"),
+        help_text=_("Enable or disable notifications for new messages.")
+    )
+    receive_mention_notifications = models.BooleanField(
+        default=True,
+        verbose_name=_("Receive Mention Notifications"),
+        help_text=_("Enable or disable notifications when you are mentioned.")
+    )
+    receive_like_notifications = models.BooleanField(
+        default=True,
+        verbose_name=_("Receive Like Notifications"),
+        help_text=_("Enable or disable notifications for likes.")
+    )
+    receive_comment_notifications = models.BooleanField(
+        default=True,
+        verbose_name=_("Receive Comment Notifications"),
+        help_text=_("Enable or disable notifications for new comments.")
+    )
+
+    notification_frequency = models.CharField(
+        max_length=20,
+        choices=[
+            ('immediate', _('Immediate')),
+            ('hourly', _('Hourly')),
+            ('daily', _('Daily')),
+            ('weekly', _('Weekly')),
+        ],
+        default='immediate',
+        verbose_name=_("Notification Frequency"),
+        help_text=_("Choose how often to receive notifications.")
+    )
+
+    notification_importance = models.CharField(
+        max_length=20,
+        choices=[
+            ('high', _('High')),
+            ('medium', _('Medium')),
+            ('low', _('Low')),
+        ],
+        default='medium',
+        verbose_name=_("Notification Importance"),
+        help_text=_("Set the importance level for notifications.")
+    )
+
+    
+    desktop_notification_sound = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name=_("Desktop Notification Sound"),
+        help_text=_("Specify the sound file for desktop notifications.")
+    )
+    mobile_notification_sound = models.CharField(
+        max_length=100,
+        null=True,
+        blank=True,
+        verbose_name=_("Mobile Notification Sound"),
+        help_text=_("Specify the sound file for mobile notifications.")
+    )
+
+    # Do Not Disturb mode
+    do_not_disturb_mode = models.BooleanField(
+        default=False,
+        verbose_name=_("Do Not Disturb Mode"),
+        help_text=_("Enable to mute notifications during specified hours.")
+    )
+
+    # Notification history
+    notification_history = models.TextField(
+        null=True,
+        blank=True,
+        verbose_name=_("Notification History"),
+        help_text=_("Log of previous notifications sent to the user.")
+    )
 
     def __str__(self):
         return f"Notification settings for {self.user.username}"
 
     class Meta:
-        db_table = "tbl_chat_notification_settings"
+        db_table = "tbl_notification_settings"
         managed = True
-        verbose_name = "Chat Notification Setting"
-        verbose_name_plural = "Chat Notifications Settings"
+        verbose_name = _("Notification Setting")
+        verbose_name_plural = _("Notification Settings")
+        ordering = ['user']  # Orders settings by user
+        unique_together = ('user',)  # Ensure only one notification setting per user
+        indexes = [
+            models.Index(fields=['user'], name='user_idx'),  # Index for faster lookups by user
+        ]
 
+from django.db import models
+from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
+from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 class Holiday(models.Model):
     title = models.CharField(max_length=100, verbose_name=_("Title"))
     short_code = models.CharField(
-        max_length=20, blank=True, null=True, verbose_name=_("Short Code"))
+        max_length=20, blank=True, null=True, verbose_name=_("Short Code")
+    )
     start_date = models.DateField(blank=True, null=True, verbose_name=_("Start Date"))
     end_date = models.DateField(blank=True, null=True, verbose_name=_("End Date"))
     desc = models.TextField(blank=True, null=True, verbose_name=_("Description"))
@@ -1383,7 +2087,7 @@ class Holiday(models.Model):
     )
     created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created At"))
     created_by = models.ForeignKey(
-        CustomUser,
+        get_user_model(),
         on_delete=models.SET_NULL,
         related_name="created_holidays",
         null=True,
@@ -1392,7 +2096,7 @@ class Holiday(models.Model):
     )
     updated_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Updated At"))
     updated_by = models.ForeignKey(
-        CustomUser,
+        get_user_model(),
         on_delete=models.SET_NULL,
         related_name="updated_holidays",
         null=True,
@@ -1400,11 +2104,39 @@ class Holiday(models.Model):
         verbose_name=_("Updated By"),
     )
 
+    is_yearly_recurring = models.BooleanField(default=False, verbose_name=_("Is Yearly Recurring"))
+    year = models.PositiveIntegerField(null=True, blank=True, verbose_name=_("Year"))
+    recurrence_pattern = models.CharField(
+        max_length=50,
+        choices=[
+            ('fixed', _('Fixed Date')),
+            ('relative', _('Relative to a Date')),
+            ('custom', _('Custom Recurrence')),
+        ],
+        blank=True,
+        null=True,
+        verbose_name=_("Recurrence Pattern"),
+    )
+    recurrence_rule = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        verbose_name=_("Recurrence Rule"),
+    )
+
     def save(self, *args, **kwargs):
         if not self.pk:
             self.created_by = kwargs.pop("created_by", None)
         self.updated_by = kwargs.pop("updated_by", None)
+
+        if self.is_yearly_recurring and not self.year:
+            self.year = timezone.now().year
+
         super(Holiday, self).save(*args, **kwargs)
+
+    def clean(self):
+        if self.start_date and self.end_date and self.start_date > self.end_date:
+            raise ValidationError(_("End date must be after start date."))
 
     def __str__(self):
         return f"{self.title} - {self.start_date}"
@@ -1414,48 +2146,94 @@ class Holiday(models.Model):
         managed = True
         verbose_name = _("Holiday")
         verbose_name_plural = _("Holidays")
-
-
+        indexes = [
+            models.Index(fields=['start_date']),
+            models.Index(fields=['end_date']),
+            models.Index(fields=['is_yearly_recurring']),
+        ]
 
 class UserTour(models.Model):
     applied_by = models.ForeignKey(
-        CustomUser,
+        get_user_model(),
         on_delete=models.CASCADE,
         related_name="tours",
         verbose_name=_("Applied By"),
     )
     from_destination = models.CharField(
-        max_length=255, verbose_name=_("From Destination")
+        max_length=255, 
+        verbose_name=_("From Destination"),
+        help_text=_("Enter the location from which the tour starts.")
     )
-    to_destination = models.CharField(max_length=255, verbose_name=_("To Destination"))
-    start_date = models.DateField(verbose_name=_("Start Date"))
-    start_time = models.TimeField(verbose_name=_("Start Time"), blank=True, null=True)
-    end_date = models.DateField(verbose_name=_("End Date"))
-    end_time = models.TimeField(verbose_name=_("End Time"), blank=True, null=True)
-    updatedAt = models.DateTimeField(
-        auto_now_add=True, verbose_name=_("Updated At"), blank=True, null=True
+    to_destination = models.CharField(
+        max_length=255, 
+        verbose_name=_("To Destination"),
+        help_text=_("Enter the destination where the tour ends.")
     )
-    createdAt = models.DateTimeField(
-        auto_now=True, verbose_name=_("Created At"), blank=True, null=True
+    start_date = models.DateField(
+        verbose_name=_("Start Date"),
+        help_text=_("Select the start date of the tour."),
     )
-    remarks = models.TextField(null=True, blank=True, verbose_name=_("Remarks"))
+    start_time = models.TimeField(
+        verbose_name=_("Start Time"), 
+        blank=True, 
+        null=True,
+        help_text=_("Select the start time of the tour.")
+    )
+    end_date = models.DateField(
+        verbose_name=_("End Date"),
+        help_text=_("Select the end date of the tour."),
+    )
+    end_time = models.TimeField(
+        verbose_name=_("End Time"), 
+        blank=True, 
+        null=True,
+        help_text=_("Select the end time of the tour.")
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True, 
+        verbose_name=_("Updated At")
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True, 
+        verbose_name=_("Created At")
+    )
+    remarks = models.TextField(
+        null=True, 
+        blank=True, 
+        verbose_name=_("Remarks"),
+        help_text=_("Any additional notes or comments about the tour.")
+    )
     status = models.CharField(
         max_length=50,
         choices=settings.TOUR_STATUS_CHOICES,
         default=settings.PENDING,
         verbose_name=_("Status"),
+        help_text=_("Current status of the tour.")
     )
     extended_end_date = models.DateField(
-        null=True, blank=True, verbose_name=_("Extended End Date")
+        null=True, 
+        blank=True, 
+        verbose_name=_("Extended End Date"),
+        help_text=_("If applicable, enter the new end date after extension.")
     )
     extended_end_time = models.TimeField(
-        null=True, blank=True, verbose_name=_("Extended End Date")
+        null=True, 
+        blank=True, 
+        verbose_name=_("Extended End Time"),
+        help_text=_("If applicable, enter the new end time after extension.")
     )
     bills_submitted = models.BooleanField(
-        default=False, verbose_name=_("Bills Submitted")
+        default=False, 
+        verbose_name=_("Bills Submitted"),
+        help_text=_("Indicate whether bills related to the tour have been submitted.")
     )
     slug = models.SlugField(
-        max_length=255, blank=True, null=True, verbose_name=_("Slug")
+        max_length=255, 
+        blank=True, 
+        null=True, 
+        unique=True, 
+        verbose_name=_("Slug"),
+        help_text=_("A unique identifier for the tour, used in URLs.")
     )
     approval_type = models.CharField(
         max_length=100,
@@ -1463,14 +2241,21 @@ class UserTour(models.Model):
         null=True,
         choices=settings.APPROVAL_TYPE_CHOICES,
         verbose_name=_("Approval Type"),
+        help_text=_("Select the type of approval required for this tour.")
     )
+
+    def clean(self):
+        if self.start_date > self.end_date:
+            raise ValidationError(_("End date must be after start date."))
+        if self.start_date == self.end_date and self.start_time and self.end_time and self.start_time >= self.end_time:
+            raise ValidationError(_("End time must be after start time on the same day."))
 
     def __str__(self):
         return f"Tour {self.id} by {self.applied_by.username}"
 
     def approve(self, action_by, reason=None):
         self.status = settings.APPROVED
-        self.save(update_fields=["status", "updatedAt"])
+        self.save(update_fields=["status", "updated_at"])
         TourStatusLog.create_log(
             tour=self,
             action_by=action_by,
@@ -1480,7 +2265,7 @@ class UserTour(models.Model):
 
     def reject(self, action_by, reason=None):
         self.status = settings.REJECTED
-        self.save(update_fields=["status", "updatedAt"])
+        self.save(update_fields=["status", "updated_at"])
         TourStatusLog.create_log(
             tour=self,
             action_by=action_by,
@@ -1490,18 +2275,17 @@ class UserTour(models.Model):
 
     def cancel(self, action_by, reason=None):
         self.status = settings.CANCELLED
-        self.save(update_fields=["status", "updatedAt"])
+        self.save(update_fields=["status", "updated_at"])
         TourStatusLog.create_log(
             tour=self,
             action_by=action_by,
             action=self.status,
             comments=f"Cancelled by {action_by.username}. Reason: {reason}",
         )
-        
+
     def pending_cancel(self, action_by, reason=None):
         self.status = settings.PENDING_CANCELLATION
-        self.save(update_fields=["status", "updatedAt"])
-    
+        self.save(update_fields=["status", "updated_at"])
         TourStatusLog.create_log(
             tour=self,
             action_by=action_by,
@@ -1512,7 +2296,7 @@ class UserTour(models.Model):
     def complete(self, action_by, reason=None):
         comments = reason or "Tour completed"
         self.status = settings.COMPLETED
-        self.save(update_fields=["status", "updatedAt"])
+        self.save(update_fields=["status", "updated_at"])
         TourStatusLog.create_log(
             tour=self, action_by=action_by, action=self.status, comments=comments
         )
@@ -1521,12 +2305,19 @@ class UserTour(models.Model):
         self.extended_end_date = new_end_date
         self.extended_end_time = new_end_time
         self.status = settings.EXTENDED
-        self.save(update_fields=["status","extended_end_date","extended_end_time" ,"updatedAt"])
+        self.save(
+            update_fields=[
+                "status",
+                "extended_end_date",
+                "extended_end_time",
+                "updated_at",
+            ]
+        )
         TourStatusLog.create_log(
             tour=self,
             action_by=action_by,
             action=self.status,
-            comments=f"Tour extended to {new_end_date} {new_end_time}. Reason {reason} ",
+            comments=f"Tour extended to {new_end_date} {new_end_time}. Reason: {reason}",
         )
 
     class Meta:
@@ -1534,6 +2325,13 @@ class UserTour(models.Model):
         managed = True
         verbose_name = _("User Tour")
         verbose_name_plural = _("Users' Tours")
+        indexes = [
+            models.Index(fields=['status']),
+            models.Index(fields=['start_date']),
+            models.Index(fields=['end_date']),
+            models.Index(fields=['slug']),
+        ]
+        unique_together = ('applied_by', 'slug')  # Prevents duplicate slugs for the same user
 
 
 class TourStatusLog(models.Model):
@@ -1637,32 +2435,68 @@ class Bill(models.Model):
 
 class AttendanceLog(models.Model):
     applied_by = models.ForeignKey(
-        CustomUser,
+        get_user_model(),
         on_delete=models.CASCADE,
         related_name="attendance_log",
         verbose_name=_("Applied By"),
     )
-    start_date = models.DateTimeField(verbose_name=_("Start Date"))
-    end_date = models.DateTimeField(verbose_name=_("End Date"))
-    from_date = models.DateTimeField(blank=True, null=True, verbose_name=_("From Date"))
-    to_date = models.DateTimeField(blank=True, null=True, verbose_name=_("To Date"))
+    start_date = models.DateTimeField(
+        verbose_name=_("Start Date"),
+        help_text=_("The date and time when attendance starts.")
+    )
+    end_date = models.DateTimeField(
+        verbose_name=_("End Date"),
+        help_text=_("The date and time when attendance ends.")
+    )
+    from_date = models.DateTimeField(
+        blank=True, 
+        null=True, 
+        verbose_name=_("From Date"),
+        help_text=_("Optional field for specifying a starting date for regularization.")
+    )
+    to_date = models.DateTimeField(
+        blank=True, 
+        null=True, 
+        verbose_name=_("To Date"),
+        help_text=_("Optional field for specifying an ending date for regularization.")
+    )
     reg_duration = models.CharField(
-        max_length=100, blank=True, null=True, verbose_name=_("Regularization Duration")
+        max_length=100, 
+        blank=True, 
+        null=True, 
+        verbose_name=_("Regularization Duration"),
+        help_text=_("Specify the duration for which regularization is requested.")
     )
     slug = models.SlugField(
-        max_length=255, unique=True, blank=True, verbose_name=_("Slug")
+        max_length=255, 
+        unique=True, 
+        blank=True, 
+        verbose_name=_("Slug"),
+        help_text=_("A unique slug generated from the title, used for URL routing.")
     )
-    title = models.CharField(max_length=255, verbose_name=_("Title"))
+    title = models.CharField(
+        max_length=255, 
+        verbose_name=_("Title"),
+        help_text=_("Enter a title for the attendance log.")
+    )
     is_regularisation = models.BooleanField(
-        default=False, verbose_name=_("Is Regularisation")
+        default=False, 
+        verbose_name=_("Is Regularisation"),
+        help_text=_("Indicate whether this entry is for regularization.")
     )
-    duration = models.TimeField(blank=True, null=True, verbose_name=_("Duration"))
+    duration = models.TimeField(
+        blank=True, 
+        null=True, 
+        verbose_name=_("Duration"),
+        help_text=_("Specify the duration of attendance.")
+    )
     reg_status = models.CharField(
         max_length=20,
         choices=settings.ATTENDANCE_REGULARISED_STATUS_CHOICES,
         blank=True,
         null=True,
         verbose_name=_("Regularization Status"),
+        help_text=_("The current status of the regularization request.")
     )
     status = models.CharField(
         max_length=20,
@@ -1670,75 +2504,97 @@ class AttendanceLog(models.Model):
         null=True,
         choices=settings.ATTENDANCE_LOG_STATUS_CHOICES,
         verbose_name=_("Status"),
+        help_text=_("Current status of the attendance log.")
     )
     att_status = models.CharField(
         max_length=20,
         choices=settings.ATTENDANCE_STATUS_CHOICES,
         verbose_name=_("Attendance Status"),
+        help_text=_("Indicate the attendance status for this log entry.")
     )
     att_status_short_code = models.CharField(
-        max_length=20,verbose_name=_("Short Code"),
-        blank=True, null=True,
+        max_length=20,
+        verbose_name=_("Short Code"),
+        blank=True,
+        null=True,
+        help_text=_("A short code representing the attendance status.")
     )
     color_hex = models.CharField(
-        max_length=7, blank=True, null=True, verbose_name=_("Color Hex Code")
+        max_length=7, 
+        blank=True, 
+        null=True, 
+        verbose_name=_("Color Hex Code"),
+        help_text=_("Optional: Color code associated with this attendance entry.")
     )
     created_at = models.DateTimeField(auto_now=True)
     updated_by = models.ForeignKey(
-        CustomUser,
+        get_user_model(),
         on_delete=models.CASCADE,
         verbose_name=_("Updated By"),
         blank=True,
         null=True,
+        help_text=_("User who last updated this attendance log entry.")
     )
     updated_at = models.DateTimeField(auto_now=True)
     reason = models.CharField(
-        max_length=100, verbose_name=_("Reason"), blank=True, null=True
+        max_length=100, 
+        verbose_name=_("Reason"), 
+        blank=True, 
+        null=True,
+        help_text=_("Reason for the attendance entry.")
     )
     is_submitted = models.BooleanField(
         default=False,
         verbose_name=_("Is Submitted"),
-        help_text=_(
-            "This is a boolean flag to handle if regularization is submitted or not."
-        ),
+        help_text=_("Indicate if the regularization has been submitted.")
     )
+
+    def clean(self):
+        if self.start_date >= self.end_date:
+            raise ValidationError(_("End date must be after start date."))
+        if self.from_date and self.to_date and self.from_date >= self.to_date:
+            raise ValidationError(_("To date must be after from date."))
 
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.title)
-
         super(AttendanceLog, self).save(*args, **kwargs)
 
     def __str__(self):
         return self.title
-    
+
     def approve(self, action_by, reason=None):
         self.status = settings.APPROVED
-        self.save(update_fields=["status", "updatedAt"])
-        self.add_action(action=self.status,performed_by=action_by,comment=reason)
+        self.save(update_fields=["status", "updated_at"])
+        self.add_action(action=self.status, performed_by=action_by, comment=reason)
 
     def reject(self, action_by, reason=None):
         self.status = settings.REJECTED
-        self.save(update_fields=["status", "updatedAt"])
-        self.add_action(action=self.status,performed_by=action_by,comment=reason)
-        
+        self.save(update_fields=["status", "updated_at"])
+        self.add_action(action=self.status, performed_by=action_by, comment=reason)
+
     def recommend(self, action_by, reason=None):
         self.status = settings.RECOMMEND
-        self.save(update_fields=["status", "updatedAt"])
-        self.add_action(action=self.status,performed_by=action_by,comment=reason)
-        
+        self.save(update_fields=["status", "updated_at"])
+        self.add_action(action=self.status, performed_by=action_by, comment=reason)
 
     def notrecommend(self, action_by, reason=None):
         self.status = settings.NOT_RECOMMEND
-        self.save(update_fields=["status", "updatedAt"])
-        self.add_action(action=self.status,performed_by=action_by,comment=reason)
-        
+        self.save(update_fields=["status", "updated_at"])
+        self.add_action(action=self.status, performed_by=action_by, comment=reason)
 
     class Meta:
         db_table = "tbl_events"
         managed = True
         verbose_name = _("Attendance Log")
         verbose_name_plural = _("Attendance Logs")
+        ordering = ["-created_at"]  # Default ordering by creation date
+        indexes = [
+            models.Index(fields=['applied_by']),
+            models.Index(fields=['status']),
+            models.Index(fields=['start_date']),
+            models.Index(fields=['end_date']),
+        ]
 
     def add_action(self, action, performed_by, comment=None):
         AttendanceLogAction.create_log(
@@ -1880,27 +2736,3 @@ class SentEmail(models.Model):
         managed = True
         verbose_name = _("Sent Mail")
         verbose_name_plural = _("Sent Mails")
-
-
-class EmployeeImage(models.Model):
-    image = models.ImageField(upload_to="employee_images/")
-    employee_code = models.CharField(max_length=100, unique=True)
-    email = models.EmailField(max_length=255, unique=True)
-    profile_complete = models.BooleanField(default=False)
-
-    def __str__(self):
-        return f"{self.employee_code} - {self.email}"
-
-    class Meta:
-        db_table = "tbl_employee_images"
-        managed = True
-        verbose_name = _("Employee Image")
-        verbose_name_plural = _("Employee Images")
-
-
-class EmployeeClassMapping(models.Model):
-    employee_code = models.CharField(max_length=100, unique=True)
-    class_index = models.IntegerField(unique=True)
-
-    def __str__(self):
-        return f"{self.employee_code} - {self.class_index}"

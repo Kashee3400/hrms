@@ -42,7 +42,25 @@ def set_user_fields(sender, instance, **kwargs):
         # For updating instance
         if hasattr(instance, 'updated_by'):
             instance.updated_by = user
-            
+
+
+@receiver(post_save, sender=LeaveBalanceOpenings)
+def create_leave_transaction(sender, instance, created, **kwargs):
+    if created:
+        # Handle newly created leave balance
+        pass
+    else:
+        # Handle updated leave balance
+        if instance.closing_balance != instance.opening_balance:
+            # Create a new LeaveTransaction instance
+            LeaveTransaction.objects.create(
+                user=instance.user,
+                leave_balance=instance,
+                leave_type=instance.leave_type,
+                transaction_date=timezone.now(),
+                days_applied=instance.closing_balance - instance.opening_balance,
+                days_approved=instance.closing_balance - instance.opening_balance,
+            )
 
 @receiver(post_save, sender=LeaveApplication)
 def create_or_update_leave_log(sender, instance, created, **kwargs):
