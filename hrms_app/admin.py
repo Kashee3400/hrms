@@ -125,15 +125,12 @@ admin.site.register(UserTour, UserTourAdmin)
 
 class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
     list_display = (
-        'user', 'leave_type', 'year', 'no_of_leaves', 'remaining_leave_balances', 'created_at', 'created_by',
+        'user', 'leave_type', 'year', 'no_of_leaves', 'remaining_leave_balances', 'opening_balance','closing_balance','created_at', 'created_by',
         'updated_at',
         'updated_by')
     search_fields = ['user__first_name', 'user__last_name']
-    fields = ('user', 'leave_type', 'year', 'no_of_leaves', 'remaining_leave_balances','opening_balance','closing_balance')
-
-    def save_model(self, request, obj, form, change):
-        obj._current_user = request.user
-        super().save_model(request, obj, form, change)
+    
+    readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
 
 
 admin.site.register(LeaveBalanceOpenings, LeaveBalanceOpeningAdmin)
