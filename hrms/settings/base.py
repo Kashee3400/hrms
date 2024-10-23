@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = config("SECRET_KEY")
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="").split(",")
-DEBUG = config("DEBUG", default=True)
+DEBUG = config("DEBUG")
 
 INSTALLED_APPS = [
     "hrms_app",
