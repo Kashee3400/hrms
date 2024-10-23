@@ -130,7 +130,7 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
         'updated_at',
         'updated_by')
     search_fields = ['user__first_name', 'user__last_name']
-    fields = ('user', 'leave_type', 'year', 'no_of_leaves', 'remaining_leave_balances')
+    fields = ('user', 'leave_type', 'year', 'no_of_leaves', 'remaining_leave_balances','opening_balance','closing_balance')
 
     def save_model(self, request, obj, form, change):
         obj._current_user = request.user
