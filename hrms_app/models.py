@@ -1651,7 +1651,7 @@ class LeaveBalanceOpenings(models.Model):
     def __str__(self):
         return (
             f"Leave Balance for {self.user.first_name} {self.user.last_name} - "
-            f"{self.leave_type.name} (Opening: {self.opening_balance}, Closing: {self.closing_balance})"
+            f"{self.leave_type.leave_type_short_code} (Opening: {self.opening_balance}, Closing: {self.closing_balance})"
         )
 
     @classmethod
