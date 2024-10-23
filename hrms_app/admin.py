@@ -124,7 +124,6 @@ admin.site.register(UserTour, UserTourAdmin)
 
 
 class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
-    form = LeaveBalanceOpeningForm
     list_display = (
         'user', 'leave_type', 'year', 'no_of_leaves', 'remaining_leave_balances', 'created_at', 'created_by',
         'updated_at',

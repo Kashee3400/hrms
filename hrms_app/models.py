@@ -1672,11 +1672,10 @@ class LeaveBalanceOpenings(models.Model):
         with transaction.atomic():
             cls.objects.bulk_create(leave_balances)
 
-    # def update_balance(self, days_approved, updated_by):
-    #     """Update the closing balance based on approved days."""
-    #     self.closing_balance = self.opening_balance + days_approved
-    #     self.updated_by = updated_by
-    #     self.save(update_fields=["closing_balance", "updated_at", "updated_by"])
+    def update_balance(self, days_approved):
+        """Update the closing balance based on approved days."""
+        self.closing_balance = self.opening_balance + days_approved
+        self.save(update_fields=["closing_balance"])
 
 
 from django.db.models import Sum
