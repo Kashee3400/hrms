@@ -1,0 +1,72 @@
+{
+    "header": [
+        {
+            "name": "id",
+            "title": "ID",
+            "size": 50,
+            "sortable": true,
+            "sortDir": "asc",
+            "format": "number"
+        },
+        {
+            "name": "leave_type",
+            "title": "Leave Type",
+            "sortable": true
+        },
+        {
+            "name": "start",
+            "title": "Start",
+            "sortable": true,
+            "size": 150,
+            "format": "date",
+            "formatMask": "dd-mm-yyyy"
+        },
+        {
+            "name": "end",
+            "title": "end",
+            "sortable": true,
+            "size": 150,
+            "format": "date",
+            "formatMask": "dd-mm-yyyy"
+        },
+        {
+            "name": "days",
+            "title": "Days",
+            "sortable": true,
+            "size": 80
+        },
+        {
+            "name": "status",
+            "title": "Status",
+            "sortable": true,
+            "size": 150,
+            "show": true
+        }
+    ],
+    "data": [
+        [
+            1,
+            "Casual Leave",
+            "31-12-2017",
+            "31-12-2017",
+            1,
+            "Approved"
+        ],
+        [
+            2,
+            "Sick Leave",
+            "13-03-2024",
+            "13-03-2024",
+            1,
+            "Pending"
+        ],
+        [
+            3,
+            "Sick Leave",
+            "13-03-2024",
+            "13-03-2024",
+            1,
+            "Pending"
+        ]
+    ]
+}
