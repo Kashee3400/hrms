@@ -255,8 +255,38 @@ class LeaveDayChoiceAdjustmentAdmin(admin.ModelAdmin):
     search_fields = ('start_day_choice', 'end_day_choice')
 
 
-# @admin.register(AttendanceLogAction)
-# class AttendanceLogActionAdmin(admin.ModelAdmin):
-#     list_display = ('action_by', 'action_by_email', 'action','timestamp')
-#     search_fields = ('action_by__username', 'action_by_email')
-    
+
+@admin.register(Logo)
+class LogoAdmin(admin.ModelAdmin):
+    list_display = ('logo', 'logo_image')
+    search_fields = ('logo',)
+    readonly_fields = ('logo_image',)  # Making logo_image read-only
+
+@admin.register(Department)
+class DepartmentAdmin(admin.ModelAdmin):
+    list_display = ('department', 'is_active', 'created_at', 'updated_at')
+    search_fields = ('department',)
+    list_filter = ('is_active',)
+    readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
+
+@admin.register(Designation)
+class DesignationAdmin(admin.ModelAdmin):
+    list_display = ('designation', 'department', 'is_active', 'created_at', 'updated_at')
+    search_fields = ('designation', 'department__department')
+    list_filter = ('is_active', 'department')
+    readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
+
+@admin.register(Gender)
+class GenderAdmin(admin.ModelAdmin):
+    list_display = ('gender', 'is_active', 'created_at')
+    search_fields = ('gender',)
+    list_filter = ('is_active',)
+    readonly_fields = ('created_at', 'updated_by', 'created_by')
+
+@admin.register(MaritalStatus)
+class MaritalStatusAdmin(admin.ModelAdmin):
+    list_display = ('marital_status', 'is_active', 'created_at')
+    search_fields = ('marital_status',)
+    list_filter = ('is_active',)
+    readonly_fields = ('created_at',)
+
