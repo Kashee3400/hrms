@@ -1510,65 +1510,6 @@ class LeaveType(models.Model):
         verbose_name_plural = _("Leave Types")
 
 
-class LeaveTransaction(models.Model):
-    user = models.ForeignKey(
-        CustomUser,
-        on_delete=models.CASCADE,
-        verbose_name=_("User"),
-        help_text=_("The user for whom the leave transaction is recorded."),
-    )
-    leave_balance = models.ForeignKey(
-        "LeaveBalanceOpenings",
-        on_delete=models.CASCADE,
-        verbose_name=_("Leave Balance"),
-        help_text=_("The leave balance associated with this transaction."),
-    )
-    leave_type = models.ForeignKey(
-        LeaveType,
-        on_delete=models.CASCADE,
-        verbose_name=_("Leave Type"),
-        help_text=_("The type of leave being requested (e.g., sick leave, vacation)."),
-    )
-    transaction_date = models.DateField(
-        default=timezone.now,
-        verbose_name=_("Transaction Date"),
-        help_text=_("The date when the leave transaction is recorded."),
-    )
-    days_applied = models.FloatField(
-        validators=[MinValueValidator(0)],
-        verbose_name=_("Days Applied"),
-        help_text=_("Number of leave days applied for in this transaction."),
-    )
-    days_approved = models.FloatField(
-        validators=[MinValueValidator(0)],
-        default=0,
-        verbose_name=_("Days Approved"),
-        help_text=_("Number of leave days that have been approved."),
-    )
-    remarks = models.TextField(
-        blank=True,
-        null=True,
-        verbose_name=_("Remarks"),
-        help_text=_("Any additional remarks regarding the leave transaction."),
-    )
-
-    def __str__(self):
-        return f"Leave Transaction for {self.user.username} - {self.leave_type.name} on {self.transaction_date}"
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        # Update the leave balance after the transaction is saved
-        self.leave_balance.update_balance(self.days_approved)
-
-    class Meta:
-        db_table = "tbl_leave_transaction"
-        managed = True
-        verbose_name = _("Leave Transaction")
-        verbose_name_plural = _("Leave Transactions")
-        ordering = [
-            "-transaction_date"
-        ]  # Orders by transaction date in descending order
-
 class LeaveBalanceOpenings(models.Model):
     user = models.ForeignKey(
         CustomUser,
@@ -1673,9 +1614,64 @@ class LeaveBalanceOpenings(models.Model):
             cls.objects.bulk_create(leave_balances)
 
     def update_balance(self, days_approved):
-        """Update the closing balance based on approved days."""
         self.closing_balance = self.opening_balance + days_approved
         self.save(update_fields=["closing_balance"])
+
+
+
+class LeaveTransaction(models.Model):
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        verbose_name=_("User"),
+        help_text=_("The user for whom the leave transaction is recorded."),
+    )
+    leave_balance = models.ForeignKey(
+        LeaveBalanceOpenings,
+        on_delete=models.CASCADE,
+        verbose_name=_("Leave Balance"),
+        help_text=_("The leave balance associated with this transaction."),
+    )
+    leave_type = models.ForeignKey(
+        LeaveType,
+        on_delete=models.CASCADE,
+        verbose_name=_("Leave Type"),
+        help_text=_("The type of leave being requested (e.g., sick leave, vacation)."),
+    )
+    transaction_date = models.DateField(
+        default=timezone.now,
+        verbose_name=_("Transaction Date"),
+        help_text=_("The date when the leave transaction is recorded."),
+    )
+    days_applied = models.FloatField(
+        validators=[MinValueValidator(0)],
+        verbose_name=_("Days Applied"),
+        help_text=_("Number of leave days applied for in this transaction."),
+    )
+    days_approved = models.FloatField(
+        validators=[MinValueValidator(0)],
+        default=0,
+        verbose_name=_("Days Approved"),
+        help_text=_("Number of leave days that have been approved."),
+    )
+    remarks = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name=_("Remarks"),
+        help_text=_("Any additional remarks regarding the leave transaction."),
+    )
+
+    def __str__(self):
+        return f"Leave Transaction for {self.user.username} - {self.leave_type.name} on {self.transaction_date}"
+
+    class Meta:
+        db_table = "tbl_leave_transaction"
+        managed = True
+        verbose_name = _("Leave Transaction")
+        verbose_name_plural = _("Leave Transactions")
+        ordering = [
+            "-transaction_date"
+        ]  # Orders by transaction date in descending order
 
 
 from django.db.models import Sum
