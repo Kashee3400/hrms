@@ -15,8 +15,8 @@ def initialize_leave_balance(sender, instance, created, **kwargs):
         current_year = timezone.now().year
         leave_types =LeaveType.objects.all()
         LeaveBalanceOpenings.initialize_leave_balances(instance,leave_types, current_year, created_by=instance)
-        shift_timing = ShiftTiming.objects.filter(role=instance.role).first()
-        EmployeeShift.objects.create(employee=instance,shift_timing=shift_timing)
+        # shift_timing = ShiftTiming.objects.filter(role=instance.role).first()
+        # EmployeeShift.objects.create(employee=instance,shift_timing=shift_timing)
 
 
 
