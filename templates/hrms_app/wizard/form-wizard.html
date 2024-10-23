@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block xtra_css %}
-    <link rel="stylesheet" href="{% static 'css/status.css' %}}"/>
+    <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}}"/>
 {% endblock %}
 
 {% block content_main %}
@@ -17,7 +17,7 @@
             <div class="container mt-5">
                 <div class="container m-5">
                     <div data-role="stepper" data-steps="{{ wizard.steps.count }}" data-step="{{ wizard.steps.step1 }}"
-                         data-view="cycle" data-cls-complete="bg-green" data-cls-current="bg-red"></div>
+                        data-view="cycle" data-cls-complete="bg-green" data-cls-current="bg-red"></div>
                 </div>
                 <form id="creation_form" method="post" enctype="multipart/form-data">
                     {% csrf_token %}
@@ -41,7 +41,7 @@
                         </div>
                         <div class="cell">
                             <button type="button" class="button primary" onclick="Metro.dialog.open('#submitDailog')">
-                                <img src="{% static 'source/images/checkmark.png' %}" alt="Check"/>
+                                <img src="{% static 'hrms_app/source/images/checkmark.png' %}" alt="Check"/>
                                 {% translate 'Submit' %}
                             </button>
                         </div>
