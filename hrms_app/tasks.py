@@ -3,7 +3,6 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.urls import reverse
 from celery import shared_task
-from decouple import config
 
 
 @shared_task
@@ -59,12 +58,6 @@ def send_leave_application_notifications(application_id, protocol, domain):
 
 @shared_task
 def send_leave_application_email(subject, message, recipient_list):
-    print(settings.EMAIL_PORT)
-    print(settings.EMAIL_HOST)
-    print(settings.EMAIL_BACKEND)
-    print(settings.EMAIL_HOST_USER)
-    print(settings.EMAIL_HOST_PASSWORD)
-    print(settings.HRMS_DEFAULT_FROM_EMAIL)
     send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
 
