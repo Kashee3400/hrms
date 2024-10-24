@@ -991,7 +991,6 @@ class UserCreationWizard(SessionWizardView):
         personal_details_form = form_list[1]
         paddress_form = form_list[2]
         caddress_form = form_list[3]
-        salary_form = form_list[4]
         user = self.get_user_instance()
         if not user:
             user = user_form.save(commit=False)
