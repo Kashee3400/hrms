@@ -1011,10 +1011,6 @@ class UserCreationWizard(SessionWizardView):
         caddress.user = user
         caddress.save()
 
-        salary = salary_form.save(commit=False)
-        salary.employee = personal_details
-        salary.save()
-
         FormProgress.objects.filter(user=user).update(status="completed")
         return redirect("employees")
 
