@@ -64,8 +64,8 @@ def send_leave_application_email(subject, message, recipient_list):
     print(settings.EMAIL_BACKEND)
     print(settings.EMAIL_HOST_USER)
     print(settings.EMAIL_HOST_PASSWORD)
-    print(settings.DEFAULT_FROM_EMAIL)
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, recipient_list)
+    print(settings.HRMS_DEFAULT_FROM_EMAIL)
+    send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
 
 @shared_task
@@ -120,7 +120,7 @@ def send_tour_notifications(tour_id, protocol, domain):
 
 @shared_task
 def send_tour_application_email(subject, message, recipient_list):
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, recipient_list)
+    send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
 
 @shared_task
@@ -173,5 +173,5 @@ def send_regularization_notification(regularization_id, protocol, domain):
 
 @shared_task
 def send_regularization_email(subject, message, recipient_list):
-    send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, recipient_list)
+    send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
