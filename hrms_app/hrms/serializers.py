@@ -178,6 +178,7 @@ class PersonalDetailsSerializer(serializers.ModelSerializer):
 
 
 class ShiftSerializer(serializers.ModelSerializer):
+    role = serializers.StringRelatedField(read_only=True)
     class Meta:
         model = ShiftTiming
         fields = [
@@ -197,7 +198,6 @@ class ShiftSerializer(serializers.ModelSerializer):
 
 class EmployeeShiftSerializer(serializers.ModelSerializer):
     shift_timing = ShiftSerializer(read_only=True)
-
     class Meta:
         model = EmployeeShift
         fields = ["id", "employee", "shift_timing", "created_at", "created_by"]
