@@ -74,7 +74,6 @@ class AttendanceLogSerializer(serializers.ModelSerializer):
             "actions",
         ]
         read_only_fields = [
-            'id', 
             'title',
             'att_status', 
             'att_status_short_code', 
