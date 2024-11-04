@@ -132,13 +132,14 @@ class AttendanceLogViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter,
         filters.SearchFilter,
     ]
-    ordering_fields = ['start_date', 'end_date', 'created_at']  # Add the fields you want to allow ordering on
-    search_fields = ['title', 'reason']  # Fields for searching
+    ordering_fields = ["start_date", "end_date", "created_at"]
+    search_fields = ["title", "reason"]
+    lookup_field = "pk"
 
     def get_queryset(self):
         user = self.request.user
         queryset = AttendanceLog.objects.filter(applied_by=user)
-        
+
         # Get the current month and year
         current_month = now().month
         current_year = now().year
@@ -162,7 +163,9 @@ class AttendanceLogViewSet(viewsets.ModelViewSet):
         from_param = self.request.query_params.get("from", None)
         to_param = self.request.query_params.get("to", None)
         if from_param and to_param:
-            queryset = queryset.filter(start_date__gte=from_param, end_date__lte=to_param)
+            queryset = queryset.filter(
+                start_date__gte=from_param, end_date__lte=to_param
+            )
 
         return queryset
 
@@ -173,7 +176,7 @@ class AttendanceLogViewSet(viewsets.ModelViewSet):
             status="success",
             message=_("Attendance logs retrieved successfully."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
     def create(self, request, *args, **kwargs):
@@ -182,7 +185,7 @@ class AttendanceLogViewSet(viewsets.ModelViewSet):
             status="success",
             message=_("Attendance log created successfully."),
             data=response.data,
-            status_code=status.HTTP_201_CREATED
+            status_code=status.HTTP_201_CREATED,
         )
 
     def update(self, request, *args, **kwargs):
@@ -191,7 +194,17 @@ class AttendanceLogViewSet(viewsets.ModelViewSet):
             status="success",
             message=_("Attendance log updated successfully."),
             data=response.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
+        )
+
+    def retrieve(self, request, *args, **kwargs):
+        attendance_log = get_object_or_404(AttendanceLog, id=kwargs.get('pk'))
+        serializer = self.get_serializer(attendance_log)
+        return create_response(
+            status="success",
+            message=_("Attendance log retrieved successfully."),
+            data=serializer.data,
+            status_code=status.HTTP_200_OK,
         )
 
     def destroy(self, request, *args, **kwargs):
@@ -199,40 +212,40 @@ class AttendanceLogViewSet(viewsets.ModelViewSet):
         return create_response(
             status="success",
             message=_("Attendance log deleted successfully."),
-            status_code=status.HTTP_204_NO_CONTENT
+            status_code=status.HTTP_204_NO_CONTENT,
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         attendance_log = self.get_object()
-        reason = request.data.get('reason', None)
+        reason = request.data.get("reason", None)
         attendance_log.approve(action_by=request.user, reason=reason)
-        return Response({'status': 'approved'}, status=status.HTTP_200_OK)
+        return Response({"status": "approved"}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
         attendance_log = self.get_object()
-        reason = request.data.get('reason', None)
+        reason = request.data.get("reason", None)
         attendance_log.reject(action_by=request.user, reason=reason)
-        return Response({'status': 'rejected'}, status=status.HTTP_200_OK)
+        return Response({"status": "rejected"}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def recommend(self, request, pk=None):
         attendance_log = self.get_object()
-        reason = request.data.get('reason', None)
+        reason = request.data.get("reason", None)
         attendance_log.recommend(action_by=request.user, reason=reason)
-        return Response({'status': 'recommended'}, status=status.HTTP_200_OK)
+        return Response({"status": "recommended"}, status=status.HTTP_200_OK)
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def notrecommend(self, request, pk=None):
         attendance_log = self.get_object()
-        reason = request.data.get('reason', None)
+        reason = request.data.get("reason", None)
         attendance_log.notrecommend(action_by=request.user, reason=reason)
-        return Response({'status': 'not recommended'}, status=status.HTTP_200_OK)
-
+        return Response({"status": "not recommended"}, status=status.HTTP_200_OK)
 
 
 #################  End Attendance Logs Modules  ############################
+
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = CustomUser.objects.all()
@@ -252,7 +265,6 @@ class CurrentUserAPIView(APIView):
         user = request.user
         serializer = CustomUserSerializer(user)
         return Response(serializer.data)
-
 
 
 class PersonalDetailsView(APIView):
@@ -346,14 +358,16 @@ class AttendanceChoicesView(APIView):
             status_code=status.HTTP_200_OK,
         )
 
+
 class LeaveApplicationViewSet(viewsets.ModelViewSet):
     """
     A viewset for viewing and editing leave application instances.
     """
+
     queryset = LeaveApplication.objects.all()
     serializer_class = LeaveApplicationSerializer
     permission_classes = [IsAuthenticated]
-    
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         try:
@@ -363,27 +377,35 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
                 status="success",
                 message=_("Leave sent to manager. Wait for approval"),
                 data=serializer.data,
-                status_code=status.HTTP_201_CREATED
+                status_code=status.HTTP_201_CREATED,
             )
         except serializers.ValidationError as e:
             return create_response(
                 status="error",
                 message=_("There was an error with your leave application."),
-                data={'non_field_errors': e.detail.get('non_field_errors', [])},
-                status_code=status.HTTP_400_BAD_REQUEST
+                data={"non_field_errors": e.detail.get("non_field_errors", [])},
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
     def update(self, request, *args, **kwargs):
         """Update the leave application with special handling for status updates."""
         leave_application = self.get_object()
-        serializer = self.get_serializer(leave_application, data=request.data, partial=True)
+        serializer = self.get_serializer(
+            leave_application, data=request.data, partial=True
+        )
         try:
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
 
             action_by = request.user
-            if leave_application.status in [settings.APPROVED, settings.REJECTED, settings.CANCELLED]:
-                LeaveLog.create_log(leave_application, action_by, leave_application.status)
+            if leave_application.status in [
+                settings.APPROVED,
+                settings.REJECTED,
+                settings.CANCELLED,
+            ]:
+                LeaveLog.create_log(
+                    leave_application, action_by, leave_application.status
+                )
             else:
                 LeaveLog.create_log(leave_application, action_by, "Updated")
 
@@ -397,10 +419,10 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
             return create_response(
                 status="error",
                 message=_("There was an error updating your leave application."),
-                data={'non_field_errors': e.detail.get('non_field_errors', [])},
-                status_code=status.HTTP_400_BAD_REQUEST
+                data={"non_field_errors": e.detail.get("non_field_errors", [])},
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
-    
+
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()  # Get the LeaveApplication instance
         serializer = self.get_serializer(instance)
@@ -420,12 +442,12 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
             data=None,
             status_code=status.HTTP_200_OK,
         )
-        
+
     def list(self, request, *args, **kwargs):
         leave_applications = self.filter_queryset(self.get_queryset())
-        
+
         return self._paginate_results(leave_applications, request)
-        
+
     def _paginate_results(self, queryset, request):
         """Helper method to paginate and serialize the results."""
         paginator = PageNumberPagination()
@@ -433,10 +455,12 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
         request_type = self.request.query_params.get("type", "")
         is_manager = request_type == "requested"
         serializer = LeaveApplicationSerializer(
-            paginated_queryset, many=True, context={"request": request, "isManager":is_manager}
+            paginated_queryset,
+            many=True,
+            context={"request": request, "isManager": is_manager},
         )
         return paginator.get_paginated_response(serializer.data)
-    
+
     def get_queryset(self):
         """Restricts the returned leave applications based on the user type."""
         user = self.request.user
@@ -448,7 +472,11 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
         # Set the isManager flag based on the request type
         self.request.is_manager = request_type == "requested"
 
-        if request_type == "requested" and hasattr(user, 'employees') and user.employees.exists():
+        if (
+            request_type == "requested"
+            and hasattr(user, "employees")
+            and user.employees.exists()
+        ):
             queryset = queryset.filter(appliedBy__in=user.employees.all())
         else:
             queryset = queryset.filter(appliedBy=user)
@@ -561,14 +589,16 @@ class LeaveTypeViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+
 from rest_framework.decorators import action
+
 
 class HolidayViewSet(viewsets.ModelViewSet):
     queryset = Holiday.objects.all()
     serializer_class = HolidaySerializer
     permission_classes = [AllowAny]
     filter_backends = [filters.OrderingFilter]  # Add other filter backends if needed
-    ordering_fields = ['start_date', 'end_date']  # Fields that can be used for ordering
+    ordering_fields = ["start_date", "end_date"]  # Fields that can be used for ordering
 
     def get_queryset(self):
         """
@@ -576,8 +606,8 @@ class HolidayViewSet(viewsets.ModelViewSet):
         by filtering against `start_date` and `end_date` query parameters.
         """
         queryset = super().get_queryset()
-        start_date_str = self.request.query_params.get('start_date', None)
-        end_date_str = self.request.query_params.get('end_date', None)
+        start_date_str = self.request.query_params.get("start_date", None)
+        end_date_str = self.request.query_params.get("end_date", None)
 
         # Parse the date strings and handle any errors
         try:
@@ -588,7 +618,9 @@ class HolidayViewSet(viewsets.ModelViewSet):
 
         # Apply filtering based on valid dates
         if start_date and end_date:
-            queryset = queryset.filter(start_date__gte=start_date, end_date__lte=end_date)
+            queryset = queryset.filter(
+                start_date__gte=start_date, end_date__lte=end_date
+            )
         elif start_date:
             queryset = queryset.filter(start_date__gte=start_date)
         elif end_date:
@@ -605,10 +637,12 @@ class HolidayViewSet(viewsets.ModelViewSet):
             return None  # Return None if no date is provided
         try:
             # Try to parse the date using `datetime.strptime` for stricter validation
-            return datetime.strptime(date_str, '%Y-%m-%d').date()
+            return datetime.strptime(date_str, "%Y-%m-%d").date()
         except ValueError:
-            raise ValidationError(f"Invalid date format for '{date_str}'. Expected format is 'YYYY-MM-DD'.")
-        
+            raise ValidationError(
+                f"Invalid date format for '{date_str}'. Expected format is 'YYYY-MM-DD'."
+            )
+
     def create(self, request, *args, **kwargs):
         """
         Handle creation of a new Holiday record.
@@ -721,6 +755,7 @@ class UserMonthlyNotificationsListView(ListAPIView):
     API view to fetch notifications for the authenticated user within the last month,
     grouped by time periods like 'Today', 'This Week', and 'This Month'.
     """
+
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
 
@@ -734,7 +769,9 @@ class UserMonthlyNotificationsListView(ListAPIView):
         one_month_ago = timezone.now() - timedelta(days=30)
 
         # Filter notifications for the past month and order them by timestamp
-        return Notification.objects.filter(receiver=user, timestamp__gte=one_month_ago).order_by('-timestamp')
+        return Notification.objects.filter(
+            receiver=user, timestamp__gte=one_month_ago
+        ).order_by("-timestamp")
 
     def list(self, request, *args, **kwargs):
         """
@@ -742,17 +779,15 @@ class UserMonthlyNotificationsListView(ListAPIView):
         """
         queryset = self.get_queryset()
         grouped_notifications = self.group_notifications_by_time_period(queryset)
-        
+
         # Structure the response using `create_response` function
-        response_data = {
-            "grouped_notifications": grouped_notifications
-        }
+        response_data = {"grouped_notifications": grouped_notifications}
 
         return create_response(
-            status='success',
-            message='Notifications from the past month fetched successfully.',
+            status="success",
+            message="Notifications from the past month fetched successfully.",
             data=response_data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
     def group_notifications_by_time_period(self, notifications):
@@ -768,13 +803,17 @@ class UserMonthlyNotificationsListView(ListAPIView):
 
             # Group by 'Today'
             if delta == 0:
-                grouped_data['Today'].append(NotificationSerializer(notification).data)
+                grouped_data["Today"].append(NotificationSerializer(notification).data)
             # Group by 'This Week'
             elif delta < 7:
-                grouped_data['This Week'].append(NotificationSerializer(notification).data)
+                grouped_data["This Week"].append(
+                    NotificationSerializer(notification).data
+                )
             # Group by 'This Month'
             else:
-                grouped_data['This Month'].append(NotificationSerializer(notification).data)
+                grouped_data["This Month"].append(
+                    NotificationSerializer(notification).data
+                )
 
         # Sort the dictionary for consistency (optional)
         sorted_grouped_data = dict(sorted(grouped_data.items()))
@@ -831,7 +870,8 @@ class UpdateNotificationStatusView(UpdateAPIView):
                 data=None,
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-            
+
+
 ##############  Notification Ends  ######################################
 
 
@@ -840,10 +880,11 @@ class UpdateNotificationStatusView(UpdateAPIView):
 ########   By Divyanshu
 ###########################################################################
 
+
 class UserTourViewSet(viewsets.ModelViewSet):
     serializer_class = UserTourSerializer
     permission_classes = [AllowAny]
-    lookup_field = 'slug' 
+    lookup_field = "slug"
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -854,14 +895,14 @@ class UserTourViewSet(viewsets.ModelViewSet):
                 status="success",
                 message=_("User tour created successfully."),
                 data=serializer.data,
-                status_code=status.HTTP_201_CREATED
+                status_code=status.HTTP_201_CREATED,
             )
         except ValidationError as e:
             return create_response(
                 status="error",
                 message=_("Failed to create user tour."),
                 data=e.detail,
-                status_code=status.HTTP_400_BAD_REQUEST
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
     def retrieve(self, request, slug=None, *args, **kwargs):
@@ -872,18 +913,18 @@ class UserTourViewSet(viewsets.ModelViewSet):
                 status="success",
                 message=_("User tour retrieved successfully."),
                 data=serializer.data,
-                status_code=status.HTTP_200_OK
+                status_code=status.HTTP_200_OK,
             )
         except Exception as e:
             return create_response(
                 status="error",
                 message=_("User tour not found."),
                 data=str(e),
-                status_code=status.HTTP_404_NOT_FOUND
+                status_code=status.HTTP_404_NOT_FOUND,
             )
 
     def update(self, request, slug=None, *args, **kwargs):
-        partial = kwargs.pop('partial', False)
+        partial = kwargs.pop("partial", False)
         try:
             tour = self.get_object()
             serializer = self.get_serializer(tour, data=request.data, partial=partial)
@@ -893,18 +934,18 @@ class UserTourViewSet(viewsets.ModelViewSet):
                 status="success",
                 message=_("User tour updated successfully."),
                 data=serializer.data,
-                status_code=status.HTTP_200_OK
+                status_code=status.HTTP_200_OK,
             )
         except ValidationError as e:
             return create_response(
                 status="error",
                 message=_("Failed to update user tour."),
                 data=e.detail,
-                status_code=status.HTTP_400_BAD_REQUEST
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
     def partial_update(self, request, slug=None, *args, **kwargs):
-        kwargs['partial'] = True
+        kwargs["partial"] = True
         return self.update(request, slug, *args, **kwargs)
 
     def destroy(self, request, slug=None, *args, **kwargs):
@@ -914,25 +955,29 @@ class UserTourViewSet(viewsets.ModelViewSet):
             return create_response(
                 status="success",
                 message=_("User tour deleted successfully."),
-                status_code=status.HTTP_204_NO_CONTENT
+                status_code=status.HTTP_204_NO_CONTENT,
             )
         except Exception as e:
             return create_response(
                 status="error",
                 message=_("Failed to delete user tour."),
                 data=str(e),
-                status_code=status.HTTP_400_BAD_REQUEST
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
     def get_queryset(self):
         user = self.request.user
         queryset = UserTour.objects.all()
         request_type = self.request.query_params.get("type")
-        if request_type == "requested" and hasattr(user, 'employees') and user.employees.exists():
+        if (
+            request_type == "requested"
+            and hasattr(user, "employees")
+            and user.employees.exists()
+        ):
             queryset = queryset.filter(applied_by__in=user.employees.all())
         else:
             queryset = queryset.filter(applied_by=user)
-            
+
         from_date = self.request.query_params.get("from_date")
         to_date = self.request.query_params.get("to_date")
         tour_status = self.request.query_params.get("status")
@@ -955,7 +1000,9 @@ class UserTourViewSet(viewsets.ModelViewSet):
         is_manager = request_type == "requested"
         page = self.paginate_queryset(queryset)
         if page is not None:
-            serializer = self.get_serializer(page, many=True, context={"request": request, "isManager": is_manager})
+            serializer = self.get_serializer(
+                page, many=True, context={"request": request, "isManager": is_manager}
+            )
             return self.get_paginated_response(serializer.data)
 
         serializer = self.get_serializer(queryset, many=True)
@@ -963,106 +1010,118 @@ class UserTourViewSet(viewsets.ModelViewSet):
             status="success",
             message=_("User tours retrieved successfully."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def approved(self, request, slug=None):
         tour = get_object_or_404(UserTour, slug=slug)
         action_by = request.user
         tour.approve(action_by)
 
-        serializer = self.get_serializer(tour,context={"request": request, "isManager": True})
+        serializer = self.get_serializer(
+            tour, context={"request": request, "isManager": True}
+        )
         return create_response(
             status="success",
             message=_("Tour approved."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def rejected(self, request, slug=None):
         tour = get_object_or_404(UserTour, slug=slug)
         action_by = self.request.user
-        reason = request.data.get('reason', None)
+        reason = request.data.get("reason", None)
         tour.reject(action_by, reason)
 
-        serializer = self.get_serializer(tour,context={"request": request, "isManager": True})
+        serializer = self.get_serializer(
+            tour, context={"request": request, "isManager": True}
+        )
         return create_response(
             status="success",
             message=_("Tour rejected."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def cancelled(self, request, slug=None):
         tour = get_object_or_404(UserTour, slug=slug)
         action_by = self.request.user
-        reason = request.data.get('reason', None)
+        reason = request.data.get("reason", None)
         tour.cancel(action_by, reason)
 
-        serializer = self.get_serializer(tour,context={"request": request, "isManager": True})
+        serializer = self.get_serializer(
+            tour, context={"request": request, "isManager": True}
+        )
         return create_response(
             status="success",
             message=_("Tour cancelled."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def pending_cancellation(self, request, slug=None):
         tour = get_object_or_404(UserTour, slug=slug)
         action_by = self.request.user
-        reason = request.data.get('reason', None)
+        reason = request.data.get("reason", None)
         tour.pending_cancel(action_by, reason)
 
-        serializer = self.get_serializer(tour,context={"request": request, "isManager": False})
+        serializer = self.get_serializer(
+            tour, context={"request": request, "isManager": False}
+        )
         return create_response(
             status="success",
             message=_("Tour cancellation is pending."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def completed(self, request, slug=None):
         tour = get_object_or_404(UserTour, slug=slug)
         action_by = self.request.user
-        reason = request.data.get('reason', None)
+        reason = request.data.get("reason", None)
         tour.complete(action_by, reason)
 
-        serializer = self.get_serializer(tour,context={"request": request, "isManager": False})
+        serializer = self.get_serializer(
+            tour, context={"request": request, "isManager": False}
+        )
         return create_response(
             status="success",
             message=_("Tour completed."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=['post'])
+    @action(detail=True, methods=["post"])
     def extended(self, request, slug=None):
         tour = get_object_or_404(UserTour, slug=slug)
         action_by = self.request.user
-        new_end_date = request.data.get('new_end_date')
-        new_end_time = request.data.get('new_end_time')
-        reason = request.data.get('reason', None)
+        new_end_date = request.data.get("new_end_date")
+        new_end_time = request.data.get("new_end_time")
+        reason = request.data.get("reason", None)
 
         if not new_end_date or not new_end_time:
             return create_response(
                 status="error",
                 message=_("New end date and time are required."),
-                status_code=status.HTTP_400_BAD_REQUEST
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         tour.extend(action_by, new_end_date, new_end_time, reason)
 
-        serializer = self.get_serializer(tour,context={"request": request, "isManager": False})
+        serializer = self.get_serializer(
+            tour, context={"request": request, "isManager": False}
+        )
         return create_response(
             status="success",
             message=_("Tour extended successfully."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
 
@@ -1074,6 +1133,7 @@ class UserTourViewSet(viewsets.ModelViewSet):
 ########   By Divyanshu
 ###########################################################################
 
+
 class DeviceInformationViewSet(viewsets.ModelViewSet):
     serializer_class = DeviceInformationSerializer
     permission_classes = [IsAuthenticated]
@@ -1082,7 +1142,7 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
         queryset = DeviceInformation.objects.all()
 
         device_location = self.request.query_params.get("status", None)
-        
+
         if device_location:
             queryset = queryset.filter(device_location__id=device_location)
         return queryset
@@ -1096,21 +1156,21 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
                 status="success",
                 message=_("Device information created successfully."),
                 data=serializer.data,
-                status_code=status.HTTP_201_CREATED
+                status_code=status.HTTP_201_CREATED,
             )
         except IntegrityError:
             return create_response(
                 status="error",
                 message=_("Device with this serial number already exists."),
                 data=None,
-                status_code=status.HTTP_400_BAD_REQUEST
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
         except ValidationError as e:
             return create_response(
                 status="error",
                 message=_("Validation error."),
                 data=e.detail,
-                status_code=status.HTTP_400_BAD_REQUEST
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
     def retrieve(self, request, *args, **kwargs):
@@ -1120,7 +1180,7 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
             status="success",
             message=_("Device information retrieved successfully."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
 
     def update(self, request, *args, **kwargs):
@@ -1133,14 +1193,14 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
                 status="success",
                 message=_("Device information updated successfully."),
                 data=serializer.data,
-                status_code=status.HTTP_200_OK
+                status_code=status.HTTP_200_OK,
             )
         except ValidationError as e:
             return create_response(
                 status="error",
                 message=_("Validation error."),
                 data=e.detail,
-                status_code=status.HTTP_400_BAD_REQUEST
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
 
     def destroy(self, request, *args, **kwargs):
@@ -1150,7 +1210,7 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
             status="success",
             message=_("Device information deleted successfully."),
             data=None,
-            status_code=status.HTTP_204_NO_CONTENT
+            status_code=status.HTTP_204_NO_CONTENT,
         )
 
     def list(self, request, *args, **kwargs):
@@ -1160,5 +1220,5 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
             status="success",
             message=_("Device information retrieved successfully."),
             data=serializer.data,
-            status_code=status.HTTP_200_OK
+            status_code=status.HTTP_200_OK,
         )
