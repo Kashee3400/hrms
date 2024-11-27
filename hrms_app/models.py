@@ -2531,7 +2531,9 @@ class AttendanceLog(models.Model):
 
     def approve(self, action_by, reason=None):
         self.status = settings.APPROVED
-        self.save(update_fields=["status", "updated_at"])
+        self.att_status_short_code = 'P'
+        self.att_status = settings.PRESENT
+        self.save(update_fields=["status", "updated_at","att_status_short_code","att_status"])
         self.add_action(action=self.status, performed_by=action_by, comment=reason)
 
     def reject(self, action_by, reason=None):

@@ -85,10 +85,20 @@ class AttendanceLogSerializer(serializers.ModelSerializer):
             "created_at",
             'actions',
         ]
+        
+    def create(self, validated_data):
+        """
+        Override the create method to handle custom logic, such as setting the created_by field.
+        """
+        user = self.context['request'].user
+        validated_data['applied_by'] = user
+        return super(OfficeLocationSerializer, self).create(validated_data)
 
     def update(self, instance, validated_data):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        user = self.context['request'].user
+        validated_data['updated_by'] = user
         instance.save()
         return instance
 
@@ -96,8 +106,6 @@ class AttendanceLogSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['isManager'] = self.context.get('isManager', False)
         return representation
-
-
 
 class GenderSerializer(serializers.ModelSerializer):
     class Meta:

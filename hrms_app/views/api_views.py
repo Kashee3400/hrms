@@ -187,15 +187,31 @@ class AttendanceLogViewSet(viewsets.ModelViewSet):
             data=response.data,
             status_code=status.HTTP_201_CREATED,
         )
-
+        
     def update(self, request, *args, **kwargs):
-        response = super().update(request, *args, **kwargs)
-        return create_response(
-            status="success",
-            message=_("Attendance log updated successfully."),
-            data=response.data,
-            status_code=status.HTTP_200_OK,
-        )
+        try:
+            log = get_object_or_404(AttendanceLog,id=self.request.data.get('id'))
+            serializer = self.get_serializer(log, data=self.request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
+            return create_response(
+                status="success",
+                message=_("Attendance Log updated successfully."),
+                data=serializer.data,
+                status_code=status.HTTP_200_OK,
+            )
+        except Exception as e:
+            print(e)
+            return create_response(
+                status="error",
+                message=_("Failed to update attendance log."),
+                data=e.detail,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+    def partial_update(self, request, pk=None, *args, **kwargs):
+        kwargs["partial"] = True
+        return self.update(request, pk=None, *args, **kwargs)
 
     def retrieve(self, request, *args, **kwargs):
         attendance_log = get_object_or_404(AttendanceLog, id=kwargs.get('pk'))
