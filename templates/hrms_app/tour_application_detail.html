@@ -6,7 +6,7 @@
   {{ user.get_full_name }} | {{ tour_application.from_destination }}
 {% endblock %}
 {% block xtra_css %}
-  <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}">
+  <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 {% endblock %}
 {% block content_main %}
@@ -61,7 +61,7 @@
           </ul>
         </div>
         <div class="container bg-white mt-5">
-          <form id="tour-update-form" method="post" action="{% url 'tour_application_update' tour_application.slug %}">
+          <form id="tour-update-form" method="post">
             {% csrf_token %}
             <div class="row">
               <div class="cell-lg-12 cell-sm-12 cell-md-12">
@@ -81,30 +81,27 @@
               </div>
               {% if not is_manager %}
                 <div id="datetime">
-                  <div id="id_status-wrapper" class="cell-md-6">{{ status_form.extended_end_date.label_tag }}
-                    {{ status_form.extended_end_date }}</div>
-                  <div id="id_status-wrapper" class="cell-md-6">{{ status_form.extended_end_time.label_tag }}
-                    {{ status_form.extended_end_time }}</div>
+                  <div id="id_status-wrapper" class="cell-md-6">{{ form.extended_end_date.label_tag }}
+                    {{ form.extended_end_date }}</div>
+                  <div id="id_status-wrapper" class="cell-md-6">{{ form.extended_end_time.label_tag }}
+                    {{ form.extended_end_time }}</div>
                 </div>
               {% endif %}
 
-              <div id="id_status-wrapper" class="cell-md-12">{{ status_form.reason.label_tag }}
-                {{ status_form.reason }}</div>
+              <div id="id_status-wrapper" class="cell-md-12">{{ form.reason.label_tag }}
+                {{ form.reason }}</div>
               <div class="cell-md-12">
                 <button type="button"
                   class="button 
                 {% if user == tour_application.applied_by and tour_application.status == 'cancelled' %}
-                    
-                 disabled 
+                    disabled 
 
                   {% elif user == tour_application.applied_by and tour_application.status == 'rejected' %}
-                    
-                 disabled
+                    disabled
 
-                  {% endif %} 
-                 primary"
+                  {% endif %} primary"
                   onclick="Metro.dialog.open('#updateDailog')">
-                  <img src="{% static 'source/images/checkmark.png' %}" />
+                  <img src="{% static 'hrms_app/source/images/checkmark.png' %}" />
                   {% if is_manager %}
                     Update
                   {% else %}
@@ -113,6 +110,9 @@
                 </button>
                 {% if not is_manager %}
                   <button type="button" class="button alert" onclick="Metro.dialog.open('#deleteDailog')">Delete</button>
+                  {% if tour_application.status == 'pending' %}
+                    <a class="button warning" href="{% url 'tour_application_update' slug=tour_application.slug %}">Edit</a>
+                  {% endif %}
                 {% endif %}
               </div>
             </div>

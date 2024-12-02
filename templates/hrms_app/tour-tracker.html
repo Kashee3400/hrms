@@ -1,24 +1,44 @@
-{% extends "hrms_app/base.html" %}
-{% load static %}
-{% load hrms_tag %}
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag %}
+{% load render_table from django_tables2 %}
 
-{% block title %}{{request.user.username|upper}} | Tour tracker{% endblock %}
+{% block title %}
+  {{ request.user.username|upper }} | Tour tracker
+{% endblock %}
 
 {% block content_main %}
+  {% render_breadcrumb 'Tour Tracker' urls %}
 
-{% render_breadcrumb "Tour Tracker" urls %}
+  <div class="container bg-light m-2">
+    <form method="get" action="{% url 'tour_tracker' %}">
+      <div class="row">
+        <!-- Status Filter -->
+        <div class="cell-md-2 cell-12 cell-sm-12 cell-lg-3">{{ form.status.label_tag }} {{ form.status }}</div>
 
-<div class="row mt-2 mx-2">
-    <div class="cell-6">
-        <a href="{% url 'apply_tour' %}" class="button info cell-12">Apply Tour</a>
-    </div>
-    <div class="cell-6">
-        <a href="#" class="button dark cell-12">Regularize Tour</a>
-    </div>
-</div>
+        <!-- From Date Filter -->
+        <div class="cell-md-3 cell-12 cell-sm-12 cell-lg-3">{{ form.fromDate.label_tag }} {{ form.fromDate }}</div>
 
- <!-- Grouping rows -->
- <div class="grid">
+        <!-- To Date Filter -->
+        <div class="cell-md-3 cell-12 cell-sm-12 cell-lg-3">{{ form.toDate.label_tag }} {{ form.toDate }}</div>
+
+        <!-- Search Field -->
+        <div class="cell-md-3 cell-12 cell-sm-12 cell-lg-3">
+          <label for="search" class="fg-gray">Search</label>
+          <input type="text" name="search" id="search" class="input" placeholder="Search tours..." />
+        </div>
+
+        <!-- Buttons: Filter, Clear Filter, Apply Tour -->
+        <div class="cell-md-3 cell-12 cell-sm-12 cell-lg-3">
+          <button type="submit" class="button"><span class="mif-filter"></span> Filter</button>
+          <a class="button secondary" href="{% url 'tour_tracker' %}">Clear Filter</a>
+          <a href="{% url 'apply_tour' %}" class="button info">Apply Tour</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Grouping rows -->
+  <div class="grid">
     <div class="row">
       {% for leave_balance in leave_balances %}
         <div class="cell mx-1">
@@ -52,87 +72,66 @@
     </div>
   </div>
 
-
-<div class="container bg-light m-2">
+  <div class="container bg-light m-2">
     <div class="row">
-        <div class="cell-12 order-1">
-            <div data-role="panel" data-title-caption="Applied Tours" data-collapsible="true"
-                data-title-icon="<span class='mif-table'></span>" class="mt-4">
-                <div class="p-4">
-                    <table class="table striped table-border mt-4" data-role="table" data-cls-table-top="row"
-                        data-cls-search="cell-md-6" data-cls-rows-count="cell-md-6" data-rows="5"
-                        data-rows-steps="5, 10" data-show-activity="false"
-                        data-source="{% url 'leave-application-list' %}" data-horizontal-scroll="true">
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-{% if user.is_rm %}
-<div class="container bg-light m-2">
-  <form method="get" action="{% url 'tour_tracker' %}">
-    <div class="row">
-      <div class="cell-md-3 cell-12 cell-sm-12 cell-lg-3">{{ form.status.label_tag }} {{ form.status }}</div>
-      <div class="cell-md-3 cell-12 cell-sm-12 cell-lg-3">{{ form.fromDate.label_tag }} {{ form.fromDate }}</div>
-      <div class="cell-md-3 cell-12 cell-sm-12 cell-lg-3">{{ form.toDate.label_tag }} {{ form.toDate }}</div>
-      <div class="cell-md-2">
-        <button type="submit" class="button"><span class="mif-filter"></span> Filter</button>
-        <a class="button secondary" href="{% url 'tour_tracker' %}">Clear Filter</a>
-      </div>
-    </div>
-  </form>
-  {% if objects %}
-    <div class="row">
-      <div class="cell order-1">
-        <div data-role="panel" data-title-caption="Requested Tours" data-collapsible="true" data-title-icon="<span class='mif-table'></span>" class="mt-4">
-          {% comment %} <div class="p-4">
-            <table class="table striped table-border mt-4" data-role="table" data-cls-table-top="row" data-cls-search="cell-md-6" data-cls-rows-count="cell-md-6" data-rows="5" data-rows-steps="5, 10,25,50,100" data-show-activity="true" data-source="{% url 'leave-requests-list' %}" data-horizontal-scroll="true"></table>
-          </div> {% endcomment %}
-          <div class="row">
-            {% for tour in objects %}
-              <div class="cell-md-3">
-                <div class="social-box">
-                  <div class="header bg-cyan fg-white">
-                    {% if tour.applied_by.personal_detail.avatar %}
-                      <img src="{{ tour.applied_by.personal_detail.avatar.url }}" class="avatar" alt="Avatar" />
-                    {% endif %}
-                    <div class="title">{{ tour.applied_by. }}</div>
-                    <a style="color: white;" href="{% url 'leave_application_detail' tour.slug %}"><div class="subtitle">Application No: {{ leave.leaveApplication.applicationNo }}</div></a>
-                  </div>
-                  <ul class="skills">
-                    <li>
-                      <div>{{ tour.from_place }} Boarding</div>
-                      <div class="text-bold">{{ tour.start_date }} {{ tour.start_time }}</div>
-                    </li>
-                    <li>
-                      <div>{{ tour.to_place }} Destination</div>
-                      <div class="text-bold">{{ tour.end_date }} {{ tour.end_time }}</div>
-                    </li>
-                    <li>
-                      <div>Status</div>
-                      <div class="text-bold {{ tour.status }}">{{ tour.status|upper }}</div>
-                    </li>
-                  </ul>
-                  <a href="{% url 'tour_application_detail' tour.slug %}" class="button primary flat-button mt-5">VIew Details</a>
-                </div>
-              </div>
-            {% endfor %}
+      <div class="cell-12 order-1">
+        <div data-role="panel" data-title-caption="Applied Tours" data-collapsible="true" data-title-icon="<span class='mif-table'></span>" class="mt-4">
+          <div class="p-4">
+            <!-- Render the table for applied tours -->
+            {% render_table table %}
           </div>
         </div>
       </div>
     </div>
-  {% else %}
-    <div class="container">
-      <h4 class="notification error">No {{ selected_status }} tour</h4>
+  </div>
+  {% if user.is_rm %}
+    <div class="m-3">
+      {% if employee_tours %}
+        <div class="row">
+          <div class="cell order-1">
+            <div data-role="panel" data-title-caption="Requested Tours" data-collapsible="true" data-title-icon="<span class='mif-table'></span>" class="mt-4">
+              <div class="row">
+                {% for tour in employee_tours %}
+                  <div class="cell-md-3">
+                    <div class="social-box">
+                      <div class="header bg-cyan fg-white">
+                        {% if tour.applied_by.personal_detail.avatar %}
+                          <img src="{{ tour.applied_by.personal_detail.avatar.url }}" class="avatar" alt="Avatar" />
+                        {% endif %}
+                        <div class="title">{{ tour.applied_by }}</div>
+                        <a style="color: white;" href="{% url 'tour_application_detail' tour.slug %}"><div class="subtitle">Application No: {{ tour.application_no }}</div></a>
+                      </div>
+                      <ul class="skills">
+                        <li>
+                          <div>{{ tour.from_place }} Boarding</div>
+                          <div class="text-bold">{{ tour.start_date }} {{ tour.start_time }}</div>
+                        </li>
+                        <li>
+                          <div>{{ tour.to_place }} Destination</div>
+                          <div class="text-bold">{{ tour.end_date }} {{ tour.end_time }}</div>
+                        </li>
+                        <li>
+                          <div>Status</div>
+                          <div class="text-bold {{ tour.status }}">{{ tour.status|upper }}</div>
+                        </li>
+                      </ul>
+                      <a href="{% url 'tour_application_detail' tour.slug %}" class="button primary flat-button mt-5">View Details</a>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="container">
+          <h4 class="notification error">No {{ selected_status }} tours</h4>
+        </div>
+      {% endif %}
     </div>
   {% endif %}
-</div>
-{% endif %}
-
-
-{% endblock content_main %}
+{% endblock %}
 
 {% block xtra_js %}
-{% endblock xtra_js %}
+
+{% endblock %}

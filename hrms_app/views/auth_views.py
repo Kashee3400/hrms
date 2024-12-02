@@ -96,7 +96,7 @@ class LoginView(RedirectURLMixin, FormView):
             next_page = self.request.GET.get(self.redirect_field_name)
             if next_page:
                 return resolve_url(next_page)
-            return resolve_url('dashboard')
+            return resolve_url(settings.LOGIN_REDIRECT_URL)
         else:
             return resolve_url(settings.LOGIN_URL)
         

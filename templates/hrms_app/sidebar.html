@@ -41,6 +41,7 @@
 
   <ul class="navview-menu mt-4" id="side-menu">
     <li class="item-header">MAIN NAVIGATION</li>
+    {% if user.is_superuser %}
     {% url 'dashboard' as dashboard %}
     <li class="{% if request.path == dashboard %}active{% endif %}">
       <a href="{{ dashboard }}">
@@ -48,6 +49,7 @@
         <span class="caption">Dashboard</span>
       </a>
     </li>
+    {% endif %}
     {% url 'calendar' as calendar %}
     <li class="{% if request.path == calendar %}active{% endif %}">
       <a href="{{ calendar }}">
@@ -93,11 +95,29 @@
       </ul>
     </li>
 
+    <li class="item-header">Reports</li>
+    
+    <li class="active-container">
+      <a href="#" class="dropdown-toggle dropdown-toggle active-toggle active-control">
+        <span class="icon"><span class="mif-stack"></span></span>
+        <span class="caption">Reports</span>
+      </a>
+      <ul class="navview-menu stay-open" style="display: block;" data-role="dropdown">
+        <li>
+          <a href="{% url 'attendance_report' %}">
+            <span class="icon"><span class="mif-stack"></span></span>
+            <span class="caption">Attendance Report</span>
+          </a>
+        </li>
+      </ul>
+    </li>
+
+
     <li class="item-header">Documentation</li>
     <li>
-      <a href="https://metroui.org.ua/intro.html">
+      <a href="#">
         <span class="icon"><span class="mif-brightness-auto fg-red"></span></span>
-        <span class="caption">Metro 4</span>
+        <span class="caption">Documentation</span>
       </a>
     </li>
   </ul>

@@ -1,0 +1,84 @@
+{% load i18n static %}
+<!DOCTYPE html>
+{% get_current_language as LANGUAGE_CODE %}
+{% get_current_language_bidi as LANGUAGE_BIDI %}
+<html lang="{{ LANGUAGE_CODE|default:'en-us' }}" dir="{{ LANGUAGE_BIDI|yesno:'rtl,ltr,auto' }}" style="overflow-y: hidden;">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>
+      {% block title %}
+
+      {% endblock %}
+    </title>
+    {% include 'includes/styles.html' %}
+    {% block dark-mode-vars %}
+    {% endblock %}
+    {% block extrastyle %}
+    {% endblock %}
+    {% block extrahead %}
+    {% endblock %}
+    {% block blockbots %}
+      <meta name="robots" content="NONE,NOARCHIVE" />
+    {% endblock %}
+
+  </head>
+
+  <body data-admin-utc-offset="{% now 'Z' %}">
+    <div class="container-scroller">
+      {% block navigation %}
+        {% include 'includes/navigation.html' %}
+      {% endblock %}
+
+      <div class="page-body-wrapper">
+        {% block sidebar %}
+          {% include 'includes/sidebar.html' %}
+        {% endblock %}
+
+        <div class="main-panel vh-100 overflow-auto">
+          <div class="content-wrapper">
+            <div class="col-12">
+              {% block messages %}
+                {% if messages %}
+                  <ul class="messagelist">
+                    {% for message in messages %}
+                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message|capfirst }}</li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              {% endblock %}
+            </div>
+            <div class="row">
+              <div class="col-sm-12">
+                {% block content %}
+                  {% block object-tools %}
+                {% endblock %}
+                {{ content }}
+                {% endblock %}
+              </div>
+            </div>
+          </div>
+          {% include 'includes/footer.html' %}
+        </div>
+
+        {% block settings_panel %}
+          {% include 'includes/settings-panel.html' %}
+        {% endblock %}
+      </div>
+    </div>
+    <!-- END Container -->
+
+    {% include 'includes/scripts.html' %}
+
+    {% block extra_js %}
+      <script>
+        (function ($) {
+          'use strict'
+          $('select').select2({
+          });
+        
+        })(jQuery)
+      </script>
+    {% endblock %}
+  </body>
+</html>

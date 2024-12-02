@@ -19,9 +19,11 @@ INSTALLED_APPS = [
     "django_filters",
     "colorfield",
     "timezone_field",
+    'django_tables2',
     'django_extensions',
     "django_ckeditor_5",
     "django.contrib.humanize",
+    "admin_star.apps.AdminStarConfig",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -69,6 +71,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "hrms_app.context_processor.logo_settings",
             ],
         },
     },
@@ -115,3 +118,8 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Asia/Kolkata"
+
+
+LOGO_URL = "hrms_app/source/images/kashee.png"
+LOGO_MINI_URL = "hrms_app/source/images/kashee.png"
+

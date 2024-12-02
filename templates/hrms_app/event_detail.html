@@ -12,7 +12,6 @@
       justify-content: center;
     }
   </style>
-  <link rel="stylesheet" href="{% static 'css/status.css' %}" />
 {% endblock %}
 
 {% block content_main %}
@@ -141,7 +140,7 @@
               <hr />
               <div class="container">
                 <button type="button" class="button {% if user == object.applied_by and not object.status == 'pending' %}disabled{% endif %} primary" onclick="Metro.dialog.open('#updateDailog')">
-                  <img src="{% static 'source/images/checkmark.png' %}" />
+                  <img src="{% static 'hrms_app/source/images/checkmark.png' %}" />
                   {% if not is_manager %}
                     Submit For Regularization
                   {% else %}

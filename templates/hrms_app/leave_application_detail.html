@@ -104,7 +104,7 @@
               <div class="cell-md-6">
                 <button type="button"
                  class="button {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %} primary" onclick="Metro.dialog.open('#updateDailog')">
-                 <img src="{% static 'source/images/checkmark.png' %}" /> 
+                 <img src="{% static 'hrms_app/source/images/checkmark.png' %}" /> 
                  {% if is_manager %} Update {% else %} Request Cancellation{% endif %}</button>
               </div>
             </div>

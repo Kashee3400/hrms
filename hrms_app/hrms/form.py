@@ -3,7 +3,6 @@ import unicodedata
 from django import forms
 from django.contrib.auth import authenticate, get_user_model, password_validation
 from django.contrib.auth.hashers import UNUSABLE_PASSWORD_PREFIX, identify_hasher
-from django.contrib.auth.models import User
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.exceptions import ValidationError
@@ -20,7 +19,7 @@ from hrms_app.hrms.utils import is_holiday, is_weekend
 from hrms_app.utility.leave_utils import apply_leave_policies, check_overlapping_leaves
 from django.core.validators import RegexValidator
 
-UserModel = get_user_model()
+User = get_user_model()
 
 
 def _unicode_ci_compare(s1, s2):
@@ -260,7 +259,7 @@ class AuthenticationForm(forms.Form):
         super().__init__(*args, **kwargs)
 
         # Set the max length and label for the "username" field.
-        self.username_field = UserModel._meta.get_field(UserModel.USERNAME_FIELD)
+        self.username_field = User._meta.get_field(User.USERNAME_FIELD)
         username_max_length = self.username_field.max_length or 254
         self.fields["username"].max_length = username_max_length
         self.fields["username"].widget.attrs["maxlength"] = username_max_length
@@ -349,8 +348,8 @@ class PasswordResetForm(forms.Form):
         that prevent inactive users and users with unusable passwords from
         resetting their password.
         """
-        email_field_name = UserModel.get_email_field_name()
-        active_users = UserModel._default_manager.filter(
+        email_field_name = User.get_email_field_name()
+        active_users = User._default_manager.filter(
             **{
                 "%s__iexact" % email_field_name: email,
                 "is_active": True,
@@ -386,7 +385,7 @@ class PasswordResetForm(forms.Form):
             domain = current_site.domain
         else:
             site_name = domain = domain_override
-        email_field_name = UserModel.get_email_field_name()
+        email_field_name = User.get_email_field_name()
         for user in self.get_users(email):
             user_email = getattr(user, email_field_name)
             context = {
@@ -652,9 +651,11 @@ class TourForm(forms.ModelForm):
         widgets = {
             "from_destination": forms.TextInput(attrs={'data-role': 'input'}),
             "start_date": forms.TextInput(attrs={'data-role':'calendarpicker'}),
-            "start_time": forms.TextInput(attrs={'data-role':'input','id': 'start_time'}),
+            "start_time": forms.TextInput(attrs={'type':'time'}),
+            # "start_time": forms.TextInput(attrs={'data-role':'input','id': 'start_time'}),
             "end_date": forms.TextInput(attrs={'data-role':'calendarpicker'}),
             "end_time": forms.TextInput(attrs={'data-role':'input','id': 'end_time'}),
+            "end_time": forms.TextInput(attrs={'type':'time'}),
             "to_destination": forms.TextInput(attrs={'data-role': 'input'}),
             "remarks": CKEditor5Widget(config_name='extends'),
         }
@@ -866,7 +867,6 @@ class AttendanceLogForm(forms.ModelForm):
 
 
 class LeaveStatusUpdateForm(forms.ModelForm):
-
     class Meta:
         model = LeaveApplication
         fields = ["status"]
@@ -912,9 +912,9 @@ class TourStatusUpdateForm(forms.ModelForm):
         fields = ["status", "extended_end_date", "extended_end_time", "reason"]
 
         widgets = {
-            "extended_end_date": forms.TextInput(attrs={"data-role": "datepicker"}),
+            "extended_end_date": forms.TextInput(attrs={"data-role": "calendarpicker"}),
             "extended_end_time": forms.TextInput(
-                attrs={"data-role": "timepicker", "data-seconds": "false"}
+                attrs={"type": "time",}
             ),
             "status": forms.Select(attrs={"data-role": "select"}),
         }
@@ -997,17 +997,34 @@ class FilterForm(forms.Form):
         widget=forms.TextInput(attrs={"data-role": "calendarpicker", "id": "toDate"}),
         required=False,
     )
+    from django import forms
+
+class EmployeeChoices(forms.Form):
+    employee = forms.ModelChoiceField(
+        queryset=User.objects.all(),
+        widget=forms.Select(attrs={"data-role": "select", "id": "option"}),
+        required=False,
+        empty_label="Select a user",
+    )
 
 
-from django.contrib.auth.models import Permission
-
+from django.contrib.auth.models import Permission, Group
+from django.utils.translation import gettext_lazy as _
 
 class CustomUserForm(forms.ModelForm):
+    # Field for selecting permissions
     permissions = forms.ModelMultipleChoiceField(
         queryset=Permission.objects.all(),
         required=False,
         widget=forms.SelectMultiple(attrs={"data-role": "select"}),
         label="Permissions",
+    )
+    # Field for selecting groups
+    groups = forms.ModelMultipleChoiceField(
+        queryset=Group.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={"data-role": "select"}),
+        label="Groups",
     )
 
     class Meta:
@@ -1064,9 +1081,11 @@ class CustomUserForm(forms.ModelForm):
         user = super().save(commit=False)
         if commit:
             user.save()
+            # Set permissions for the user
             user.user_permissions.set(self.cleaned_data["permissions"])
+            # Set groups for the user
+            user.groups.set(self.cleaned_data["groups"])
         return user
-
 
 class PersonalDetailsForm(forms.ModelForm):
     class Meta:
@@ -1289,3 +1308,31 @@ class CorrespondingAddressForm(forms.ModelForm):
                 r"^\d{5}(?:[-\s]\d{4})?$", _("Enter a valid ZIP code")
             ),
         }
+
+
+class AttendanceReportFilterForm(forms.Form):
+    # Define the form fields
+    location = forms.ModelMultipleChoiceField(
+        queryset=OfficeLocation.objects.all(),
+        required=True,
+        widget=forms.SelectMultiple(attrs={"data-role": "select"}),
+        label="Location",
+    )
+    from_date = forms.DateField(
+        required=True,
+        label="From Date",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+    )
+    
+    to_date = forms.DateField(
+        required=True,
+        label="To Date",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+    )
+    
+    active = forms.BooleanField(
+        required=False,
+        label="Active Employees Only",
+        initial=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )

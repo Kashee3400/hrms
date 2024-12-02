@@ -87,9 +87,7 @@ class CustomUser(AbstractUser):
     )
 
     def __str__(self):
-        if not self.first_name:
-            return self.username
-        return f"{self.first_name} {self.last_name}"
+        return self.get_full_name()
 
     def toggle_manager_status(self):
         self.is_rm = not self.is_rm

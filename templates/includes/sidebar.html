@@ -1,0 +1,92 @@
+{% load i18n static admin_star %}
+
+<nav class="sidebar sidebar-fixed vh-100 overflow-auto" id="sidebar">
+  <!-- Search Bar -->
+  <div class="sidebar-search p-3">
+    <input type="text" class="form-control" id="sidebarSearch" placeholder="{% trans 'Search...' %}">
+  </div>
+
+  <ul class="nav flex-column">
+    <li class="nav-item {% if request.user.is_superuser and request.path == '/admin/' or not request.user.is_superuser and request.path == '/' %} active {% endif %}">
+      {% if request.user.is_superuser %}
+        <a class="nav-link" href="{% url 'admin:index' %}">
+      {% else %}
+        <a class="nav-link" href="/">
+      {% endif %}
+          <i class="mdi mdi-grid-large menu-icon"></i>
+          <span class="menu-title">{% trans "Dashboard" %}</span>
+        </a>
+    </li>
+
+    <!-- Django dynamic menu items -->
+    {% admin_get_menu as app_list %}
+    {% if app_list %}
+      {% for app in app_list %}
+        {% if app.has_perms and not app.pinned %}
+          <li class="nav-item {% if app.app_label in request.path %} active {% endif %}">
+            <a class="nav-link"
+              data-bs-toggle="collapse"
+              href="#submenu-{{ app.app_label }}"
+              aria-expanded="{% if app.app_label in request.path %}true{% else %}false{% endif %}"
+              aria-controls="submenu-{{ app.app_label }}"> 
+              <i class="menu-icon mdi {% if app.icon %}{{ app.icon }} {% else %} mdi-octagon {% endif %}"></i>
+              <span class="menu-title">{{ app.label|slice:10 }}{% if app.label|length > 10 %}..{% endif %}</span>
+              <i class="menu-arrow"></i>
+            </a>
+
+            <div class="collapse {% if app.app_label in request.path %}show{% endif %}" id="submenu-{{ app.app_label }}">
+              {% if app.models %}
+                <ul class="nav flex-column sub-menu">
+                  {% for model in app.models %}
+                    {% if model.url %}
+                      <li class="nav-item">
+                        <a class="nav-link {% if model.url in request.path %} active {% endif %}" href="{{ model.url }}"><p>{{ model.label }}</p></a>
+                      </li>
+                    {% else %}
+                      <li class="nav-item">{{ model.label }}</li>
+                    {% endif %}
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+          </li>
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+  </ul>
+</nav>
+<script>
+  document.getElementById('sidebarSearch').addEventListener('input', function() {
+    const query = this.value.toLowerCase();
+    const navItems = document.querySelectorAll('#sidebar .nav-item');
+    
+    navItems.forEach(item => {
+      const text = item.innerText.toLowerCase();
+      const submenu = item.querySelector('.collapse');
+      let matchFound = text.includes(query);
+
+      // If submenu exists, check its items
+      if (submenu) {
+        const submenuItems = submenu.querySelectorAll('.sub-menu .nav-item');
+        submenuItems.forEach(subItem => {
+          const subItemText = subItem.innerText.toLowerCase();
+          if (subItemText.includes(query)) {
+            subItem.style.display = ''; // Show matching submenu item
+            matchFound = true; // Mark match found to show parent item
+            submenu.classList.add('show'); // Expand submenu if match found
+          } else {
+            subItem.style.display = 'none'; // Hide non-matching submenu items
+          }
+        });
+      }
+
+      // Show or hide parent item based on whether any match was found
+      if (matchFound) {
+        item.style.display = '';
+      } else {
+        item.style.display = 'none';
+        if (submenu) submenu.classList.remove('show'); // Collapse submenu if no match
+      }
+    });
+  });
+</script>

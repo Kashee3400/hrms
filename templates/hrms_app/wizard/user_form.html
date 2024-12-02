@@ -2,7 +2,7 @@
 
 {% block content %}
   <div data-role="panel" data-title-caption="Step 1: User Details" data-cls-panel="shadow-1" class="mt-5" data-title-icon="<span class='mif-user'></span>"
-  data-collapsible="true" data-cls-collapse-toggle="bg-dark fg-white marker-light" data-cls-title="bg-yellow fg-dark" data-cls-title-icon="bg-green fg-white">
+  data-collapsible="true" data-cls-collapse-toggle="bg-dark fg-white marker-light" data-cls-title="bg-light fg-dark" data-cls-title-icon="bg-green fg-white">
     <div class="row">
       {% for field in form %}
         {% if field.name != 'permissions' %}
@@ -31,8 +31,9 @@
   </div>
 
   <div data-role="panel" data-title-caption="User Permissions" data-cls-panel="shadow-1" class="mt-5" data-title-icon="<span class='mif-apps'></span>"
-  data-collapsible="true" data-cls-collapse-toggle="bg-dark fg-white marker-light" data-cls-title="bg-yellow fg-dark" data-cls-title-icon="bg-green fg-white">
-    <div class="cell-12">
+  data-collapsible="true" data-cls-collapse-toggle="bg-dark fg-white marker-light" data-cls-title="bg-light fg-dark" data-cls-title-icon="bg-green fg-white">
+  <div class="row">
+    <div class="cell-6">
       <label for="{{ form.permissions.id_for_label }}">{{ form.permissions.label_tag }}</label>
       {{ form.permissions }}
 
@@ -48,5 +49,7 @@
         </div>
       {% endif %}
     </div>
+    
+  </div>
   </div>
 {% endblock %}

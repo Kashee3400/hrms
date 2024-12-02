@@ -48,7 +48,7 @@
             <div class="bg-white p-0">
               <div class="skill-box mt-4-minus">
                 <div class="header border-top border-bottom bd-default">
-                  <img src="{% if  user.personal_detail.avatar %}{{ user.personal_detail.avatar.url }}{% endif %}" class="avatar" />
+                  <img src="{% if user.personal_detail.avatar %}{{ user.personal_detail.avatar.url }}{% else %}{% static 'hrms_app/im/person.png' %}{% endif %}" class="avatar" />
                   <div class="title">{{ user.first_name }}</div>
                   <div class="subtitle">
                     {{user.personal_detail.designation}}
@@ -65,7 +65,7 @@
                   </li>
                 </ul>
                 <div class="d-flex flex-justify-start flex-align-center p-4">
-                  <div class="cell"><button class="button info"><i class="fa-solid fa-comments"></i></button></div>
+                  <div class="cell"><a href="{% url 'edit_user_wizard' user.pk %}" class="button info"><i class="fa-solid fa-edit"></i></a></div>
                   <div class="cell"><button class="button dark ml-1">Send Email</button></div>
                   <div class="cell"><a href="{% url 'employee_profile' user.pk %}" class="button square ml-1"><i class="fa-solid fa-eye"></i></a></div>                  
                 </div>

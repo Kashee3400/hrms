@@ -70,3 +70,22 @@ class LeaveListViewMixin:
                 "show": True
             }
         ]
+
+
+from django.core.exceptions import PermissionDenied
+
+class ModelPermissionRequiredMixin:
+    model = None
+    permission_action = "view"
+
+    def has_permission(self, user):
+        if not self.model:
+            raise ValueError("The 'model' attribute must be set.")
+        opts = self.model._meta
+        perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"
+        return user.has_perm(perm)
+
+    def dispatch(self, request, *args, **kwargs):
+        if not self.has_permission(request.user):
+            raise PermissionDenied("You do not have the required permissions.")
+        return super().dispatch(request, *args, **kwargs)

@@ -9,6 +9,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('check-user-balance/', check_user_balance, name='check_user_balance'),
     path('leaves/', LeaveApplicationListView.as_view(), name='leave-application-list'),
+    path("save-column-preferences/", save_column_preferences, name="save_column_preferences"),
     path('', include(site.get_urls())),
     path("ckeditor5/", include('django_ckeditor_5.urls')),
     path('schedule/', include('schedule.urls')),

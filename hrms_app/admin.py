@@ -1,28 +1,25 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from hrms_app.hrms.form import *
+from hrms_app.hrms.resources import  CustomUserResource
 from .models import *
 from django_ckeditor_5.widgets import CKEditor5Widget
+from django.utils.safestring import mark_safe
+from import_export.admin import ImportExportModelAdmin
 
 admin.site.site_title = "HRMS"
 admin.site.site_header = "HRMS Administration"
 
-
-class CustomUserAdmin(UserAdmin):
+class CustomUserAdmin(UserAdmin, ImportExportModelAdmin):
+    resource_class = CustomUserResource
     model = CustomUser
-    list_display = ['username', 'first_name', 'last_name', 'official_email', 'is_superuser', 'is_staff', 'is_active',
-                    'date_joined', 'last_login']
+    list_display = ['username', 'first_name', 'last_name', 'official_email', 'is_superuser', 
+                    'is_staff', 'is_active', 'date_joined', 'last_login']
     fieldsets = UserAdmin.fieldsets + (
-        ('Custom Fields', {'fields': ('official_email', 'is_rm', 'reports_to','role','device_location')}),
+        ('Custom Fields', {'fields': ('official_email', 'is_rm', 'reports_to', 'role', 'device_location')}),
     )
-    # add_fieldsets = UserAdmin.add_fieldsets + (
-    #     (None, {'fields': ('role',)}),
-    # )
-
 
 admin.site.register(CustomUser, CustomUserAdmin)
-
-from django.utils.safestring import mark_safe
 
 
 class LeaveTypeAdmin(admin.ModelAdmin):
@@ -135,7 +132,6 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
 
 admin.site.register(LeaveBalanceOpenings, LeaveBalanceOpeningAdmin)
 
-
 class PersonalDetailAdmin(admin.ModelAdmin):
     list_display = (
         'employee_code',
@@ -152,10 +148,58 @@ class PersonalDetailAdmin(admin.ModelAdmin):
         'ctc',
         'ann_date',
         'doj',
-        'dol'
+        'dol',
     )
 
-    search_fields = ['user__first_name', 'user__last_name', 'employee_code', 'mobile_number', 'official_mobile_number']
+    # Add filters
+    list_filter = (
+        'gender',
+        'designation',
+        'religion',
+        'marital_status',
+        'doj',
+        'dol',
+    )
+
+    # Add search fields
+    search_fields = [
+        'user__first_name',
+        'user__last_name',
+        'employee_code',
+        'mobile_number',
+        'official_mobile_number',
+    ]
+
+    # Organize fields into fieldsets
+    fieldsets = (
+        ('Personal Information', {
+            'fields': (
+                'employee_code', 
+                'user', 
+                'avatar', 
+                'gender', 
+                'religion', 
+                'marital_status', 
+                'birthday'
+            ),
+        }),
+        ('Contact Details', {
+            'fields': (
+                'mobile_number', 
+                'alt_mobile_number', 
+                'official_mobile_number',
+            ),
+        }),
+        ('Job Details', {
+            'fields': (
+                'designation', 
+                'ctc', 
+                'ann_date', 
+                'doj', 
+                'dol',
+            ),
+        }),
+    )
 
 
 admin.site.register(PersonalDetails, PersonalDetailAdmin)
@@ -264,12 +308,14 @@ class DepartmentAdmin(admin.ModelAdmin):
     search_fields = ('department',)
     list_filter = ('is_active',)
     readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
+    prepopulated_fields = {'slug': ('department',)}
 
 @admin.register(Designation)
 class DesignationAdmin(admin.ModelAdmin):
     list_display = ('designation', 'department', 'is_active', 'created_at', 'updated_at')
     search_fields = ('designation', 'department__department')
     list_filter = ('is_active', 'department')
+    prepopulated_fields = {'slug': ('designation',)}
     readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
 
 @admin.register(Gender)

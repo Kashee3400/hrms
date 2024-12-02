@@ -1,5 +1,4 @@
 from hrms_app.hrms.form import *
-from hrms_app.models import *
 from django.http import HttpResponseForbidden, HttpResponseRedirect
 from django.contrib import messages
 from django.views.generic import (
@@ -16,9 +15,12 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
     PermissionRequiredMixin,
 )
+from django_filters.views import FilterView
+from django_tables2.views import SingleTableMixin
+from ..table_classes import UserTourTable,LeaveApplicationTable
 import pandas as pd
 from django.urls import reverse, reverse_lazy
-from hrms_app.views.mixins import LeaveListViewMixin
+from hrms_app.views.mixins import LeaveListViewMixin,ModelPermissionRequiredMixin
 from django.utils.translation import gettext_lazy as _
 from datetime import datetime
 from django.conf import settings
@@ -38,6 +40,8 @@ from django.views import View
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.views.decorators.csrf import csrf_exempt
+from django.utils.timezone import now
+from django.contrib.messages.views import SuccessMessageMixin
 
 logger = logging.getLogger(__name__)
 
@@ -97,148 +101,241 @@ class EmployeeProfileView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
 class AboutPageView(TemplateView):
     template_name = "hrms_app/calendar.html"
 
-
-class LeaveTrackerView(PermissionRequiredMixin, TemplateView):
+class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
     template_name = "hrms_app/leave-tracker.html"
-    permission_required = "hrms_app.view_leaveapplication"
+    model = LeaveApplication
+    permission_action = "view"
 
-    def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
+    def dispatch(self, request, *args, **kwargs):
+        """Check if the user has the required permission dynamically."""
+        opts = self.model._meta
+        perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"
+        if not request.user.has_perm(perm):
+            logger.warning(f"Permission denied for user {request.user}. Required: {perm}")
+            raise PermissionDenied("You do not have permission to access this resource.")
+        
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get_table_class(self):
+            # Dynamically define table columns based on session data or defaults
+            class DynamicLeaveApplicationTable(LeaveApplicationTable):
+                class Meta(LeaveApplicationTable.Meta):
+                    # Get selected columns from session or use defaults
+                    selected_columns = self.request.session.get(
+                        "selected_columns", 
+                        ["appliedBy", "status", "startDate", "endDate"]
+                    )
+                    fields = selected_columns
+
+            return DynamicLeaveApplicationTable
+
+    def get_leave_balances(self, user):
+        """Fetch leave balances for the user."""
+        try:
+            leave_types = LeaveType.objects.all()
+            leave_balances = LeaveBalanceOpenings.objects.filter(user=user, leave_type__in=leave_types)
+            leave_balances_dict = {lb.leave_type: lb for lb in leave_balances}
+
+            leave_balances_list = [
+                {
+                    "balance": lb.remaining_leave_balances,
+                    "leave_type": lb.leave_type,
+                    "url": reverse("apply_leave_with_id", args=[lb.leave_type.pk]),
+                    "color": lb.leave_type.color_hex,
+                }
+                for lb in leave_balances
+            ]
+
+            # Include maternity leave if applicable
+            if user.personal_detail and user.personal_detail.gender.gender == "Female":
+                ml_balance = leave_balances_dict.get(settings.ML)
+                if ml_balance:
+                    leave_balances_list.append(
+                        {
+                            "balance": ml_balance.remaining_leave_balances,
+                            "leave_type": ml_balance.leave_type.leave_type,
+                            "url": reverse("apply_leave_with_id", args=[ml_balance.leave_type.id]),
+                            "color": "#ff9447",
+                        }
+                    )
+
+            return leave_balances_list
+        except LeaveBalanceOpenings.DoesNotExist:
+            logger.error(f"Leave balances not found for user {user}.")
+            return []
+        except Exception as e:
+            logger.exception(f"Unexpected error while fetching leave balances: {e}")
+            return []
+
+    def get_filtered_leaves(self, user, form):
+        """Apply filters to the leave applications."""
+        try:
+            employee_leaves = LeaveApplication.objects.filter(appliedBy__in=user.employees.all())
+            if form.is_valid():
+                status = form.cleaned_data.get("status")
+                from_date = form.cleaned_data.get("fromDate")
+                to_date = form.cleaned_data.get("toDate")
+                if status:
+                    employee_leaves = employee_leaves.filter(status=status)
+                if from_date:
+                    employee_leaves = employee_leaves.filter(startDate__gte=from_date)
+                if to_date:
+                    employee_leaves = employee_leaves.filter(endDate__lte=to_date)
+            else:
+                messages.warning(self.request, "Invalid filter data provided.")
+            return employee_leaves
+        except ValidationError as ve:
+            logger.warning(f"Validation error while filtering leaves: {ve}")
+            messages.error(self.request, "There was an issue processing your filter. Please try again.")
+            return LeaveApplication.objects.none()
+        except Exception as e:
+            logger.exception(f"Unexpected error while filtering leaves: {e}")
+            messages.error(self.request, "An unexpected error occurred. Please contact support.")
+            return LeaveApplication.objects.none()
+        
+    def get_queryset(self):
+        """Filter tours based on the logged-in user's tours and their employees' tours."""
+        user = self.request.user
+        user_leaves = LeaveApplication.objects.filter(appliedBy=user)
+
+        # Get the search query parameter (if any)
+        search_term = self.request.GET.get("search", "").strip()
+
+        if search_term:
+            # Perform a case-insensitive search across multiple fields
+            user_leaves = user_leaves.filter(
+                Q(appliedby__username__icontains=search_term) |  # Search by username
+                Q(appliedby__first_name__icontains=search_term) |  # Search by first name
+                Q(appliedby__last_name__icontains=search_term) |  # Search by last name
+                Q(from_destination__icontains=search_term) |  # Search by from_destination
+                Q(to_destination__icontains=search_term)  # Search by to_destination
+            )
+
+        return user_leaves
 
     def get_context_data(self, **kwargs):
+        """Prepare the context for the template."""
         context = super().get_context_data(**kwargs)
         user = self.request.user
 
+        # Initialize filter form
         form = FilterForm(self.request.GET)
 
-        # Fetch leave balances
-        leave_types = LeaveType.objects.all()
-        leave_balances = LeaveBalanceOpenings.objects.filter(
-            user=user, leave_type__in=leave_types
-        )
-        leave_balances_dict = {lb.leave_type: lb for lb in leave_balances}
-        leave_balances_list = [
-            {
-                "balance": lb.remaining_leave_balances,
-                "leave_type": lb.leave_type,
-                "url": reverse("apply_leave_with_id", args=[lb.leave_type.pk]),
-                "color": f"{lb.leave_type.color_hex}",
-            }
-            for lb in leave_balances
-        ]
-
-        if user.personal_detail and user.personal_detail.gender.gender == "Female":
-            ml_balance = leave_balances_dict.get(settings.ML)
-            if ml_balance:
-                leave_balances_list.append(
-                    {
-                        "balance": ml_balance.remaining_leave_balances,
-                        "leave_type": ml_balance.leave_type.leave_type,
-                        "url": reverse(
-                            "apply_leave_with_id", args=[ml_balance.leave_type.id]
-                        ),
-                        "color": "#ff9447",
-                    }
-                )
-
-        # Start with an initial QuerySet for leaves
-        leaves = LeaveApplication.objects.filter(
-            appliedBy__in=user.employees.all(), status=settings.PENDING
-        )
-
-        if form.is_valid():
-            selected_status = form.cleaned_data.get("status", settings.PENDING)
-            from_date = form.cleaned_data.get("fromDate")
-            to_date = form.cleaned_data.get("toDate")
-
-            if selected_status:
-                leaves = leaves.filter(status=selected_status)
-            if from_date:
-                leaves = leaves.filter(startDate__gte=from_date)
-            if to_date:
-                leaves = leaves.filter(endDate__lte=to_date)
-
-        context.update(
-            {
-                "current_date": datetime.now(),
-                "leave_balances": leave_balances_list,
-                "form": form,
-                "selected_status": selected_status,
-                "employee_leaves": [
-                    {
-                        "leaveApplication": leave,
-                        "start_date": format_date(leave.startDate),
-                        "end_date": format_date(leave.endDate),
-                    }
-                    for leave in leaves
-                ],
-                "pending_leave_count": len(
-                    get_employee_requested_leave(user=user, status=settings.PENDING)
-                ),
-            }
-        )
-
-        urls = [
-            ("dashboard", {"label": "Dashboard"}),
-            ("leave_tracker", {"label": "Leave Tracker"}),
-        ]
-        context["urls"] = urls
+        try:
+            # Prepare leave balances and filtered leaves
+            leave_balances = self.get_leave_balances(user)
+            combined_leaves = self.get_filtered_leaves(user, form)
+            employee_leaves = combined_leaves.filter(appliedBy__in=user.employees.all())
+            context.update(
+                {
+                    "current_date": now(),
+                    "leave_balances": leave_balances,
+                    "form": form,
+                    "employee_leaves": [
+                        {
+                            "leaveApplication": leave,
+                            "start_date": leave.startDate.strftime("%Y-%m-%d"),
+                            "end_date": leave.endDate.strftime("%Y-%m-%d"),
+                        }
+                        for leave in employee_leaves
+                    ],
+                    "pending_leave_count": LeaveApplication.objects.filter(
+                        appliedBy=user, status=settings.PENDING
+                    ).count(),
+                    "urls": [
+                        ("dashboard", {"label": "Dashboard"}),
+                        ("leave_tracker", {"label": "Leave Tracker"}),
+                    ],
+                }
+            )
+            all_columns = [field.name for field in LeaveApplication._meta.fields if field.name not in ['id', 'slug', 'status','reason']]
+            selected_columns = self.request.session.get(
+                "selected_columns", 
+                ["appliedBy", "status", "startDate", "endDate"]
+            )
+            context["all_columns"] = all_columns
+            context["selected_columns"] = selected_columns
+        except Exception as e:
+            logger.exception(f"Unexpected error in context preparation: {e}")
+            messages.error(self.request, "An error occurred while loading the page. Please try again later.")
 
         return context
 
+from django.http import JsonResponse
+import json
 
-class ApplyLeaveView(CreateView):
+def save_column_preferences(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        selected_columns = data.get("selected_columns", [])
+        request.session["selected_columns"] = selected_columns
+        return JsonResponse({"status": "success", "selected_columns": selected_columns})
+    return JsonResponse({"status": "error"}, status=400)
+
+class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = LeaveApplication
     form_class = LeaveApplicationForm
     template_name = "hrms_app/apply-leave.html"
-    permission_required = "hrms_app.add_leaveapplication"
+    permission_action = "add"  # Action for permission check
+    success_message = "Leave applied successfully."
 
-    def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
+    def dispatch(self, request, *args, **kwargs):
+        """Check if the user has permission dynamically for the model."""
+        opts = self.model._meta
+        perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"
+        if not request.user.has_perm(perm):
+            raise PermissionDenied("You do not have permission to apply for leave.")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
+        """Pass additional data to the form."""
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
-        kwargs["leave_type"] = self.kwargs.get("pk")
+        kwargs["leave_type"] = self.kwargs.get("pk")  # Leave type ID from URL
         return kwargs
 
     def form_valid(self, form):
+        """Handle successful form submission."""
         leave_application = form.save(commit=False)
         leave_application.appliedBy = self.request.user
         leave_application.save()
-        messages.success(self.request, "Leave applied successfully")
+        messages.success(self.request, self.success_message)
+
+        # Redirect to the next URL if provided, or fallback to leave tracker
         next_url = self.request.POST.get("next")
         if next_url and urlparse(next_url).netloc == "":
             return redirect(next_url)
         return redirect(reverse_lazy("leave_tracker"))
 
     def form_invalid(self, form):
-        leave_type = self.kwargs.get("pk")
-        leave_balance = LeaveBalanceOpenings.objects.filter(
-            user=self.request.user, leave_type_id=leave_type
-        ).first()
-        context = self.get_context_data(form=form, leave_balance=leave_balance)
-        messages.success(self.request, "Leave application failed")
+        """Handle form submission failure."""
+        context = self.get_context_data(form=form)
+        messages.error(self.request, "Leave application failed. Please correct the errors below.")
         return self.render_to_response(context)
 
     def get_context_data(self, **kwargs):
+        """Prepare context data for the template."""
         context = super().get_context_data(**kwargs)
-        leave_type = kwargs.get("leave_type", self.kwargs.get("pk"))
-        leave_balance = kwargs.get(
-            "leave_balance",
-            LeaveBalanceOpenings.objects.filter(
-                user=self.request.user, leave_type_id=leave_type
-            ).first(),
+        leave_type_id = self.kwargs.get("pk")
+
+        # Fetch leave balance for the specified leave type
+        leave_balance = LeaveBalanceOpenings.objects.filter(
+            user=self.request.user, leave_type_id=leave_type_id
+        ).first()
+
+        # Add data to the context
+        context.update(
+            {
+                "leave_balance": leave_balance,
+                "form": kwargs.get(
+                    "form", LeaveApplicationForm(user=self.request.user, leave_type=leave_type_id)
+                ),
+                "urls": [
+                    ("dashboard", {"label": "Dashboard"}),
+                    ("leave_tracker", {"label": "Leave Tracker"}),
+                ],
+            }
         )
-        context["form"] = kwargs.get(
-            "form", LeaveApplicationForm(user=self.request.user, leave_type=leave_type)
-        )
-        context["leave_balance"] = leave_balance
-        urls = [
-            ("dashboard", {"label": "Dashboard"}),
-            ("leave_tracker", {"label": "Leave Tracker"}),
-        ]
-        context["urls"] = urls
         return context
 
 
@@ -368,24 +465,40 @@ class LeaveApplicationListView(View,LeaveListViewMixin):
 
         return JsonResponse(data)
 
-class EventPageView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+class EventPageView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/calendar.html"
-    permission_required = "hrms_app.view_attendancelog"
-    permission_denied_message = _("You do not have permission to access this page.")
+    model = AttendanceLog  # Or the model you want to check permissions for
+    permission_action = "view"  # Action (view, add, change, delete)
 
-    def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
+    def dispatch(self, request, *args, **kwargs):
+        """Check if the user has the required permission dynamically."""
+        opts = self.model._meta  # Get the model's meta data
+        perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"  # Format permission name
+        
+        if not request.user.has_perm(perm):
+            logger.warning(f"Permission denied for user {request.user}. Required: {perm}")
+            raise PermissionDenied("You do not have permission to access this resource.")
+        
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
+        """Prepare the context for the template."""
         context = super().get_context_data(**kwargs)
+        
+        form = EmployeeChoices(self.request.GET)  # Add any forms if needed
 
-        urls = [
-            ("dashboard", {"label": "Dashboard"}),
-            ("calendar", {"label": "Attendance Calendar"}),
-        ]
-        context["urls"] = urls
+        # Add dynamic context for the template
+        context.update(
+            {
+                "current_date": now(),
+                "form": form,
+                "urls": [
+                    ("dashboard", {"label": "Dashboard"}),
+                    ("calendar", {"label": "Attendance Calendar"}),
+                ],
+            }
+        )
         return context
-
 
 class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = AttendanceLog
@@ -452,10 +565,17 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
 class EventListView(View):
     def get(self, request, *args, **kwargs):
+        user_id = request.GET.get("employees", request.user.id)
+        try:
+            user = User.objects.get(pk=user_id)
+        except User.DoesNotExist:
+            return JsonResponse({"error": "User not found"}, status=404)
+
         holidays = Holiday.objects.all()
-        attendances = AttendanceLog.objects.filter(applied_by=request.user)
-        leave_applications = LeaveApplication.objects.filter(appliedBy=request.user)
-        tour_applications = UserTour.objects.filter(applied_by=request.user)
+        attendances = AttendanceLog.objects.filter(applied_by=user)
+        leave_applications = LeaveApplication.objects.filter(appliedBy=user)
+        tour_applications = UserTour.objects.filter(applied_by=user)
+        
         events_data = [
             {
                 "id": holiday.pk,
@@ -644,50 +764,94 @@ class AddHolidaysView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         return self.success_url
 
 
-class TourTrackerView(PermissionRequiredMixin, UserPassesTestMixin, TemplateView):
+class TourTrackerView(LoginRequiredMixin,SingleTableMixin, FilterView):
     template_name = "hrms_app/tour-tracker.html"
-    permission_required = "hrms_app.add_usertour"
+    model = UserTour
+    table_class = UserTourTable
+    permission_action = "view"
 
-    def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
+    def dispatch(self, request, *args, **kwargs):
+        """Check if the user has the required permission dynamically."""
+        opts = self.model._meta
+        perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"
+        if not request.user.has_perm(perm):
+            raise PermissionDenied("You do not have permission to access this resource.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_queryset(self):
+        """Filter tours based on the logged-in user's tours and their employees' tours."""
+        user = self.request.user
+        # Get the user's own tours and the tours assigned to their employees
+        user_tours = UserTour.objects.filter(applied_by=user)
+
+        # Get the search query parameter (if any)
+        search_term = self.request.GET.get("search", "").strip()
+
+        if search_term:
+            # Perform a case-insensitive search across multiple fields
+            user_tours = user_tours.filter(
+                Q(applied_by__username__icontains=search_term) |  # Search by username
+                Q(applied_by__first_name__icontains=search_term) |  # Search by first name
+                Q(applied_by__last_name__icontains=search_term) |  # Search by last name
+                Q(from_destination__icontains=search_term) |  # Search by from_destination
+                Q(to_destination__icontains=search_term)  # Search by to_destination
+            )
+
+        return user_tours
 
     def get_context_data(self, **kwargs):
+        """Prepare the context for the template."""
         context = super().get_context_data(**kwargs)
         user = self.request.user
         form = FilterForm(self.request.GET)
 
-        # Start with an initial QuerySet for leaves
-        tours = UserTour.objects.filter(applied_by__in=user.employees.all())
+        # Get the user's own tours
+        user_tours = UserTour.objects.filter(applied_by=user)
 
-        if form.is_valid():
-            selected_status = form.cleaned_data.get("status", settings.PENDING)
-            from_date = form.cleaned_data.get("fromDate")
-            to_date = form.cleaned_data.get("toDate")
-            if not selected_status:
-                tours = tours.filter(status=settings.PENDING)
-            if selected_status:
-                tours = tours.filter(status=selected_status)
-            if from_date:
-                tours = tours.filter(startDate__gte=from_date)
-            if to_date:
-                tours = tours.filter(endDate__lte=to_date)
+        # Apply additional filters (status, date, etc.)
+        selected_status = form.cleaned_data.get("status", settings.PENDING) if form.is_valid() else settings.PENDING
+        from_date = form.cleaned_data.get("fromDate")
+        to_date = form.cleaned_data.get("toDate")
 
+        if selected_status:
+            user_tours = user_tours.filter(status=selected_status)
+        if from_date:
+            user_tours = user_tours.filter(startDate__gte=from_date)
+        if to_date:
+            user_tours = user_tours.filter(endDate__lte=to_date)
+
+        # Get the tours assigned to the user's employees (if the user is an RM)
+        if user.is_rm:
+            employee_tours = UserTour.objects.filter(applied_by__in=user.employees.all())
+            context.update(
+                {
+                    "employee_tours": employee_tours,
+                }
+            )
+        else:
+            # If not RM, show both the user's own and the employees' tours
+            employee_tours = UserTour.objects.filter(applied_by__in=user.employees.all())
+            context.update(
+                {
+                    "user_tours": user_tours,
+                    "employee_tours": employee_tours,
+                }
+            )
+
+        # Add the current date and URLs for navigation
         context.update(
             {
-                "current_date": datetime.now(),
+                "current_date": now(),
                 "form": form,
-                "objects": tours,
-                "selected_status": selected_status,
+                "search_term": self.request.GET.get("search", ""),  # Add search term to context
+                "urls": [
+                    ("dashboard", {"label": "Dashboard"}),
+                    ("tour_tracker", {"label": "Tour Tracker"}),
+                ],
             }
         )
 
-        urls = [
-            ("dashboard", {"label": "Dashboard"}),
-            ("tour_tracker", {"label": "Tour Tracker"}),
-        ]
-        context["urls"] = urls
         return context
-
 
 class ApplyTourView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = UserTour
@@ -787,6 +951,13 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         )
         context["urls"] = urls
         return context
+    
+    def get_success_url(self):
+        return reverse_lazy(
+            "tour_application_detail", kwargs={"slug": self.object.slug}
+        )
+
+
 
 
 class TourApplicationDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
@@ -809,8 +980,8 @@ class TourApplicationDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteV
 
 class TourApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = UserTour
-    form_class = TourStatusUpdateForm
-    template_name = "hrms_app/tour_application_detail.html"
+    form_class = TourForm
+    template_name = "hrms_app/apply-tour.html"
     permission_required = "hrms_app.change_usertour"
 
     def test_func(self):
@@ -912,7 +1083,7 @@ TEMPLATES = {
 }
 
 
-class UserCreationWizard(SessionWizardView):
+class UserCreationWizard(LoginRequiredMixin,SessionWizardView):
     file_storage = FileSystemStorage(location=settings.MEDIA_ROOT)
     template_name = "hrms_app/form_wizard.html"
     url_name = reverse_lazy("/")
@@ -944,6 +1115,7 @@ class UserCreationWizard(SessionWizardView):
             instance = None
 
             if model_class == CustomUser:
+                # Fetch the existing user instance for the user form
                 instance = model_class.objects.filter(pk=user.pk).first()
             else:
                 instance = model_class.objects.filter(user_id=user.pk).first()
@@ -951,6 +1123,53 @@ class UserCreationWizard(SessionWizardView):
             return model_to_dict(instance) if instance else None
 
         return super().get_form_initial(step)
+
+    def done(self, form_list, **kwargs):
+        try:
+            with transaction.atomic():
+                return self._extracted_from_done_4(form_list)
+        except Exception as e:
+            logger.error(f"Error during form submission in done method: {e}")
+            return self.render_error_page()
+
+    def _extracted_from_done_4(self, form_list):
+        user_form = form_list[0]
+        personal_details_form = form_list[1]
+        paddress_form = form_list[2]
+        caddress_form = form_list[3]
+
+        # Get user instance from the form or create if not found
+        user = self.get_user_instance()
+        
+        if not user:
+            # If no user instance, create a new user from user_form data
+            user = user_form.save(commit=False)
+            user.set_password("12345@Kmpcl")  # Set a default password for new users
+            user.save()
+        else:
+            # If the user exists, update the existing user instance
+            user = user_form.save(commit=False)
+
+        # Save or update related models (PersonalDetails, Addresses, etc.)
+        personal_details = personal_details_form.save(commit=False)
+        personal_details.user = user
+        personal_details.save()
+
+        paddress = paddress_form.save(commit=False)
+        paddress.user = user
+        paddress.save()
+
+        caddress = caddress_form.save(commit=False)
+        caddress.user = user
+        caddress.save()
+
+        # Update progress status once all data is saved
+        FormProgress.objects.filter(user=user).update(status="completed")
+        return redirect("employees")
+
+    def render_error_page(self):
+        # Render error page in case of failure
+        return redirect("error_page")
 
     def post(self, *args, **kwargs):
         current_step = self.steps.current
@@ -978,40 +1197,6 @@ class UserCreationWizard(SessionWizardView):
             logger.error(f"Error saving form data for step {current_step}: {e}")
             raise
 
-    def done(self, form_list, **kwargs):
-        try:
-            with transaction.atomic():
-                return self._extracted_from_done_4(form_list)
-        except Exception as e:
-            logger.error(f"Error during form submission in done method: {e}")
-            return self.render_error_page()
-
-    def _extracted_from_done_4(self, form_list):
-        user_form = form_list[0]
-        personal_details_form = form_list[1]
-        paddress_form = form_list[2]
-        caddress_form = form_list[3]
-        user = self.get_user_instance()
-        if not user:
-            user = user_form.save(commit=False)
-            user.set_password("12345@Kmpcl")
-            user.save()
-
-        # Save all the other form data
-        personal_details = personal_details_form.save(commit=False)
-        personal_details.user = user
-        personal_details.save()
-
-        paddress = paddress_form.save(commit=False)
-        paddress.user = user
-        paddress.save()
-
-        caddress = caddress_form.save(commit=False)
-        caddress.user = user
-        caddress.save()
-
-        FormProgress.objects.filter(user=user).update(status="completed")
-        return redirect("employees")
 
     def render_error_page(self):
         return redirect("error_page")

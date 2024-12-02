@@ -1,7 +1,6 @@
 from django.urls import path
 from django.shortcuts import render
-from hrms_app.views import views
-from hrms_app.views import auth_views
+from hrms_app.views import views,api_views,auth_views,report_view
 
 
 class CustomSite:
@@ -39,8 +38,8 @@ class CustomSite:
 
 site = CustomSite()
 
-
-site.register_view('', views.HomePageView, name='dashboard')
+app_name = 'hrms'
+site.register_view('dashboard', views.HomePageView, name='dashboard')
 site.register_view('login/', auth_views.LoginView, name='login')
 site.register_view('logout/', auth_views.LogoutView, name='logout')
 site.register_view('reset-password/', auth_views.PasswordResetView, name='reset_password')
@@ -51,7 +50,7 @@ site.register_view('password-change/', views.ChangePasswordView, name='password_
 site.register_view('password-change-done/', auth_views.PasswordChangeDoneView, name='password_change_done')
 site.register_view('leave-tracker/', views.LeaveTrackerView, name='leave_tracker')
 site.register_view('apply-leave/', views.ApplyLeaveView, name='apply_leave')
-site.register_view('attendance/', views.EventPageView, name='calendar')
+site.register_view('', views.EventPageView, name='calendar')
 site.register_view('attendance/<slug:slug>/', views.EventDetailPageView, name='event_detail')
 site.register_view('profile/', views.ProfilePageView, name='profile')
 site.register_view('apply-leave/<int:pk>/', views.ApplyLeaveView, name='apply_leave_with_id')
@@ -66,3 +65,10 @@ site.register_view('tour/<int:pk>/delete', views.TourApplicationDeleteView, name
 site.register_view('tours/<slug:slug>/upload_bill/', views.UploadBillView, name='upload_bill')
 site.register_view('employees/', views.EmployeeListView, name='employees')
 site.register_view('employee-profile/<int:pk>/', views.EmployeeProfileView, name='employee_profile')
+
+
+###############################################################################################
+######                                Reports URLS                                        #####
+###############################################################################################
+site.register_view('attendance-report/', report_view.MonthAttendanceReportView, name='attendance_report')
+
