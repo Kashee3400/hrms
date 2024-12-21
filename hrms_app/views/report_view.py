@@ -49,7 +49,7 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             "leave_type__leave_type_short_code",
             "leave_type__half_day_short_code",
         )
-        tour_logs = leave_logs.values(
+        tour_logs = tour_logs.values(
             "applied_by_id",
             "start_date",
             "end_date",
@@ -193,7 +193,7 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
         Fetch all attendance logs in one query for the selected employees and date range.
         """
         return UserTour.objects.filter(
-            appliedBy__in=employees, start_date__gte=start_date, end_date__lte=end_date,status=settings.APPROVED
+            applied_by__in=employees, start_date__gte=start_date, end_date__lte=end_date,status=settings.APPROVED
         ).select_related("applied_by")
 
 def format_emp_code(emp_code):
