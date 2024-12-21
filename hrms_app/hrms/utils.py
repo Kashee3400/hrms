@@ -7,6 +7,7 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from hrms_app.models import Holiday
+from rest_framework.response import Response
 
 def send_email(subject, template_name, context, from_email, recipient_list):
     """
@@ -30,17 +31,18 @@ def send_email(subject, template_name, context, from_email, recipient_list):
     )
 
 
-def call_soap_api(device_instance):
+def call_soap_api(device_instance,from_date , to_date):
     url = device_instance.api_link
     headers = {"Content-Type": "text/xml"}
     params = {"op": "GetTransactionsLog"}
-
+    attendance_start_date = device_instance.from_date if from_date is None else from_date
+    attendance_to_date = device_instance.to_date if to_date is None else to_date
     body = f"""<?xml version="1.0" encoding="utf-8"?>
     <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
         <soap:Body>
             <GetTransactionsLog xmlns="http://tempuri.org/">
-                <FromDateTime>{device_instance.from_date}</FromDateTime>
-                <ToDateTime>{device_instance.to_date}</ToDateTime>
+                <FromDateTime>{attendance_start_date}</FromDateTime>
+                <ToDateTime>{attendance_to_date}</ToDateTime>
                 <SerialNumber>{device_instance.serial_number}</SerialNumber>
                 <UserName>{device_instance.username}</UserName>
                 <UserPassword>{device_instance.password}</UserPassword>
@@ -51,7 +53,6 @@ def call_soap_api(device_instance):
     """
 
     response = requests.post(url, params=params, data=body, headers=headers)
-
     if response.status_code == 200:
         root = ET.fromstring(response.content)
 
@@ -70,10 +71,18 @@ def call_soap_api(device_instance):
                 log_time_str = " ".join(
                     parts[1:]
                 )  # Join the remaining parts as log_time_str
+                
                 try:
-                    log_time = datetime.strptime(log_time_str, "%Y-%m-%d %H:%M:%S")
-                    date_key = log_time.date()
+                    if not device_instance.include_seconds:
+                        # Remove the seconds part if present
+                        log_time_str = log_time_str.rsplit(":", 1)[0]
+                        time_format = "%Y-%m-%d %H:%M"
+                    else:
+                        time_format = "%Y-%m-%d %H:%M:%S"
 
+                    log_time = datetime.strptime(log_time_str, time_format)
+                    
+                    date_key = log_time.date()
                     grouped_data[emp_code][date_key].append(log_time)
                 except ValueError as e:
                     print(f"Issue parsing line: {line}. Error: {e}")
@@ -81,9 +90,9 @@ def call_soap_api(device_instance):
                 print(f"Issue parsing line: {line}. Insufficient data.")
 
         return grouped_data
-
     else:
-        print(f"Error: {response.status_code} - {response.reason}")
+        print(f"Error: Response returned with status code {response.status_code}")
+        return None
 
 
 def is_weekend(date):
@@ -103,10 +112,6 @@ def get_non_working_days(start, end):
     return non_working_days
 
 
-
-
-from rest_framework.response import Response
-
 def create_response(status: str, message: str, data: dict = None, status_code: int = 200) -> Response:
     response_data = {
         "status": status,
@@ -114,5 +119,4 @@ def create_response(status: str, message: str, data: dict = None, status_code: i
         "data": data
     }
     return Response(response_data, status=status_code)
-
 

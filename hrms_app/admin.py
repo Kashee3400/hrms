@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from hrms_app.hrms.form import *
-from hrms_app.hrms.resources import  CustomUserResource
+from hrms_app.hrms.resources import  CustomUserResource,HolidayResource
 from .models import *
 from django_ckeditor_5.widgets import CKEditor5Widget
 from django.utils.safestring import mark_safe
@@ -24,10 +24,14 @@ admin.site.register(CustomUser, CustomUserAdmin)
 
 class LeaveTypeAdmin(admin.ModelAdmin):
     form = LeaveTypeForm
-    list_display = ['leave_type', 'leave_type_short_code', 'min_notice_days'
+    list_display = ['leave_type', 'leave_type_short_code','half_day_short_code', 'min_notice_days'
         , 'max_days_limit', 'min_days_limit', 'allowed_days_per_year', 'leave_fy_start', 'leave_fy_end',
-                    'color_representation', 'text_color_representation', 'created_at', 'created_by', 'updated_at',
+                    'created_at', 'created_by', 'updated_at',
                     'updated_by','consecutive_restriction']
+    
+    fields = ('leave_type', 'leave_type_short_code','half_day_short_code', 'min_notice_days'
+        ,'max_days_limit', 'min_days_limit', 'allowed_days_per_year', 'leave_fy_start', 'leave_fy_end','consecutive_restriction')
+
     
     search_fields = ['leave_type']
     
@@ -50,21 +54,17 @@ class LeaveTypeAdmin(admin.ModelAdmin):
 
 admin.site.register(LeaveType, LeaveTypeAdmin)
 
-
-class HolidayAdmin(admin.ModelAdmin):
+class HolidayAdmin(ImportExportModelAdmin):
+    resource_class = HolidayResource
     form = HolidayForm
-
-    list_display = ['title', 'short_code', 'start_date'
-        , 'end_date', 'desc', 'color_representation']
+    list_display = ['title', 'short_code', 'start_date', 'end_date', 'desc', 'color_representation']
 
     def color_representation(self, obj):
         return mark_safe(f'<div style="width: 30px; height: 20px; background-color: {obj.color_hex}"></div>')
 
     color_representation.short_description = 'Color'
 
-
 admin.site.register(Holiday, HolidayAdmin)
-
 
 class AttendanceStatusColorAdmin(admin.ModelAdmin):
     form = AttendanceStatusColorForm
@@ -90,8 +90,9 @@ admin.site.register(AttendanceSetting, AttendanceSettingAdmin)
 class AttendanceLogAdmin(admin.ModelAdmin):
     list_display = (
         'applied_by', 'start_date', 'end_date', 'att_status', 'duration', 'color_representation', 'is_regularisation',
-        'is_submitted')
-    search_fields = ['applied_by__first_name', 'applied_by__last_name']
+        'is_submitted','slug')
+    search_fields = ['applied_by__first_name','applied_by__username', 'applied_by__last_name']
+    list_filter = ['start_date', 'end_date',]
 
     def color_representation(self, obj):
         return mark_safe(f'<div style="width: 30px; height: 20px; background-color: {obj.color_hex}"></div>')
@@ -111,7 +112,8 @@ admin.site.register(AttendanceLogAction, AttendanceLogActionAdmin)
 
 
 class UserTourAdmin(admin.ModelAdmin):
-    list_display = ('applied_by', 'from_destination', 'to_destination', 'start_date', 'end_date', 'status')
+    list_display = ('applied_by', 'from_destination', 'to_destination', 'start_date', 'end_date', 'status','total')
+    search_fields = ['username','user__first_name', 'user__last_name']
     formfield_overrides = {
         models.TextField: {'widget': CKEditor5Widget()},
     }
@@ -125,7 +127,7 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
         'user', 'leave_type', 'year', 'no_of_leaves', 'remaining_leave_balances', 'opening_balance','closing_balance','created_at', 'created_by',
         'updated_at',
         'updated_by')
-    search_fields = ['user__first_name', 'user__last_name']
+    search_fields = ['username','user__first_name', 'user__last_name']
     
     readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
 
@@ -332,3 +334,10 @@ class MaritalStatusAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     readonly_fields = ('created_at',)
 
+@admin.register(LeaveDay)
+class LeaveDayAdmin(admin.ModelAdmin):
+    list_display = ("leave_application", "date", "is_full_day")
+    list_filter = ("is_full_day", "date")
+    search_fields = ("leave_application__applicationNo", "leave_application__appliedBy__username")
+    date_hierarchy = "date"
+    ordering = ("-date",)

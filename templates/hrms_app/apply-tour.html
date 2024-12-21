@@ -5,10 +5,8 @@
   {{ request.user.first_name }} | Apply Tour
 {% endblock %}
 
-{% block xtra_css %}
-  <link rel="stylesheet" href="{% static 'css/status.css' %}" />
-  <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.13.18/jquery.timepicker.min.css" />
+{% block extrastyle %}
+  <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
   <style>
     .required {
       color: red;
@@ -16,94 +14,67 @@
   </style>
 {% endblock %}
 
-{% block content_main %}
-  {% render_breadcrumb 'Tour Applcation' urls %}
+{% block content %}
+  {% render_breadcrumb 'Tour Application' urls %}
 
-  <div class="container bg-light m-2">
-    <h6 class="m-5">Note: All <span style="color: red;">*</span> marked are required.</h6>
+  <div class="bg-white p-4">
+    <h6 class="mb-4">Note: All <span class="text-danger">*</span> marked fields are required.</h6>
     <form id="apply-tour-form" method="post">
       {% csrf_token %}
-      <div class="row">
+      <div class="row g-3">
         {% for field in form %}
           {% if field.name != 'remarks' %}
-            <div class="cell-md-4 cell-12">
-              {{ field.label_tag }}<span class="required">*</span>
+            <div class="col-md-4 col-12">
+              {{ field.label_tag }}<span class="text-danger">*</span>
               {{ field }}
               {% if field.errors %}
-                <div class="fg-red">{{ field.errors }}</div>
+                <div class="text-danger">{{ field.errors }}</div>
               {% endif %}
-              <small class="help-text">{{ field.help_text }}</small>
+              <small class="form-text text-muted">{{ field.help_text }}</small>
             </div>
           {% endif %}
         {% endfor %}
 
-        <div class="cell-12">
-          {{ form.remarks.label_tag }}<span class="required">*</span>
+        <div class="col-12">
+          {{ form.remarks.label_tag }}<span class="text-danger">*</span>
           {{ form.remarks }}
           {% if form.remarks.errors %}
-            <div class="fg-red">{{ form.remarks.errors }}</div>
+            <div class="text-danger">{{ form.remarks.errors }}</div>
           {% endif %}
-          <small class="help-text">{{ form.remarks.help_text }}</small>
+          <small class="form-text text-muted">{{ form.remarks.help_text }}</small>
         </div>
       </div>
 
-      <div class="row mt-2 mx-2">
-        <div class="cell-12">
-          <button type="button" class="button alert" onclick="Metro.dialog.open('#openDailog')">Apply Tour</button>
+      <div class="row mt-3">
+        <div class="col-12 text-center">
+          <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#confirmationModal"><i class="mdi mdi-airplane-takeoff menu-icon"></i>Apply Tour</button>
         </div>
       </div>
     </form>
   </div>
-  <div class="dialog" data-role="dialog" id="openDailog">
-    <div class="dialog-title bg-alert">Are you sure?</div>
-    <div class="dialog-content">You want to apply for tour. Please Check details before you submit.</div>
-    <div class="dialog-actions">
-      <div class="row">
-        <div class="dialog-actions">
-          <button type="reset" class="button js-dialog-close">Cancel</button>
-          <button type="button" class="button primary js-dialog-close" onclick="submitForm()">Submit</button>
+
+  <!-- Modal -->
+  <div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title" id="confirmationModalLabel">Are you sure?</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">You want to apply for a tour. Please check the details before you submit.</div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" onclick="submitForm()">Submit</button>
         </div>
       </div>
     </div>
   </div>
 {% endblock %}
 
-{% block xtra_js %}
-  <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-timepicker/1.13.18/jquery.timepicker.min.js"></script>
+{% block extra_js %}
   <script>
-    ClassicEditor.create(document.querySelector('#id_remarks'))
-      .then((editor) => {
-        window.editor = editor
-      })
-      .catch((error) => {
-        console.error(error)
-      })
     function submitForm() {
       $('#apply-tour-form').submit()
     }
-  </script>
-  <script>
-    $(document).ready(function () {
-      // Optional: Add change event for start_date to update min date dynamically
-      $('#id_start_date').change(function () {
-        var startDate = $('#id_start_date').val()
-        $('#id_end_date').val('')
-        if (startDate) {
-          var startDateObj = new Date(startDate)
-          startDateObj.setDate(startDateObj.getDate() - 1)
-          var minDate = startDateObj.toISOString().split('T')[0]
-          $('#id_end_date').attr('data-min-date', minDate)
-        }
-      })
-      $('#start_time').timepicker({
-        // Configure timepicker options here
-        change: function (selectedTime) {
-          $('#end_time').timepicker('option', 'minTime', selectedTime)
-        }
-      })
-    
-      $('#end_time').timepicker()
-    })
   </script>
 {% endblock %}

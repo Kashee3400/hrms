@@ -120,6 +120,6 @@ CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "Asia/Kolkata"
 
 
-LOGO_URL = "hrms_app/source/images/kashee.png"
-LOGO_MINI_URL = "hrms_app/source/images/kashee.png"
+LOGO_URL = "hrms_app/img/logo.png"
+LOGO_MINI_URL = "hrms_app/img/logo.png"
 

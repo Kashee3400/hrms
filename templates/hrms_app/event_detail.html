@@ -5,7 +5,7 @@
   {{ user }} | {{ object.title }}
 {% endblock %}
 
-{% block xtra_css %}
+{% block extrastyle %}
   <style>
     .center-row {
       display: flex;
@@ -14,157 +14,136 @@
   </style>
 {% endblock %}
 
-{% block content_main %}
+{% block content %}
   {% render_breadcrumb 'Attendance' urls %}
-  <div class="container">
-    <div class="row" style="display: flex; justify-content: center;">
-      <div class="cell-md-6 cell-sm-12 mt-4">
-        <div data-role="panel" data-title-caption="{{ object.title }}" data-title-icon="<span class='mif-apps'></span>">
-          <div class="bg-white p-4">
-            <div class="skill-box mt-4-minus">
-              <ul class="skills">
-                <li>
-                  <span>Login Time:</span>
-                  <span class="badge">{{ object.start_date }}</span>
+
+  <div class="mt-4">
+    <div class="row justify-content-center">
+      <div class="col-md-6 col-sm-12 mb-4">
+        <div class="card">
+          <div class="card-header d-flex align-items-center">
+            <span class="me-2"><i class="bi bi-grid"></i></span>
+            <span>{{ object.title }}</span>
+          </div>
+          <div class="card-body">
+            <div class="mb-4">
+              <ul class="list-group list-group-flush">
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <span><b>Login Time:</b></span>
+                  <span class="badge bg-info">{{ object.start_date }}</span>
                 </li>
-                <li>
-                  <span>Logout Time:</span>
-                  <span class="badge">{{ object.end_date }}</span>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <span><b>Logout Time:</b></span>
+                  <span class="badge bg-info">{{ object.end_date }}</span>
                 </li>
-                <li>
-                  <span>Working Hours:</span>
-                  <span class="badge">{{ object.duration.hour }} Hrs and {{ object.duration.minute }} Mins</span>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <span><b>Working Hours:</b></span>
+                  <span class="badge bg-secondary">{{ object.duration.hour }} Hrs and {{ object.duration.minute }} Mins</span>
                 </li>
-                <li>
-                  <span>Status:</span>
-                  <span class="badge bg-green fg-white">{{ object.att_status }}</span>
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <span><b>Status:</b></span>
+                  <span class="badge bg-success text-white">{{ object.att_status }}</span>
                 </li>
               </ul>
             </div>
           </div>
-          {% if object.actions.all %}
-            <div data-role="panel" data-title-caption="Follow ups" data-collapsed="false" data-collapsible="true">
-              <ul>
-                {% for log in object.actions.all|dictsortreversed:'timestamp' %}
-                  <li style="background-color: azure; padding: 0.5rem; margin: 0.5rem;">
-                    <strong class="{{ log.action }}">{{ log.action|capfirst }}</strong> by {{ log.action_by_name }} - {{ log.timestamp|naturaltime }}
-                  </li>
-                {% empty %}
-                  <li>No logs available.</li>
-                {% endfor %}
-              </ul>
-            </div>
-          {% endif %}
         </div>
       </div>
       {% if object.is_regularisation %}
-        <div class="cell-md-6 cell-sm-12 mt-4">
-          <div data-role="panel" data-title-caption="{{ object.reg_status }}" data-title-icon="<span class='mif-apps'></span>">
-            <div class="row">
-              <div class="cell-lg-6">
-                <div class="bg-white p-1 m-1">
-                  <div class="form-group">
-                    <label for="from_date">From :</label>
-                    <input type="text" id="from_date" data-role="input" value="{{ object.from_date }}" readonly />
-                  </div>
-                </div>
-              </div>
-              <div class="cell-lg-6">
-                <div class="bg-white p-1 m-1">
-                  <div class="form-group">
-                    <label for="to_date">To :</label>
-                    <input type="text" data-role="input" id="to_date" value="{{ object.to_date }}" readonly />
+        <div class="col-md-6 col-sm-12 mb-4">
+          {% if object.actions.all %}
+            <div class="accordion" id="followUpsAccordion">
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="followUpsHeader"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#followUpsCollapse" aria-expanded="true" aria-controls="followUpsCollapse">Follow Ups</button></h2>
+                <div id="followUpsCollapse" class="accordion-collapse collapse show" aria-labelledby="followUpsHeader">
+                  <div class="accordion-body">
+                    <ul class="list-unstyled">
+                      {% for log in object.actions.all|dictsortreversed:'timestamp' %}
+                        <li class="p-2 mb-2" style="background-color: azure;">
+                          <strong class="{{ log.action }}">{{ log.action|capfirst }}</strong> by {{ log.action_by_name }} - {{ log.timestamp|naturaltime }}
+                        </li>
+                      {% empty %}
+                        <li>No logs available.</li>
+                      {% endfor %}
+                    </ul>
                   </div>
                 </div>
               </div>
             </div>
-            <div class="row">
-              <div class="cell-lg-6 cell-sm-12 cell-md-6">
-                <div class="bg-white p-1">
-                  <div class="form-group">
-                    <label for="reg_duration">Duration :</label>
-                    <input type="text" id="reg_duration" data-role="input" value="{{ object.reg_duration }}" readonly />
-                  </div>
-                </div>
-              </div>
-              <div class="cell-lg-6 cell-sm-12 cell-md-6">
-                <div class="bg-white p-1 m-1">
-                  <label for="status">Status :</label>
-                  <select data-role="select" id="status" disabled>
-                    <option>{{ object.status|capfirst }}</option>
-                  </select>
-                </div>
-              </div>
+          {% else %}
+            <div class="alert">No Follow ups</div>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+    <div class="col-md-12 col-sm-12 mb-4">
+      <div class="card">
+        <div class="card-header d-flex align-items-center">
+          <span class="me-2"><i class="bi bi-grid"></i></span>
+          <span>{{ object.reg_status|capfirst }}</span>
+        </div>
+        <div class="card-body">
+          {% if object.is_submitted %}
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="submittedCheckbox" checked disabled />
+              <label class="form-check-label" for="submittedCheckbox">Submitted</label>
             </div>
-            {% if object.is_submitted %}
-              <input type="checkbox" data-role="checkbox" data-caption="Submitted" checked disabled />
-            {% endif %}
-            <form id="reg-application-form" method="post">
-              {% csrf_token %}
-              <div class="row">
-                {% if form.reason %}
-                  <div class="cell-lg-12 cell-sm-12 cell-md-12">
-                    <div class="bg-white p-1 m-1">
-                      <div class="form-group">
-                        <label for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
-                        {{ form.reason }}
-                        {% if form.reason.errors %}
-                          <div class="form-error">
-                            {% for error in form.reason.errors %}
-                              <ul>{{ error }}</ul>
-                            {% endfor %}
-                          </div>
-                        {% endif %}
+          {% endif %}
+          <form id="reg-application-form" method="post">
+            {% csrf_token %}
+            <div class="row">
+              {% for field in form %}
+                <div class="col-lg-3 col-md-4 col-sm-12 mb-3">
+                  <div class="form-group">
+                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                      <div class="invalid-feedback d-block">
+                        <ul class="mb-0">
+                          {% for error in field.errors %}
+                            <li>{{ error }}</li>
+                          {% endfor %}
+                        </ul>
                       </div>
-                    </div>
+                    {% endif %}
                   </div>
+                </div>
+              {% endfor %}
+            </div>
+            <div class="d-flex justify-content-end">
+              <button type="button" class="btn btn-primary {% if user == object.applied_by and not object.status == 'pending' %}disabled{% endif %}" data-bs-toggle="modal" data-bs-target="#updateDialog">
+                {% if not is_manager %}
+                  Submit For Regularization
+                {% else %}
+                  Approve Regularization
                 {% endif %}
-                {% if form.status %}
-                  <div class="cell-lg-12 cell-sm-12 cell-md-12">
-                    <div class="bg-white p-1 m-1">
-                      <div class="form-group">
-                        <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
-                        {{ form.status }}
-                        {% if form.status.errors %}
-                          <div class="notification error">
-                            {% for error in form.status.errors %}
-                              <p>{{ error }}</p>
-                            {% endfor %}
-                          </div>
-                        {% endif %}
-                      </div>
-                    </div>
-                  </div>
-                {% endif %}
-              </div>
-              <hr />
-              <div class="container">
-                <button type="button" class="button {% if user == object.applied_by and not object.status == 'pending' %}disabled{% endif %} primary" onclick="Metro.dialog.open('#updateDailog')">
-                  <img src="{% static 'hrms_app/source/images/checkmark.png' %}" />
-                  {% if not is_manager %}
-                    Submit For Regularization
-                  {% else %}
-                    Approve Regularization
-                  {% endif %}
-                </button>
-              </div>
-            </form>
-          </div>
-          <div class="dialog" data-role="dialog" id="updateDailog">
-            <div class="dialog-title">Are you sure?</div>
-            <div class="dialog-content">You want to update the {{ object.reg_status|upper }} duration {{ object.reg_duration }}</div>
-            <div class="dialog-actions">
-              <button type="reset" class="button js-dialog-close">Cancel</button>
-              <button type="button" class="button primary js-dialog-close" onclick="submitForm()">Submit</button>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal fade" id="updateDialog" tabindex="-1" aria-labelledby="updateDialogLabel" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="updateDialogLabel">Are you sure?</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">You want to update the {{ object.reg_status|upper }} duration {{ object.reg_duration }}</div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" onclick="submitForm()">Submit</button>
             </div>
           </div>
         </div>
-      {% endif %}
+      </div>
     </div>
   </div>
 {% endblock %}
 
-{% block xtra_js %}
+{% block extra_js %}
+<script src="{% static 'hrms_app/js/attendance_log.js' %}"></script>
   <script>
     function submitForm() {
       document.getElementById('reg-application-form').submit()

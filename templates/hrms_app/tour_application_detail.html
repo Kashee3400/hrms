@@ -1,15 +1,12 @@
 {% extends 'hrms_app/base.html' %}
-{% load static %}
-{% load hrms_tag humanize %}
-{{ form.media }}
+{% load static hrms_tag humanize %}
 {% block title %}
   {{ user.get_full_name }} | {{ tour_application.from_destination }}
 {% endblock %}
-{% block xtra_css %}
+{% block extrastyle %}
   <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 {% endblock %}
-{% block content_main %}
+{% block content %}
   {% render_breadcrumb 'Tour Detail' urls %}
 
   {% if form.non_field_errors %}
@@ -19,159 +16,161 @@
       {% endfor %}
     </div>
   {% endif %}
-
-  <div class="container bg-light" style="margin: 10px; padding: 10px;">
+  <div class="container bg-light my-3 p-3">
     <div class="row">
-      <div class="cell">
-        <div class="skill-box">
-          <div class="header bg-green fg-white">
-            {% if tour_application.applied_by.personal_detail.avatar %}
-              <img src="{{ tour_application.applied_by.personal_detail.avatar.url }}" class="avatar" alt="Avatar" />
-            {% endif %}
-            <div class="title">{{ tour_application.applied_by }}</div>
-            <div class="subtitle">{{ tour_application.slug|upper }}</div>
-          </div>
-          <ul class="skills">
-            <li class="tour-step">
-              <span class="step-label">Boarding</span>
-              <span class="badge">{{ tour_application.from_destination }} ({{ tour_application.start_date }} - {{ tour_application.start_time }})</span>
-              <span class="arrow"><i class="fas fa-arrow-right"></i></span>
-              <span class="step-label">Destination</span>
-              <span class="badge">{{ tour_application.to_destination }} ({{ tour_application.end_date }} - {{ tour_application.end_time }})</span>
-            </li>
-
-            <li>
-              <span>Status</span>
-              <span class="badge">{{ tour_application.status|upper }}</span>
-            </li>
-            <li>
-              <span>Applied At</span>
-              <span class="badge">{{ tour_application.updatedAt }}</span>
-            </li>
-            {% if tour_application.createdAt %}
-              <li>
-                <span>Last Updated At</span>
-                <span class="badge">{{ tour_application.createdAt }}</span>
+      <div class="col-12">
+        <div class="row">
+          <div class="col-md-6 col-lg-6 col-sm-12">
+            <div class="card-header d-flex align-items-center">
+              {% if tour_application.applied_by.personal_detail.avatar %}
+                <img src="{{ tour_application.applied_by.personal_detail.avatar.url }}" class="rounded-circle me-3" alt="Avatar" style="width: 50px; height: 50px;" />
+              {% endif %}
+              <div>
+                <h5 class="card-title mb-0">{{ tour_application.applied_by }}</h5>
+                <small class="card-subtitle text-uppercase">{{ tour_application.slug }}</small>
+              </div>
+            </div>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item">
+                <strong>Boarding:</strong>
+                {{ tour_application.from_destination }}
+                <span class="badge bg-info text-dark">{{ tour_application.start_date }} - {{ tour_application.start_time }}</span>
+                <i class="fas fa-arrow-right mx-2"></i>
+                <strong>Destination:</strong>
+                {{ tour_application.to_destination }}
+                <span class="badge bg-info text-dark">{{ tour_application.end_date }} - {{ tour_application.end_time }}</span>
               </li>
-            {% endif %}
-
-            <li>
-              <div>{{ tour_application.remarks|safe }}</div>
-            </li>
-          </ul>
+              <li class="list-group-item">
+                <strong>Status:</strong> <span class="badge bg-primary">{{ tour_application.status|upper }}</span>
+              </li>
+              <li class="list-group-item">
+                <strong>Applied At:</strong> {{ tour_application.updated_at }}
+              </li>
+              {% if tour_application.created_at %}
+                <li class="list-group-item">
+                  <strong>Last Updated At:</strong> {{ tour_application.created_at }}
+                </li>
+              {% endif %}
+              <li class="list-group-item">{{ tour_application.remarks|safe }}</li>
+            </ul>
+          </div>
+          <div class="col-md-6 col-lg-6 col-sm-12">
+            <div class="card-header">
+              <h5>Follow-ups</h5>
+            </div>
+            <div class="card-body">
+              <ul class="list-group">
+                {% for log in tour_application.logs.all|dictsortreversed:'timestamp' %}
+                  <li class="list-group-item">
+                    <strong>{{ log.action }}</strong> by {{ log.action_by_name }} - {{ log.timestamp }} ({{ log.timestamp|naturaltime }})<p class="mb-0">{{ log.comments }}</p>
+                  </li>
+                {% empty %}
+                  <li class="list-group-item">No logs available.</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
         </div>
-        <div class="container bg-white mt-5">
-          <form id="tour-update-form" method="post">
-            {% csrf_token %}
-            <div class="row">
-              <div class="cell-lg-12 cell-sm-12 cell-md-12">
-                <div class="bg-white p-1 m-1">
+        <div class="card mt-4">
+          <div class="card-body">
+            <form id="tour-update-form" method="post">
+              {% csrf_token %}
+              <div class="row">
+                <div class="col-12 mb-3">
                   <div class="form-group">
                     <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
                     {{ form.status }}
                     {% if form.status.errors %}
-                      <div class="notification error">
+                      <div class="alert alert-danger mt-2">
                         {% for error in form.status.errors %}
-                          <p>{{ error }}</p>
+                          <p class="mb-0">{{ error }}</p>
                         {% endfor %}
                       </div>
                     {% endif %}
                   </div>
                 </div>
-              </div>
-              {% if not is_manager %}
-                <div id="datetime">
-                  <div id="id_status-wrapper" class="cell-md-6">{{ form.extended_end_date.label_tag }}
-                    {{ form.extended_end_date }}</div>
-                  <div id="id_status-wrapper" class="cell-md-6">{{ form.extended_end_time.label_tag }}
-                    {{ form.extended_end_time }}</div>
-                </div>
-              {% endif %}
-
-              <div id="id_status-wrapper" class="cell-md-12">{{ form.reason.label_tag }}
-                {{ form.reason }}</div>
-              <div class="cell-md-12">
-                <button type="button"
-                  class="button 
-                {% if user == tour_application.applied_by and tour_application.status == 'cancelled' %}
-                    disabled 
-
-                  {% elif user == tour_application.applied_by and tour_application.status == 'rejected' %}
-                    disabled
-
-                  {% endif %} primary"
-                  onclick="Metro.dialog.open('#updateDailog')">
-                  <img src="{% static 'hrms_app/source/images/checkmark.png' %}" />
-                  {% if is_manager %}
-                    Update
-                  {% else %}
-                    Submit Request
-                  {% endif %}
-                </button>
                 {% if not is_manager %}
-                  <button type="button" class="button alert" onclick="Metro.dialog.open('#deleteDailog')">Delete</button>
-                  {% if tour_application.status == 'pending' %}
-                    <a class="button warning" href="{% url 'tour_application_update' slug=tour_application.slug %}">Edit</a>
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.extended_end_date.id_for_label }}">{{ form.extended_end_date.label }}</label>
+                    {{ form.extended_end_date }}
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.extended_end_time.id_for_label }}">{{ form.extended_end_time.label }}</label>
+                    {{ form.extended_end_time }}
+                  </div>
+                {% endif %}
+                <div class="col-12 mb-3">
+                  <label for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
+                  {{ form.reason }}
+                </div>
+                <div class="col-12 d-flex gap-2">
+                  <button type="button" class="btn btn-primary" onclick="$('#updateDialog').modal('show')">
+                    <i class="fas fa-check-circle"></i>
+                    {% if is_manager %}
+                      Update
+                    {% else %}
+                      Submit Request
+                    {% endif %}
+                  </button>
+                  {% if not is_manager %}
+                    <button type="button" class="btn btn-danger" onclick="$('#deleteDialog').modal('show')">Delete</button>
+                    {% if tour_application.status == 'pending' %}
+                      <a class="btn btn-warning" href="{% url 'tour_application_update' slug=tour_application.slug %}">Edit</a>
+                    {% endif %}
                   {% endif %}
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+        <!-- Update Modal -->
+        <div class="modal fade" id="updateDialog" tabindex="-1" aria-labelledby="updateDialogLabel" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title" id="updateDialogLabel">Are you sure?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+              </div>
+              <div class="modal-body">
+                {% if is_manager %}
+                  You want to update the tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }} of {{ tour_application.applied_by }}.
+                {% else %}
+                  You want to cancel your tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }}.
                 {% endif %}
               </div>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div class="dialog" data-role="dialog" id="updateDailog">
-        <div class="dialog-title">Are you sure?</div>
-        <div class="dialog-content">
-          {% if is_manager %}
-            You want to update the tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }} of {{ tour_application.applied_by }}
-          {% else %}
-            You want to cancel your tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }}.
-          {% endif %}
-        </div>
-        <div class="dialog-actions">
-          <button type="reset" class="button js-dialog-close">Cancel</button>
-          <button type="button" class="button primary js-dialog-close" onclick="submitForm()">Submit</button>
-        </div>
-      </div>
-
-      <div class="dialog" data-role="dialog" id="deleteDailog">
-        <div class="dialog-title bg-alert">Are you sure?</div>
-        <div class="dialog-content">You want to delete the tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }}</div>
-        <div class="dialog-actions">
-          <div class="row">
-            <div class="cell">
-              <button type="reset" class="button secondary js-dialog-close">Cancel</button>
-            </div>
-            <div class="cell">
-              <form method="POST" action="{% url 'tour_application_delete' tour_application.id %}">
-                {% csrf_token %}
-                <button class="button alert js-dialog-close" type="submit">Go</button>
-              </form>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitForm()">Submit</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="cell">
-        <div data-role="panel" data-title-caption="Follow ups" data-collapsed="false" data-collapsible="true">
-          <ul>
-            {% for log in tour_application.logs.all|dictsortreversed:'timestamp' %}
-              <div style="background-color: azure; padding: 0.5rem; margin: 0.5rem;">
-                <li>{{ log.action }} by {{ log.action_by_name }} - {{ log.timestamp }} ({{ log.timestamp|naturaltime }})</li>
-                <li>{{ log.comments }}</li>
+        <!-- Delete Modal -->
+        <div class="modal fade" id="deleteDialog" tabindex="-1" aria-labelledby="deleteDialogLabel" aria-hidden="true">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteDialogLabel">Are you sure?</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
               </div>
-            {% empty %}
-              <li>No logs available.</li>
-            {% endfor %}
-          </ul>
+              <div class="modal-body">You want to delete the tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination }}.</div>
+              <div class="modal-footer">
+                <form method="POST" action="{% url 'tour_application_delete' tour_application.id %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 {% endblock %}
 
-{% block xtra_js %}
+{% block extra_js %}
   <script>
     function submitForm() {
       document.getElementById('tour-update-form').submit()

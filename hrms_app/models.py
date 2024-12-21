@@ -1,13 +1,10 @@
 from django.db import models
 from django.utils.text import slugify
 from django.contrib.auth.models import AbstractUser
-from django.template.defaultfilters import filesizeformat
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
-from django.utils.timesince import timesince
 import random
 import string
-from .middleware import CurrentUserMiddleware
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction, IntegrityError
@@ -15,6 +12,8 @@ from django.utils import timezone
 from datetime import timedelta
 import uuid
 from django.core.validators import MinValueValidator
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 
 
 
@@ -852,13 +851,6 @@ class ShiftTiming(models.Model):
             models.Index(fields=["start_time", "end_time"], name="idx_shift_timing"),
         ]
 
-
-from django.db import models
-from django.utils.translation import gettext_lazy as _
-from django.core.exceptions import ValidationError
-from django.conf import settings
-
-
 class EmployeeShift(models.Model):
     employee = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -912,7 +904,6 @@ class EmployeeShift(models.Model):
             raise ValidationError(
                 _("This employee already has a shift with the selected timing.")
             )
-
 
 class BankDetails(models.Model):
     user = models.ForeignKey(
@@ -1097,7 +1088,8 @@ class LeaveApplication(models.Model):
         if not self.slug:
             self.slug = self.generate_unique_slug()
 
-        super().save(*args, **kwargs)
+        super().save(*args, **kwargs)  # Save first
+
 
     def generate_unique_application_no(self):
         """Generate a unique application number."""
@@ -1186,7 +1178,14 @@ class LeaveApplication(models.Model):
             ),
         ]
 
+class LeaveDay(models.Model):
+    leave_application = models.ForeignKey(LeaveApplication, on_delete=models.CASCADE, related_name="leave_days")
+    date = models.DateField(verbose_name=_("Date"))
+    is_full_day = models.BooleanField(default=True, verbose_name=_("Is Full Day"))
 
+    class Meta:
+        unique_together = ('leave_application', 'date')
+        
 class OfficeLocation(models.Model):
     id = models.UUIDField(
         primary_key=True,
@@ -1318,7 +1317,7 @@ class DeviceInformation(models.Model):
         help_text=_("Enter the API link for the device."),
         default="http://1.22.197.176:99/iclock/WebAPIService.asmx",  # Default link can be modified if needed
     )
-
+    include_seconds = models.BooleanField(default=False)
     def __str__(self):
         return f"{self.serial_number} from {self.from_date} to {self.to_date}"
 
@@ -1371,6 +1370,16 @@ class LeaveType(models.Model):
         blank=True,
         null=True,
         verbose_name=_("Leave Type Short Code"),
+        help_text=_(
+            "Provide a short code for the leave type (optional). This must be unique if provided."
+        ),
+    )
+    half_day_short_code = models.CharField(
+        max_length=100,
+        unique=True,
+        blank=True,
+        null=True,
+        verbose_name=_("Half Day Short Code"),
         help_text=_(
             "Provide a short code for the leave type (optional). This must be unique if provided."
         ),
@@ -2021,14 +2030,6 @@ class NotificationSetting(models.Model):
             ),  # Index for faster lookups by user
         ]
 
-
-from django.db import models
-from django.contrib.auth import get_user_model
-from django.utils.translation import gettext_lazy as _
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-
-
 class Holiday(models.Model):
     title = models.CharField(max_length=100, verbose_name=_("Title"))
     short_code = models.CharField(
@@ -2058,36 +2059,12 @@ class Holiday(models.Model):
         blank=True,
         verbose_name=_("Updated By"),
     )
-
-    is_yearly_recurring = models.BooleanField(
-        default=False, verbose_name=_("Is Yearly Recurring")
-    )
     year = models.PositiveIntegerField(null=True, blank=True, verbose_name=_("Year"))
-    recurrence_pattern = models.CharField(
-        max_length=50,
-        choices=[
-            ("fixed", _("Fixed Date")),
-            ("relative", _("Relative to a Date")),
-            ("custom", _("Custom Recurrence")),
-        ],
-        blank=True,
-        null=True,
-        verbose_name=_("Recurrence Pattern"),
-    )
-    recurrence_rule = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        verbose_name=_("Recurrence Rule"),
-    )
 
     def save(self, *args, **kwargs):
         if not self.pk:
             self.created_by = kwargs.pop("created_by", None)
         self.updated_by = kwargs.pop("updated_by", None)
-
-        if self.is_yearly_recurring and not self.year:
-            self.year = timezone.now().year
 
         super(Holiday, self).save(*args, **kwargs)
 
@@ -2106,8 +2083,15 @@ class Holiday(models.Model):
         indexes = [
             models.Index(fields=["start_date"]),
             models.Index(fields=["end_date"]),
-            models.Index(fields=["is_yearly_recurring"]),
         ]
+
+from datetime import datetime, timedelta
+from django.utils.timezone import make_aware, is_naive
+
+def make_datetime_aware(date, time):
+    """Helper to combine date and time into a timezone-aware datetime."""
+    naive_datetime = datetime.combine(date, time or datetime.min.time())
+    return make_aware(naive_datetime) if is_naive(naive_datetime) else naive_datetime
 
 
 class UserTour(models.Model):
@@ -2116,6 +2100,12 @@ class UserTour(models.Model):
         on_delete=models.CASCADE,
         related_name="tours",
         verbose_name=_("Applied By"),
+    )
+    short_code = models.CharField(
+        max_length=10,
+        verbose_name=_("Short Code"),
+        default='T',
+        help_text=_("Short code for the tour to show in the report"),
     )
     from_destination = models.CharField(
         max_length=255,
@@ -2195,6 +2185,11 @@ class UserTour(models.Model):
         verbose_name=_("Approval Type"),
         help_text=_("Select the type of approval required for this tour."),
     )
+    total = models.TimeField(
+            help_text=_("The total duration of the tour from start date & time to end date & time in hours and minutes."),
+            blank=True,
+            null=True,
+        )
 
     def clean(self):
         if self.start_date > self.end_date:
@@ -2211,6 +2206,36 @@ class UserTour(models.Model):
 
     def __str__(self):
         return f"Tour {self.id} by {self.applied_by.username}"
+    
+    def save(self, *args, **kwargs):
+        """
+        Override the save method to calculate the total duration.
+        Total is calculated as the difference between start and end or extended end.
+        """
+        if self.start_date and self.start_time:
+            start_datetime = make_datetime_aware(self.start_date, self.start_time)
+            # Use extended end date/time if available, else fallback to end date/time
+            if self.extended_end_date and self.extended_end_time:
+                end_datetime = make_datetime_aware(self.extended_end_date, self.extended_end_time)
+            elif self.end_date and self.end_time:
+                end_datetime = make_datetime_aware(self.end_date, self.end_time)
+            else:
+                end_datetime = None
+            
+            if end_datetime:
+                # Calculate the total duration
+                duration = end_datetime - start_datetime
+                total_seconds = duration.total_seconds()
+                total_hours = int(total_seconds // 3600)
+                total_minutes = int((total_seconds % 3600) // 60)
+
+                # Store the duration as a TimeField
+                self.total = timedelta(hours=total_hours, minutes=total_minutes)
+            else:
+                self.total = None  # No duration if end_datetime isn't defined
+
+        # Call the parent class's save method to save the object
+        super().save(*args, **kwargs)
 
     def approve(self, action_by, reason=None):
         self.status = settings.APPROVED
@@ -2394,7 +2419,6 @@ class Bill(models.Model):
         verbose_name = _("Tour Bill")
         verbose_name_plural = _("Tour Bills")
 
-
 class AttendanceLog(models.Model):
     applied_by = models.ForeignKey(
         get_user_model(),
@@ -2414,9 +2438,7 @@ class AttendanceLog(models.Model):
         blank=True,
         null=True,
         verbose_name=_("From Date"),
-        help_text=_(
-            "Optional field for specifying a starting date for regularization."
-        ),
+        help_text=_("Optional field for specifying a starting date for regularization."),
     )
     to_date = models.DateTimeField(
         blank=True,
@@ -2512,6 +2534,16 @@ class AttendanceLog(models.Model):
         verbose_name=_("Is Submitted"),
         help_text=_("Indicate if the regularization has been submitted."),
     )
+    is_late_coming = models.BooleanField(
+        default=False,
+        verbose_name=_("Is Late Coming"),
+        help_text=_("Indicate if this entry is for late coming regularization."),
+    )
+    is_early_going = models.BooleanField(
+        default=False,
+        verbose_name=_("Is Early Going"),
+        help_text=_("Indicate if this entry is for early going regularization."),
+    )
 
     def clean(self):
         if self.start_date >= self.end_date:
@@ -2531,7 +2563,7 @@ class AttendanceLog(models.Model):
         self.status = settings.APPROVED
         self.att_status_short_code = 'P'
         self.att_status = settings.PRESENT
-        self.save(update_fields=["status", "updated_at","att_status_short_code","att_status"])
+        self.save(update_fields=["status", "updated_at", "att_status_short_code", "att_status"])
         self.add_action(action=self.status, performed_by=action_by, comment=reason)
 
     def reject(self, action_by, reason=None):
@@ -2554,7 +2586,7 @@ class AttendanceLog(models.Model):
         managed = True
         verbose_name = _("Attendance Log")
         verbose_name_plural = _("Attendance Logs")
-        ordering = ["-created_at"]  # Default ordering by creation date
+        ordering = ["-created_at"]
         indexes = [
             models.Index(fields=["applied_by"]),
             models.Index(fields=["status"]),
@@ -2566,7 +2598,6 @@ class AttendanceLog(models.Model):
         AttendanceLogAction.create_log(
             self, action=action, action_by=performed_by, notes=comment
         )
-
 
 class AttendanceLogAction(models.Model):
     log = models.ForeignKey(
@@ -2702,3 +2733,16 @@ class SentEmail(models.Model):
         managed = True
         verbose_name = _("Sent Mail")
         verbose_name_plural = _("Sent Mails")
+
+class OffDay(models.Model):
+    employee = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    date = models.DateField()
+    off_type = models.CharField(max_length=50, choices=[('Sunday', 'Sunday'),], default='Sunday')
+    reason = models.TextField(blank=True, null=True)
+
+    class Meta:
+        unique_together = ('employee', 'date')
+        verbose_name = "Off Day"
+        verbose_name_plural = "Off Days"
+    def __str__(self):
+        return f"{self.employee} - {self.date} - {self.off_type}"

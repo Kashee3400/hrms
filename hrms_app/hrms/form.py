@@ -18,6 +18,13 @@ from colorfield.widgets import ColorWidget
 from hrms_app.hrms.utils import is_holiday, is_weekend
 from hrms_app.utility.leave_utils import apply_leave_policies, check_overlapping_leaves
 from django.core.validators import RegexValidator
+from bootstrap_datepicker_plus.widgets import (
+    DatePickerInput,
+    TimePickerInput,
+    DateTimePickerInput,
+    MonthPickerInput,
+    YearPickerInput,
+)
 
 User = get_user_model()
 
@@ -60,7 +67,7 @@ class ReadOnlyPasswordHashWidget(forms.Widget):
                     summary.append({"label": gettext(key), "value": value_})
         context["summary"] = summary
         return context
-    
+
     def id_for_label(self, id_):
         return None
 
@@ -545,6 +552,7 @@ class AdminPasswordChangeForm(forms.Form):
 
 from datetime import datetime, timedelta
 
+
 class SetPasswordForm(forms.Form):
 
     error_messages = {
@@ -628,10 +636,11 @@ class ChangeUserPasswordForm(SetPasswordForm):
 class ExcelUploadForm(forms.Form):
     file = forms.FileField()
 
+
 class TourForm(forms.ModelForm):
     approval_type = forms.ChoiceField(
         choices=settings.APPROVAL_TYPE_CHOICES,
-        widget=forms.RadioSelect(attrs={"type": "radio", "data-role": "radio"}),
+        widget=forms.Select(),
         label=_("Approval Type"),
         required=True,
     )
@@ -649,15 +658,38 @@ class TourForm(forms.ModelForm):
             "remarks",
         ]
         widgets = {
-            "from_destination": forms.TextInput(attrs={'data-role': 'input'}),
-            "start_date": forms.TextInput(attrs={'data-role':'calendarpicker'}),
-            "start_time": forms.TextInput(attrs={'type':'time'}),
-            # "start_time": forms.TextInput(attrs={'data-role':'input','id': 'start_time'}),
-            "end_date": forms.TextInput(attrs={'data-role':'calendarpicker'}),
-            "end_time": forms.TextInput(attrs={'data-role':'input','id': 'end_time'}),
-            "end_time": forms.TextInput(attrs={'type':'time'}),
-            "to_destination": forms.TextInput(attrs={'data-role': 'input'}),
-            "remarks": CKEditor5Widget(config_name='extends'),
+            "from_destination": forms.TextInput(
+                attrs={"class": "form-control"},
+            ),
+            "start_date": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
+            ),
+            "start_time": TimePickerInput(
+                attrs={"class": "form-control"},
+            ),
+            "end_date": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                range_from="start_date",
+                attrs={"class": "form-control"},
+            ),
+            "end_time": TimePickerInput(
+                attrs={"class": "form-control"},
+            ),
+            "to_destination": forms.TextInput(
+                attrs={"class": "form-control"},
+            ),
+            "remarks": CKEditor5Widget(config_name="extends"),
         }
         labels = {
             "from_destination": _("Boarding"),
@@ -668,7 +700,6 @@ class TourForm(forms.ModelForm):
             "to_destination": _("Destination"),
             "remarks": _("Remark"),
         }
-
 
     def __init__(self, *args, **kwargs):
         super(TourForm, self).__init__(*args, **kwargs)
@@ -710,9 +741,6 @@ class LeaveTypeForm(forms.ModelForm):
 
 class LeaveApplicationForm(forms.ModelForm):
     class Meta:
-        today = datetime.now()
-        one_day_before = today - timedelta(days=1)
-        formatted_date = one_day_before.strftime("%Y-%m-%d")
         model = LeaveApplication
         fields = [
             "leave_type",
@@ -726,20 +754,10 @@ class LeaveApplicationForm(forms.ModelForm):
         ]
         widgets = {
             "startDate": forms.TextInput(
-                attrs={
-                    "type": "text",
-                    "data-min-date": formatted_date,
-                    "data-role": "calendarpicker",
-                    "data-cls-calendar": "compact",
-                }
+                attrs={"class": "form-control datepicker"},
             ),
             "endDate": forms.TextInput(
-                attrs={
-                    "type": "text",
-                    "data-min-date": formatted_date,
-                    "data-role": "calendarpicker",
-                    "data-cls-calendar": "compact",
-                }
+                attrs={"class": "form-control datepicker"},
             ),
             "startDayChoice": forms.Select(
                 attrs={"class": "leaveOption id_startDayChoice"}
@@ -835,10 +853,56 @@ class AttendanceLogForm(forms.ModelForm):
 
     class Meta:
         model = AttendanceLog
-        fields = ["reason", "status"]
+        fields = [
+            "reg_status",
+            "status",
+            "start_date",
+            "end_date",
+            "duration",
+            "from_date",
+            "to_date",
+            "reg_duration",
+            "reason",
+        ]
         widgets = {
-            "reason": forms.Textarea(attrs={"data-role": "textarea"}),
-            "status": forms.Select(attrs={"data-role": "select"}),
+            "reg_status": forms.Select(attrs={"class": "form-control"}),
+            "duration": TimePickerInput(attrs={"class": "form-control","readonly": "readonly"}),
+            "reg_duration": forms.TextInput(attrs={"class": "form-control","readonly": "readonly"}),
+            "start_date": DateTimePickerInput(
+                options={
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                format="%Y-%m-%d %H:%M",
+                attrs={"class": "form-control ","readonly": "readonly"},
+            ),
+            "end_date": DateTimePickerInput(
+                range_from="start_date",
+                format="%Y-%m-%d %H:%M",
+                attrs={"class": "form-control","readonly": "readonly"},
+            ),
+            "from_date": DateTimePickerInput(
+                options={
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                format="%Y-%m-%d %H:%M",
+                attrs={"class": "form-control"},
+            ),
+            "to_date": DateTimePickerInput(
+                options={
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                format="%Y-%m-%d %H:%M",
+                attrs={"class": "form-control"},
+                range_from="from_date",
+            ),
+            "reason": forms.Textarea(attrs={"class": "form-control"}),
+            "status": forms.Select(attrs={"class": "form-control"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -900,9 +964,14 @@ class LeaveStatusUpdateForm(forms.ModelForm):
 
 
 class TourStatusUpdateForm(forms.ModelForm):
-
     reason = forms.CharField(
-        widget=forms.Textarea(attrs={"data-role": "textarea", "data-max-height": "50"}),
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": _("Enter your reason"),
+            }
+        ),
         label=_("Reason"),
         required=False,
     )
@@ -910,13 +979,23 @@ class TourStatusUpdateForm(forms.ModelForm):
     class Meta:
         model = UserTour
         fields = ["status", "extended_end_date", "extended_end_time", "reason"]
-
         widgets = {
-            "extended_end_date": forms.TextInput(attrs={"data-role": "calendarpicker"}),
-            "extended_end_time": forms.TextInput(
-                attrs={"type": "time",}
+            "extended_end_date": DatePickerInput(
+                attrs={
+                    "class": "form-control",
+                }
             ),
-            "status": forms.Select(attrs={"data-role": "select"}),
+            "extended_end_time": TimePickerInput(
+                attrs={
+                    "class": "form-control",
+                }
+            ),
+            "status": forms.Select(
+                attrs={
+                    "class": "form-select",
+                }
+            ),
+            "reason": CKEditor5Widget(config_name="reason"),
         }
         labels = {
             "extended_end_date": _("New Date"),
@@ -926,7 +1005,6 @@ class TourStatusUpdateForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        # sourcery skip: merge-comparisons, merge-else-if-into-elif, move-assign
         user = kwargs.pop("user", None)
         is_manager = kwargs.pop("is_manager", None)
         super().__init__(*args, **kwargs)
@@ -936,8 +1014,6 @@ class TourStatusUpdateForm(forms.ModelForm):
             if is_manager:
                 self.fields.pop("extended_end_date", None)
                 self.fields.pop("extended_end_time", None)
-                self.fields["extended_end_date"].required = True
-                self.fields["extended_end_time"].required = True
                 filtered_choices = [
                     choice
                     for choice in settings.TOUR_STATUS_CHOICES
@@ -945,10 +1021,7 @@ class TourStatusUpdateForm(forms.ModelForm):
                     in [settings.APPROVED, settings.REJECTED, settings.CANCELLED]
                 ]
             else:
-                if (
-                    current_status.status == settings.CANCELLED
-                    or current_status.status == settings.REJECTED
-                ):
+                if current_status.status in [settings.CANCELLED, settings.REJECTED]:
                     filtered_choices = [
                         choice
                         for choice in settings.TOUR_STATUS_CHOICES
@@ -965,7 +1038,10 @@ class TourStatusUpdateForm(forms.ModelForm):
                             settings.PENDING_CANCELLATION,
                         ]
                     ]
-            self.fields["status"].widget = forms.Select(choices=filtered_choices)
+            self.fields["status"].widget = forms.Select(
+                choices=filtered_choices,
+                attrs={"class": "form-select"},
+            )
 
 
 class LeaveBalanceOpeningForm(forms.ModelForm):
@@ -980,26 +1056,40 @@ class LeaveBalanceOpeningForm(forms.ModelForm):
         ]
 
 
-from django import forms
-
-
 class FilterForm(forms.Form):
     status = forms.ChoiceField(
         choices=settings.LEAVE_STATUS_CHOICES,
-        widget=forms.Select(attrs={"data-role": "select", "id": "option"}),
+        widget=forms.Select(attrs={"class": "form-select", "id": "status-filter"}),
         required=False,
     )
-    fromDate = forms.DateField(
-        widget=forms.TextInput(attrs={"data-role": "calendarpicker", "id": "fromDate"}),
+    from_date = forms.DateField(
+        widget=DatePickerInput(
+            options={
+                "format": "YYYY-MM-DD",
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            attrs={"class": "form-control"},
+        ),
         required=False,
     )
-    toDate = forms.DateField(
-        widget=forms.TextInput(attrs={"data-role": "calendarpicker", "id": "toDate"}),
+    to_date = forms.DateField(
+        widget=DatePickerInput(
+            options={
+                "format": "YYYY-MM-DD",
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            range_from="from_date",
+            attrs={"class": "form-control"},
+        ),
         required=False,
     )
-    from django import forms
 
-class EmployeeChoices(forms.Form):
+
+class EmployeeChoicesForm(forms.Form):
     employee = forms.ModelChoiceField(
         queryset=User.objects.all(),
         widget=forms.Select(attrs={"data-role": "select", "id": "option"}),
@@ -1010,6 +1100,7 @@ class EmployeeChoices(forms.Form):
 
 from django.contrib.auth.models import Permission, Group
 from django.utils.translation import gettext_lazy as _
+
 
 class CustomUserForm(forms.ModelForm):
     # Field for selecting permissions
@@ -1086,6 +1177,7 @@ class CustomUserForm(forms.ModelForm):
             # Set groups for the user
             user.groups.set(self.cleaned_data["groups"])
         return user
+
 
 class PersonalDetailsForm(forms.ModelForm):
     class Meta:
@@ -1203,6 +1295,7 @@ class PersonalDetailsForm(forms.ModelForm):
             ),
         }
 
+
 class PermanentAddressForm(forms.ModelForm):
     class Meta:
         model = PermanentAddress
@@ -1315,24 +1408,38 @@ class AttendanceReportFilterForm(forms.Form):
     location = forms.ModelMultipleChoiceField(
         queryset=OfficeLocation.objects.all(),
         required=True,
-        widget=forms.SelectMultiple(attrs={"data-role": "select"}),
+        widget=forms.SelectMultiple(),
         label="Location",
     )
     from_date = forms.DateField(
-        required=True,
-        label="From Date",
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=DatePickerInput(
+            options={
+                "format": "YYYY-MM-DD",
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            attrs={"class": "form-control"},
+        ),
+        required=False,
     )
-    
     to_date = forms.DateField(
-        required=True,
-        label="To Date",
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        widget=DatePickerInput(
+            options={
+                "format": "YYYY-MM-DD",
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            range_from="from_date",
+            attrs={"class": "form-control"},
+        ),
+        required=False,
     )
-    
+
     active = forms.BooleanField(
         required=False,
         label="Active Employees Only",
         initial=True,
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        widget=forms.CheckboxInput(attrs={"data-role": "checkbox"}),
     )

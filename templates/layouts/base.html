@@ -8,20 +8,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>
       {% block title %}
-
       {% endblock %}
     </title>
     {% include 'includes/styles.html' %}
     {% block dark-mode-vars %}
     {% endblock %}
     {% block extrastyle %}
+
     {% endblock %}
     {% block extrahead %}
+
     {% endblock %}
     {% block blockbots %}
       <meta name="robots" content="NONE,NOARCHIVE" />
     {% endblock %}
-
   </head>
 
   <body data-admin-utc-offset="{% now 'Z' %}">
@@ -42,7 +42,7 @@
                 {% if messages %}
                   <ul class="messagelist">
                     {% for message in messages %}
-                    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message|capfirst }}</li>
+                      <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message|capfirst }}</li>
                     {% endfor %}
                   </ul>
                 {% endif %}
@@ -69,16 +69,8 @@
     <!-- END Container -->
 
     {% include 'includes/scripts.html' %}
-
     {% block extra_js %}
-      <script>
-        (function ($) {
-          'use strict'
-          $('select').select2({
-          });
-        
-        })(jQuery)
-      </script>
+
     {% endblock %}
   </body>
 </html>

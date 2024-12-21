@@ -1,6 +1,6 @@
 $(document).ready(function () {
     $('#balances').hide();
-    $('#id_leave_type').hide();
+    $('#leave_type_div').hide();
     $('#choices').hide();
     
     $('#id_startDate').change(function () {
@@ -17,8 +17,6 @@ $(document).ready(function () {
         $('#id_endDate').attr('data-min-date', minDate);
         totalDays = calculateTotalDays(startDate, endDate);
         bookedBalance = calculateBookedBalance(totalDays, startDate);
-        $('#balanceSummary').show();
-        $('#leaveDates').show();
         $('#balances').show();
         // $('#choices').show();
     });
@@ -28,13 +26,10 @@ $(document).ready(function () {
         var selectedValue = $(this).val();
         var startDate = $('#id_startDate').val();
         var endDate = $('#id_endDate').val();
-        console.log(endDate)
-        console.log(startDate)
         if (selectId && selectId.startsWith('id_startDayChoice')) {
             startDay = selectedValue;
             if (startDate === endDate) {
                 $('#id_endDayChoice').val(selectedValue);
-                
                 endDay = selectedValue;
             }
             $('#id_startDayChoice').val(selectedValue);
@@ -49,9 +44,6 @@ $(document).ready(function () {
             updateTotalDays(startDay, endDay);
         }
     });
-    // $('#btnSbmit').on('click', function () {
-    //     applyLeave(startDay, endDay);
-    // });
 });
 
 function updateTotalDays(startDay, endDay) {

@@ -17,7 +17,7 @@ def apply_leave_policies(user, leave_type, startDate, endDate, bookedLeave):
     elif leave_type.leave_type_short_code == "SL":
         pass  # No specific check needed as it can be applied on the same date
     elif leave_type.leave_type_short_code == "EL":
-        apply_el_policy(user, leave_type, startDate, bookedLeave)
+        apply_el_policy(user, leave_type, bookedLeave)
 
 
 def apply_cl_policy(user, leave_type, startDate, bookedLeave):
@@ -53,12 +53,19 @@ def apply_cl_policy(user, leave_type, startDate, bookedLeave):
             raise ValidationError("Consecutive CL applications are not allowed.")
 
 
-def apply_el_policy(user, leave_type, startDate, bookedLeave):
-    el_allowed_days = leave_type.allowed_days_per_year
-    el_min_days = leave_type.min_notice_days
-    if bookedLeave > el_allowed_days:
+def apply_el_policy(user, leave_type, bookedLeave):
+    allowed_days_per_year = leave_type.allowed_days_per_year
+    min_notice_days = leave_type.min_notice_days
+    max_days_limit = leave_type.max_days_limit
+    min_days_limit = leave_type.min_days_limit
+    if bookedLeave > max_days_limit:
         raise ValidationError(
-            f"EL can be applied for a maximum of {el_allowed_days} days in the financial year."
+            f"EL can be applied for maximum ({max_days_limit}) days."
+        )
+
+    if bookedLeave < min_days_limit:
+        raise ValidationError(
+            f"EL can be applied for minimum ({min_days_limit}) days."
         )
 
     current_fy_start = leave_type.leave_fy_start
@@ -75,9 +82,9 @@ def apply_el_policy(user, leave_type, startDate, bookedLeave):
         startDate__lte=current_fy_end,
         status__in=[settings.APPROVED, settings.PENDING_CANCELLATION],
     ).count()
-    if el_application_count >= el_min_days:
+    if el_application_count >= allowed_days_per_year:
         raise ValidationError(
-            f"EL can be applied a maximum of {leave_type.max_days_limit} times in the financial year."
+            f"EL can be applied a maximum of {allowed_days_per_year} times in the financial year."
         )
 
 
@@ -95,35 +102,57 @@ def check_overlapping_leaves(user, startDate, endDate):
 
 def get_employee_requested_leave(user, status=None):
     leave_status = status if status is not None else settings.PENDING
-    employee_leaves = []
-    employees = user.employees.all()
-    for employee in employees:
-        employee_leaves.extend(
-            [
-                {
-                    "leaveApplication": leaveApplication,
-                    "start_date": format_date(leaveApplication.startDate),
-                    "end_date": format_date(leaveApplication.endDate),
-                }
-                for leaveApplication in employee.leaves.filter(status=leave_status)
-            ]
-        )
+
+    if user.is_superuser:
+        # If the user is a superuser, fetch all leave applications with the given status
+        employee_leaves = [
+            {
+                "leaveApplication": leaveApplication,
+                "start_date": format_date(leaveApplication.startDate),
+                "end_date": format_date(leaveApplication.endDate),
+            }
+            for leaveApplication in LeaveApplication.objects.filter(status=leave_status)
+        ]
+    else:
+        # Fetch leave applications for employees assigned to the user
+        employee_leaves = []
+        employees = user.employees.all()
+        for employee in employees:
+            employee_leaves.extend(
+                [
+                    {
+                        "leaveApplication": leaveApplication,
+                        "start_date": format_date(leaveApplication.startDate),
+                        "end_date": format_date(leaveApplication.endDate),
+                    }
+                    for leaveApplication in employee.leaves.filter(status=leave_status)
+                ]
+            )
+
     return employee_leaves
+
+def get_employee_requested_tour(user, status=None):
+    tour_status = status if status is not None else settings.PENDING
+
+    if user.is_superuser:
+        # Fetch all tours with the given status for superusers
+        return UserTour.objects.filter(status=tour_status)
+    else:
+        # Fetch tours applied by employees assigned to the user
+        return UserTour.objects.filter(applied_by__in=user.employees.all(), status=tour_status)
 
 
 def get_regularization_requests(user, status=None):
     reg_status = status if status is not None else settings.PENDING
-    return AttendanceLog.objects.filter(
-        applied_by__in=user.employees.all(), is_submitted=True, status=reg_status
-    )
 
-
-def get_employee_requested_tour(user, status=None):
-    tour_status = status if status is not None else settings.PENDING
-    return UserTour.objects.filter(
-        applied_by__in=user.employees.all(), status=tour_status
-    )
-
+    if user.is_superuser:
+        # Fetch all regularization requests with the given status for superusers
+        return AttendanceLog.objects.filter(is_submitted=True, status=reg_status)
+    else:
+        # Fetch regularization requests applied by employees assigned to the user
+        return AttendanceLog.objects.filter(
+            applied_by__in=user.employees.all(), is_submitted=True, status=reg_status
+        )
 
 def format_date(date):
     from django.utils.timezone import make_aware, make_naive
@@ -232,8 +261,6 @@ class LeavePolicyManager:
                 f"Consecutive {self.leave_type} applications are not allowed."
             )
 
-        print(f"Days between: {days_between}")
-
         if (
             last_leave_type in self.leave_type.restricted_after_leave_types.all()
             and days_between <= last_leave.leave_type.min_days_limit
@@ -310,8 +337,6 @@ def calculate_total_days(start_date, end_date, start_day_choice, end_day_choice)
     Uses database-stored adjustment values for flexibility.
     Ensures the result is always positive.
     """
-    print(f"Start Date: {start_date}")
-    print(f"End Date: {end_date}")
     if start_date > end_date:
         start_date, end_date = end_date, start_date
     total_days = (end_date - start_date).days + 1
@@ -330,6 +355,5 @@ def calculate_total_days(start_date, end_date, start_day_choice, end_day_choice)
         ] and end_day_choice in [settings.FIRST_HALF, settings.SECOND_HALF]:
             return 0.5
         return 1.0
-    print(f"Days: {total_days}")
 
     return float(total_days)  # Return as float for consistency

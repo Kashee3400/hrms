@@ -1,5 +1,5 @@
 from import_export import resources
-from hrms_app.models import CustomUser
+from hrms_app.models import CustomUser,Holiday
 
 class CustomUserResource(resources.ModelResource):
     class Meta:
@@ -11,3 +11,8 @@ class CustomUserResource(resources.ModelResource):
         )  # Specify fields to include in import/export
         export_order = fields  # Ensure consistent column order in exports
 
+class HolidayResource(resources.ModelResource):
+    class Meta:
+        model = Holiday
+        fields = ('id', 'title', 'short_code', 'start_date', 'end_date', 'desc', 'color_hex')
+        export_order = ('id', 'title', 'short_code', 'start_date', 'end_date', 'desc', 'color_hex')

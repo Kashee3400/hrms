@@ -4,79 +4,80 @@
   {{ user }} | Attendance Logs
 {% endblock %}
 
-{% block xtra_css %}
-  <link rel="stylesheet" type="text/css" href="{% static 'hrms_app/source/vendors/fullcalendar/dist/fullcalendar.css' %}" />
+{% block extrastyle %}
+  <link rel="stylesheet" type="text/css" href="{% static 'vendors/fullcalendar/dist/fullcalendar.css' %}" />
 {% endblock %}
 
-{% block content_main %}
+{% block content %}
   {% render_breadcrumb 'Attendance' urls %}
-  <div class="loader-overlay" style="display:none;">
-    <div class="mx-auto color-style activity-atom" data-role-activity="true">
-      <span class="electron"></span>
-      <span class="electron"></span>
-      <span class="electron"></span>
+
+  <!-- Loader Overlay -->
+  <div id="loader-overlay" style="display: none;">
+    <div class="d-flex justify-content-center align-items-center position-fixed top-0 start-0 w-100 h-100 bg-white opacity-75 loader-overlay" style="display: none; z-index: 1050;">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
     </div>
   </div>
 
   {% if user.is_staff or user.is_superuser %}
-    <div style="padding: 1.2rem;" class="container bg-light mb-2">
+    <!-- Filter Form -->
+    <div class="bg-white p-3 mb-3 rounded">
       <form method="get" action="{% url 'calendar' %}">
-        <div class="row">
-          <div class="cell-md-6 cell-12 cell-sm-12 cell-lg-6">
-            <!-- Status Filter -->
-            <div class="cell-md-2 cell-12 cell-sm-12 cell-lg-3">{{ form.employee }}</div>
-          </div>
-
-          <!-- Buttons: Filter, Clear Filter, Apply Tour -->
-          <div class="cell-md-3 cell-12 cell-sm-12 cell-lg-3">
-            <button type="submit" class="button"><span class="mif-filter"></span> Filter</button>
-            <a class="button secondary" href="{% url 'calendar' %}">Clear Filter</a>
-          </div>
+        <div class="row g-3">
+          <div class="col-lg-3 col-md-6 col-sm-12">{{ form.employee }}</div>
         </div>
       </form>
     </div>
   {% endif %}
 
-  <div style="padding: 1.2rem;" class="container bg-light p-1">
+  <!-- Calendar Container -->
+  <div class="bg-white p-3 rounded">
     <div id="calendar"></div>
   </div>
 {% endblock %}
 
-{% block xtra_js %}
-  <script type="text/javascript" src="{% static 'hrms_app/source/vendors/moment/moment.js' %}"></script>
-  <script type="text/javascript" src="{% static 'hrms_app/source/vendors/fullcalendar/dist/fullcalendar.js' %}"></script>
-  <script type="text/javascript" src="{% static 'hrms_app/source/vendors/fullcalendar/dist/locale-all.js' %}"></script>
-  <script type="text/javascript" src="{% static 'hrms_app/source/vendors/fullcalendar/dist/gcal.js' %}"></script>
-  <script type="text/javascript" src="{% static 'hrms_app/source/vendors/fullcalendar/dist/gcal.min.js' %}"></script>
+{% block extra_js %}
+  <script type="text/javascript" src="{% static 'vendors/moment/moment.js' %}"></script>
+  <script type="text/javascript" src="{% static 'vendors/fullcalendar/dist/fullcalendar.js' %}"></script>
+  <script type="text/javascript" src="{% static 'vendors/fullcalendar/dist/locale-all.js' %}"></script>
+  <script type="text/javascript" src="{% static 'vendors/fullcalendar/dist/gcal.js' %}"></script>
+  <script type="text/javascript" src="{% static 'vendors/fullcalendar/dist/gcal.min.js' %}"></script>
+
   <script>
     $(document).ready(function () {
-        var loader = $('.loader-overlay');
-
-        // Function to load events for a specific user
-        function loadCalendar(userId) {
-            var url = '{% url "event_list" %}';
-            if (userId) {
-                url += '?user_id=' + userId;
-            }
-
-            $('#calendar').fullCalendar('destroy'); // Clear the calendar
-            $('#calendar').fullCalendar({
-                events: url,
-                editable: true,
-                eventLimit: true
-            });
-            loader.css('display', 'none');
+      var loader = $('#loader-overlay')
+      loadCalendar()
+    
+      function loadCalendar(userId) {
+        loader.css('display', 'flex')
+        var url = '{% url "event_list" %}'
+        if (userId) {
+          url += '?employee=' + userId
         }
-
-        // Load calendar for the authenticated user by default
-        loadCalendar();
-
-        // Handle user selection
-        $('#userSelect').change(function () {
-            var selectedUserId = $(this).val();
-            loadCalendar(selectedUserId);
+        $('#calendar').fullCalendar('destroy') // Clear previous calendar
+        $('#calendar').fullCalendar({
+          events: url,
+          editable: true,
+          header: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'month,agendaWeek,agendaDay'
+          },
+          eventRender: function(event, element) {
+            if (event.url) {
+              element.attr('href', event.url);
+            }
+          }
         });
-    });
-</script>
-
+        
+        loader.css('display', 'none')
+      }
+    
+      $('#option').change(function () {
+        var selectedUserId = $(this).val()
+        loadCalendar(selectedUserId)
+      })
+    })
+  </script>
 {% endblock %}

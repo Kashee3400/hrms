@@ -5,115 +5,111 @@
   HRMS | Employees
 {% endblock %}
 
-{% block xtra_css %}
-  <link rel="stylesheet" href="{% static 'css/status.css' %}}" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <link rel="stylesheet" href="{% static 'metro/css/metro-all.css' %}" />
+{% block extracss %}
+  <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
 {% endblock %}
 
-{% block content_main %}
+{% block content %}
   {% render_breadcrumb 'Employees' urls %}
-
-  <div class="container bg-light">
+  <div class="container bg-white p-2">
     <div class="container">
       <form method="get" action="{% url 'employees' %}">
         <div class="row">
-          <div class="cell-md-4 cell-sm-12 cell-lg-3 ">
+          <div class="col-md-4 col-sm-12 col-lg-3">
             <div class="form-group">
-              <input type="text" data-role="input" data-search-button="true" name="q" value="{{ search_query }}" placeholder="Search users..." class="form-control" />
+              <input type="text" class="form-control" name="q" value="{{ search_query }}" placeholder="Search users..." />
             </div>
           </div>
-          <div class="cell-md-4 cell-sm-12 cell-lg-3">
+          <div class="col-md-4 col-sm-12 col-lg-3">
             <div class="form-group">
-              <select name="is_active" data-role="select">
+              <select name="is_active" class="form-select">
                 <option value="">All</option>
                 <option value="True" {% if is_active == 'True' %}selected{% endif %}>Active</option>
                 <option value="False" {% if is_active == 'False' %}selected{% endif %}>Inactive</option>  
               </select>
             </div>
           </div>
-          <div class="cell-md-4 cell-sm-12 cell-lg-3">
-            <button type="submit" class="button"><span class="mif-filter"></span> Filter</button>
-            <a class="button secondary" href='{% url "employees" %}'>Clear Filter</a>
-            <a href="{% url 'create_user' %}" class="button secondary outline" ><i class="fa-solid fa-user-plus"></i>Add Employee</a>
+          <div class="col-md-4 col-sm-12 col-lg-3 d-flex justify-content-between align-items-center">
+            <button type="submit" class="btn btn-primary btn-sm"><span class="mif-filter"></span> Filter</button>
+            <a class="btn btn-secondary btn-sm" href="{% url 'employees' %}">Clear Filter</a>
+            <a href="{% url 'create_user' %}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-user-plus"></i> Add Employee</a>
           </div>
         </div>
       </form>
       <!-- User List -->
     </div>
+
     <div class="container mt-3">
       <div class="row">
         {% for user in users %}
-          <div class="cell-md-4 cell-sm-12 cell-lg-3 mt-3">
-            <div class="bg-white p-0">
-              <div class="skill-box mt-4-minus">
-                <div class="header border-top border-bottom bd-default">
-                  <img src="{% if user.personal_detail.avatar %}{{ user.personal_detail.avatar.url }}{% else %}{% static 'hrms_app/im/person.png' %}{% endif %}" class="avatar" />
-                  <div class="title">{{ user.first_name }}</div>
-                  <div class="subtitle">
-                    {{user.personal_detail.designation}}
-                  </div>
+          <div class="col-md-4 col-sm-12 col-lg-3 mt-3">
+            <div class="card">
+              <div class="card-body">
+                <div class="d-flex flex-column align-items-center">
+                  <img src="{% if user.personal_detail.avatar %}
+                      {{ user.personal_detail.avatar.url }}
+                    {% else %}
+                      {% static 'hrms_app/im/person.png' %}
+                    {% endif %}"
+                    class="avatar rounded-circle mb-2 img-fluid"
+                    style="max-width: 100px; max-height: 100px; width: auto; height: auto;" />
+                  <h5 class="card-title">{{ user.first_name }}</h5>
+                  <h6 class="card-subtitle mb-2 text-muted">{{ user.personal_detail.designation }}</h6>
                 </div>
-                <ul class="skills">
+                <ul class="list-unstyled">
                   <li>
                     <span>Department</span>
-                    <span class="badge bg-orange fg-white">{{user.personal_detail.designation.department}}</span>
+                    <span class="badge bg-warning text-dark">{{ user.personal_detail.designation.department }}</span>
                   </li>
                   <li>
                     <span>Joined At</span>
-                    <span class="badge">{{user.personal_detail.doj}}</span>
+                    <span class="badge bg-info text-white">{{ user.personal_detail.doj }}</span>
                   </li>
                 </ul>
-                <div class="d-flex flex-justify-start flex-align-center p-4">
-                  <div class="cell"><a href="{% url 'edit_user_wizard' user.pk %}" class="button info"><i class="fa-solid fa-edit"></i></a></div>
-                  <div class="cell"><button class="button dark ml-1">Send Email</button></div>
-                  <div class="cell"><a href="{% url 'employee_profile' user.pk %}" class="button square ml-1"><i class="fa-solid fa-eye"></i></a></div>                  
-                </div>
+                <div class="d-flex justify-content-between">
+                  <a href="{% url 'edit_user_wizard' user.pk %}" class="btn btn-info btn-sm"><i class="fa-solid fa-edit"></i> Edit</a>
+                  <a href="{% url 'employee_profile' user.pk %}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-eye"></i> View</a>
+              </div>              
               </div>
             </div>
           </div>
         {% empty %}
-          <tr>
-            <td colspan="5">No users found.</td>
-          </tr>
+          <div class="col-12">
+            <p>No Employee found.</p>
+          </div>
         {% endfor %}
       </div>
-  
     </div>
-    <!-- Pagination Controls -->
-    <div class="pagination">
-      <span class="step-links">
-        {% if users.has_previous %}
-          <a href="?q={{ search_query }}&is_active={{ is_active }}&page=1">&laquo; First</a>
-          <a href="?q={{ search_query }}&is_active={{ is_active }}&page={{ users.previous_page_number }}">Previous</a>
-        {% endif %}
 
-        <span class="current">Page {{ users.number }} of {{ users.paginator.num_pages }}.</span>
-        {% if users.has_next %}
-          <a href="?q={{ search_query }}&is_active={{ is_active }}&page={{ users.next_page_number }}">Next</a>
-          <a href="?q={{ search_query }}&is_active={{ is_active }}&page={{ users.paginator.num_pages }}">Last &raquo;</a>
-        {% endif %}
-      </span>
+    <!-- Pagination -->
+    <div class="container mt-3">
+      <nav>
+        <ul class="pagination justify-content-center">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page=1">&laquo; First</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.previous_page_number }}">Previous</a>
+            </li>
+          {% endif %}
+
+          <li class="page-item active">
+            <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.</span>
+          </li>
+
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.next_page_number }}">Next</a>
+            </li>
+            <li class="page-item">
+              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
     </div>
   </div>
-  <div class="dialog" data-role="dialog" id="emailDailog">
-    <div class="dialog-title bg-alert">Send Email to Employee</div>
-    <div class="dialog-content"></div>
-    <div class="dialog-actions">
-      <div class="row">
-        <div class="cell">
-          <button type="reset" class="button secondary js-dialog-close">Cancel</button>
-        </div>
-        <div class="cell">
-          <form method="POST" action="">
-            {% csrf_token %}
-            <button class="button alert js-dialog-close" type="submit">Go</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
 {% endblock %}
 
 {% block xtra_js %}

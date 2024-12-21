@@ -5,39 +5,10 @@
 {% block title %}
   {{ leave_application.appliedBy }} | {{ leave_application.applicationNo }}
 {% endblock %}
-{% block xtra_css %}
-  <style>
-    .approved {
-      color: green;
-      background-color: aquamarine;
-      border-radius: 0.2rem;
-      padding-top: 10px;
-      padding-bottom: 10px;
-    }
-    .rejected {
-      color: red;
-      background-color: #f79090;
-      border-radius: 0.2rem;
-      padding-top: 10px;
-      padding-bottom: 10px;
-    }
-    .pending {
-      color: #646363;
-      background-color: #8080808a;
-      border-radius: 0.2rem;
-      padding-top: 10px;
-      padding-bottom: 10px;
-    }
-    .cancelled {
-      color: #ffdbb1;
-      background-color: #ff8900;
-      border-radius: 0.2rem;
-      padding-top: 10px;
-      padding-bottom: 10px;
-    }
-  </style>
+{% block extrastyle %}
+<link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}">
 {% endblock %}
-{% block content_main %}
+{% block content %}
   {% render_breadcrumb 'Leave Detail' urls %}
 
   {% if form.non_field_errors %}
@@ -47,89 +18,117 @@
       {% endfor %}
     </div>
   {% endif %}
-  <div class="container bg-light" style="margin: 10px; padding: 10px;">
+  <div class="container bg-light p-4">
     <div class="row">
-      <div class="cell">
-        <div class="social-box">
-          <div class="header bg-cyan fg-white">
+      <div class="col-12 col-md-6 mb-4">
+        <div class="card">
+          <div class="card-header bg-info text-white d-flex align-items-center">
             {% if leave_application.appliedBy.personal_detail.avatar %}
-              <img src="{{ leave_application.appliedBy.personal_detail.avatar.url }}" class="avatar" alt="Avatar" />
+              <img src="{{ leave_application.appliedBy.personal_detail.avatar.url }}" class="rounded-circle me-3" style="width: 40px; height: 40px;" alt="Avatar" />
             {% endif %}
-            <div class="title">{{ leave_application.appliedBy }}</div>
-            <div class="subtitle">Application No: {{ leave_application.applicationNo }}</div>
+            <div>
+              <h5 class="mb-0">{{ leave_application.appliedBy }}</h5>
+              <small>Application No: {{ leave_application.applicationNo }}</small>
+            </div>
           </div>
-          <ul class="skills">
-            <li>
-              <div>{{ leave_application.leave_type.leave_type_short_code }} Leave Balance</div>
-              <div class="text-bold">{{ leave_application.balanceLeave }}</div>
-            </li>
-            <li>
-              <div>Days</div>
-              <div class="text-bold">{{ leave_application.usedLeave }}</div>
-            </li>
-            <li>
-              <div>Status</div>
-              <div class="text-bold {{ leave_application.status }}">{{ leave_application.status|upper }}</div>
-            </li>
-          </ul>
-          <div class="leave-dates m-2">
-            <p class="date-row">
-              <span class="text-bold">From</span>
-              <span class="date-info">{{ leave_application.startDate.date }} -{% leave_start_end_status leave_application.startDayChoice %}</span>
-            </p>
-            <p class="date-row">
-              <span class="text-bold">To</span>
-              <span class="date-info">{{ leave_application.endDate.date }} -{% leave_start_end_status leave_application.endDayChoice %}</span>
-            </p>
-            <hr />Reason
-            {{ leave_application.reason|safe }}
+          <div class="card-body">
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item">
+                <strong>{{ leave_application.leave_type.leave_type_short_code }} Leave Balance:</strong>
+                <span class="float-end fw-bold">{{ leave_application.balanceLeave }}</span>
+              </li>
+              <li class="list-group-item">
+                <strong>Days:</strong>
+                <span class="float-end fw-bold">{{ leave_application.usedLeave }}</span>
+              </li>
+              <li class="list-group-item">
+                <strong>Status:</strong>
+                <span class="float-end fw-bold text-uppercase {{ leave_application.status }}">{{ leave_application.status }}</span>
+              </li>
+            </ul>
+            <div class="mt-3">
+              <p>
+                <strong>From:</strong> {{ leave_application.startDate.date }} -{% leave_start_end_status leave_application.startDayChoice %}
+              </p>
+              <p>
+                <strong>To:</strong> {{ leave_application.endDate.date }} -{% leave_start_end_status leave_application.endDayChoice %}
+              </p>
+              <hr />
+              <p>
+                <strong>Reason:</strong>
+              </p>
+              <p>{{ leave_application.reason|safe }}</p>
+            </div>
           </div>
         </div>
       </div>
-      <div class="cell">
-        <div data-role="panel" data-title-caption="Follow ups" data-collapsed="false" data-collapsible="true">
-          <ul>
-            {% for log in leave_application.logs.all %}
-              <li style="background-color: azure; padding: 0.5rem; margin: 0.5rem;">{{ log.action }} by {{ log.action_by_name }} - {{ log.timestamp|naturaltime }}</li>
-            {% empty %}
-              <li>No logs available.</li>
-            {% endfor %}
-          </ul>
+
+      <div class="col-12 col-md-6">
+        <div class="card">
+          <div class="card-header">Follow Ups</div>
+          <div class="card-body">
+            <ul class="list-group">
+              {% for log in leave_application.logs.all %}
+                <li class="list-group-item">
+                  <p>
+                    <strong>{{ log.action }}</strong> by {{ log.action_by_name }} - {{ log.timestamp|naturaltime }}
+                  </p>
+                </li>
+              {% empty %}
+                <li class="list-group-item">No logs available.</li>
+              {% endfor %}
+            </ul>
+          </div>
         </div>
-        <div class="container bg-white mt-5">
-          <form id="leave-application-form" method="post" action="{% url 'leave_application_update' leave_application.slug %}">
-            {% csrf_token %}
-            <div class="row">
-              <div class="cell-md-6">{{ status_form.status }}</div>
-              <div class="cell-md-6">
-                <button type="button"
-                 class="button {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %} primary" onclick="Metro.dialog.open('#updateDailog')">
-                 <img src="{% static 'hrms_app/source/images/checkmark.png' %}" /> 
-                 {% if is_manager %} Update {% else %} Request Cancellation{% endif %}</button>
+
+        <div class="card mt-4">
+          <div class="card-body">
+            <form id="leave-application-form" method="post" action="{% url 'leave_application_update' leave_application.slug %}">
+              {% csrf_token %}
+              <div class="row g-3">
+                <div class="col-md-6">{{ status_form.status }}</div>
+                <div class="col-md-6">
+                  <button type="button" class="btn btn-primary btn-sm w-100 {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %}" data-bs-toggle="modal" data-bs-target="#updateDialog">
+                    {% if is_manager %}
+                       Update
+                    {% else %}
+                      Request Cancellation
+                    {% endif %}
+                  </button>
+                </div>
               </div>
-            </div>
-            <div class="dialog" data-role="dialog" id="updateDailog">
-              <div class="dialog-title">Are you sure?</div>
-              <div class="dialog-content">
-                {% if is_manager %}
-                  You want to update the {{ leave_application.applicationNo }} of {{ leave_application.appliedBy }}
-                {% else %}
-                  You want to cancel your "{{ leave_application.applicationNo }}" leave.
-                {% endif %}
+
+              <!-- Update Dialog -->
+              <div class="modal fade" id="updateDialog" tabindex="-1" aria-labelledby="updateDialogLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <div class="modal-header">
+                      <h5 class="modal-title" id="updateDialogLabel">Are you sure?</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                      {% if is_manager %}
+                        You want to update the application {{ leave_application.applicationNo }} of {{ leave_application.appliedBy }}.
+                      {% else %}
+                        You want to cancel your "{{ leave_application.applicationNo }}" leave.
+                      {% endif %}
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                      <button type="submit" class="btn btn-primary">Submit</button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="dialog-actions">
-                <button type="reset" class="button js-dialog-close">Cancel</button>
-                <button type="button" class="button primary js-dialog-close" onclick="submitForm()">Submit</button>
-              </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
     </div>
   </div>
 {% endblock %}
 
-{% block xtra_js %}
+{% block extra_js %}
   <script>
     function submitForm() {
       document.getElementById('leave-application-form').submit()

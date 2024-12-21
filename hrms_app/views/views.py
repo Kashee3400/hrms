@@ -17,10 +17,10 @@ from django.contrib.auth.mixins import (
 )
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
-from ..table_classes import UserTourTable,LeaveApplicationTable
+from ..table_classes import UserTourTable, LeaveApplicationTable
 import pandas as pd
 from django.urls import reverse, reverse_lazy
-from hrms_app.views.mixins import LeaveListViewMixin,ModelPermissionRequiredMixin
+from hrms_app.views.mixins import LeaveListViewMixin, ModelPermissionRequiredMixin
 from django.utils.translation import gettext_lazy as _
 from datetime import datetime
 from django.conf import settings
@@ -72,6 +72,7 @@ class EmployeeProfileView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = CustomUser
     context_object_name = "employee"
     permission_required = "hrms_app.view_employeeprofileview"
+
     def test_func(self):
         return self.get_object() == self.request.user or self.request.user.is_staff
 
@@ -101,6 +102,7 @@ class EmployeeProfileView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
 class AboutPageView(TemplateView):
     template_name = "hrms_app/calendar.html"
 
+
 class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
     template_name = "hrms_app/leave-tracker.html"
     model = LeaveApplication
@@ -111,29 +113,34 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
         opts = self.model._meta
         perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"
         if not request.user.has_perm(perm):
-            logger.warning(f"Permission denied for user {request.user}. Required: {perm}")
-            raise PermissionDenied("You do not have permission to access this resource.")
-        
-        return super().dispatch(request, *args, **kwargs)
-    
-    def get_table_class(self):
-            # Dynamically define table columns based on session data or defaults
-            class DynamicLeaveApplicationTable(LeaveApplicationTable):
-                class Meta(LeaveApplicationTable.Meta):
-                    # Get selected columns from session or use defaults
-                    selected_columns = self.request.session.get(
-                        "selected_columns", 
-                        ["appliedBy", "status", "startDate", "endDate"]
-                    )
-                    fields = selected_columns
+            logger.warning(
+                f"Permission denied for user {request.user}. Required: {perm}"
+            )
+            raise PermissionDenied(
+                "You do not have permission to access this resource."
+            )
 
-            return DynamicLeaveApplicationTable
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_table_class(self):
+        # Dynamically define table columns based on session data or defaults
+        class DynamicLeaveApplicationTable(LeaveApplicationTable):
+            class Meta(LeaveApplicationTable.Meta):
+                # Get selected columns from session or use defaults
+                selected_columns = self.request.session.get(
+                    "selected_columns", ["appliedBy", "status", "startDate", "endDate"]
+                )
+                fields = selected_columns
+
+        return DynamicLeaveApplicationTable
 
     def get_leave_balances(self, user):
         """Fetch leave balances for the user."""
         try:
             leave_types = LeaveType.objects.all()
-            leave_balances = LeaveBalanceOpenings.objects.filter(user=user, leave_type__in=leave_types)
+            leave_balances = LeaveBalanceOpenings.objects.filter(
+                user=user, leave_type__in=leave_types
+            )
             leave_balances_dict = {lb.leave_type: lb for lb in leave_balances}
 
             leave_balances_list = [
@@ -154,7 +161,9 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
                         {
                             "balance": ml_balance.remaining_leave_balances,
                             "leave_type": ml_balance.leave_type.leave_type,
-                            "url": reverse("apply_leave_with_id", args=[ml_balance.leave_type.id]),
+                            "url": reverse(
+                                "apply_leave_with_id", args=[ml_balance.leave_type.id]
+                            ),
                             "color": "#ff9447",
                         }
                     )
@@ -170,7 +179,9 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
     def get_filtered_leaves(self, user, form):
         """Apply filters to the leave applications."""
         try:
-            employee_leaves = LeaveApplication.objects.filter(appliedBy__in=user.employees.all())
+            employee_leaves = LeaveApplication.objects.filter(
+                appliedBy__in=user.employees.all()
+            )
             if form.is_valid():
                 status = form.cleaned_data.get("status")
                 from_date = form.cleaned_data.get("fromDate")
@@ -186,13 +197,18 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
             return employee_leaves
         except ValidationError as ve:
             logger.warning(f"Validation error while filtering leaves: {ve}")
-            messages.error(self.request, "There was an issue processing your filter. Please try again.")
+            messages.error(
+                self.request,
+                "There was an issue processing your filter. Please try again.",
+            )
             return LeaveApplication.objects.none()
         except Exception as e:
             logger.exception(f"Unexpected error while filtering leaves: {e}")
-            messages.error(self.request, "An unexpected error occurred. Please contact support.")
+            messages.error(
+                self.request, "An unexpected error occurred. Please contact support."
+            )
             return LeaveApplication.objects.none()
-        
+
     def get_queryset(self):
         """Filter tours based on the logged-in user's tours and their employees' tours."""
         user = self.request.user
@@ -204,11 +220,15 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
         if search_term:
             # Perform a case-insensitive search across multiple fields
             user_leaves = user_leaves.filter(
-                Q(appliedby__username__icontains=search_term) |  # Search by username
-                Q(appliedby__first_name__icontains=search_term) |  # Search by first name
-                Q(appliedby__last_name__icontains=search_term) |  # Search by last name
-                Q(from_destination__icontains=search_term) |  # Search by from_destination
-                Q(to_destination__icontains=search_term)  # Search by to_destination
+                Q(appliedby__username__icontains=search_term)  # Search by username
+                | Q(
+                    appliedby__first_name__icontains=search_term
+                )  # Search by first name
+                | Q(appliedby__last_name__icontains=search_term)  # Search by last name
+                | Q(
+                    from_destination__icontains=search_term
+                )  # Search by from_destination
+                | Q(to_destination__icontains=search_term)  # Search by to_destination
             )
 
         return user_leaves
@@ -248,21 +268,29 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
                     ],
                 }
             )
-            all_columns = [field.name for field in LeaveApplication._meta.fields if field.name not in ['id', 'slug', 'status','reason']]
+            all_columns = [
+                field.name
+                for field in LeaveApplication._meta.fields
+                if field.name not in ["id", "slug", "status", "reason"]
+            ]
             selected_columns = self.request.session.get(
-                "selected_columns", 
-                ["appliedBy", "status", "startDate", "endDate"]
+                "selected_columns", ["appliedBy", "status", "startDate", "endDate"]
             )
             context["all_columns"] = all_columns
             context["selected_columns"] = selected_columns
         except Exception as e:
             logger.exception(f"Unexpected error in context preparation: {e}")
-            messages.error(self.request, "An error occurred while loading the page. Please try again later.")
+            messages.error(
+                self.request,
+                "An error occurred while loading the page. Please try again later.",
+            )
 
         return context
 
+
 from django.http import JsonResponse
 import json
+
 
 def save_column_preferences(request):
     if request.method == "POST":
@@ -272,11 +300,12 @@ def save_column_preferences(request):
         return JsonResponse({"status": "success", "selected_columns": selected_columns})
     return JsonResponse({"status": "error"}, status=400)
 
+
 class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     model = LeaveApplication
     form_class = LeaveApplicationForm
     template_name = "hrms_app/apply-leave.html"
-    permission_action = "add"  # Action for permission check
+    permission_action = "add"
     success_message = "Leave applied successfully."
 
     def dispatch(self, request, *args, **kwargs):
@@ -310,7 +339,9 @@ class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     def form_invalid(self, form):
         """Handle form submission failure."""
         context = self.get_context_data(form=form)
-        messages.error(self.request, "Leave application failed. Please correct the errors below.")
+        messages.error(
+            self.request, "Leave application failed. Please correct the errors below."
+        )
         return self.render_to_response(context)
 
     def get_context_data(self, **kwargs):
@@ -328,7 +359,10 @@ class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
             {
                 "leave_balance": leave_balance,
                 "form": kwargs.get(
-                    "form", LeaveApplicationForm(user=self.request.user, leave_type=leave_type_id)
+                    "form",
+                    LeaveApplicationForm(
+                        user=self.request.user, leave_type=leave_type_id
+                    ),
                 ),
                 "urls": [
                     ("dashboard", {"label": "Dashboard"}),
@@ -390,8 +424,8 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
         user = self.request.user
 
         if (
-                leave_application.appliedBy == user
-                or leave_application.appliedBy.reports_to == user
+            leave_application.appliedBy == user
+            or leave_application.appliedBy.reports_to == user
         ):
             return leave_application
 
@@ -415,7 +449,7 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
             ),
         ]
         context["is_manager"] = (
-                self.request.user == leave_application.appliedBy.reports_to
+            self.request.user == leave_application.appliedBy.reports_to
         )
         context["status_form"] = LeaveStatusUpdateForm(
             user=self.request.user, instance=self.object
@@ -428,7 +462,8 @@ from hrms_app.utility.leave_utils import format_date
 from django.http import JsonResponse
 from django.views import View
 
-class LeaveApplicationListView(View,LeaveListViewMixin):
+
+class LeaveApplicationListView(View, LeaveListViewMixin):
     START_LEAVE_TYPE_CHOICES = {
         "1": "Full Day",
         "2": "First Half (Morning)",
@@ -465,33 +500,29 @@ class LeaveApplicationListView(View,LeaveListViewMixin):
 
         return JsonResponse(data)
 
+
 class EventPageView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/calendar.html"
-    model = AttendanceLog  # Or the model you want to check permissions for
-    permission_action = "view"  # Action (view, add, change, delete)
-
-    def dispatch(self, request, *args, **kwargs):
-        """Check if the user has the required permission dynamically."""
-        opts = self.model._meta  # Get the model's meta data
-        perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"  # Format permission name
-        
-        if not request.user.has_perm(perm):
-            logger.warning(f"Permission denied for user {request.user}. Required: {perm}")
-            raise PermissionDenied("You do not have permission to access this resource.")
-        
-        return super().dispatch(request, *args, **kwargs)
+    model = AttendanceLog
 
     def get_context_data(self, **kwargs):
         """Prepare the context for the template."""
         context = super().get_context_data(**kwargs)
-        
-        form = EmployeeChoices(self.request.GET)  # Add any forms if needed
+        initial_data = {"employee": self.request.user}
+        form = EmployeeChoicesForm(self.request.GET or initial_data)
 
-        # Add dynamic context for the template
+        if form.is_valid():
+            employee = form.cleaned_data.get("employee")
+        else:
+            employee = self.request.user
+
+        employee = self.request.user if employee is None else employee
+
         context.update(
             {
                 "current_date": now(),
                 "form": form,
+                "employee": employee,
                 "urls": [
                     ("dashboard", {"label": "Dashboard"}),
                     ("calendar", {"label": "Attendance Calendar"}),
@@ -499,6 +530,7 @@ class EventPageView(LoginRequiredMixin, TemplateView):
             }
         )
         return context
+
 
 class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = AttendanceLog
@@ -514,10 +546,11 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     def get_object(self, queryset=None):
         attendance_log = super().get_object(queryset)
         user = self.request.user
-
         if (
-                attendance_log.applied_by == user
-                or attendance_log.applied_by.reports_to == user
+            attendance_log.applied_by == user
+            or attendance_log.applied_by.reports_to == user
+            or self.request.user.is_staff
+            or self.request.user.is_superuser
         ):
             return attendance_log
         raise PermissionDenied()
@@ -549,7 +582,7 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         attendance_log = self.get_object()
         context["is_manager"] = (
-                self.request.user == attendance_log.applied_by.reports_to
+            self.request.user == attendance_log.applied_by.reports_to
         )
         urls = [
             ("dashboard", {"label": "Dashboard"}),
@@ -562,10 +595,13 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context["urls"] = urls
         return context
 
+from django.http import JsonResponse
+from django.urls import reverse_lazy
+from django.utils import timezone
 
 class EventListView(View):
     def get(self, request, *args, **kwargs):
-        user_id = request.GET.get("employees", request.user.id)
+        user_id = request.GET.get("employee", self.request.user.id)
         try:
             user = User.objects.get(pk=user_id)
         except User.DoesNotExist:
@@ -575,65 +611,66 @@ class EventListView(View):
         attendances = AttendanceLog.objects.filter(applied_by=user)
         leave_applications = LeaveApplication.objects.filter(appliedBy=user)
         tour_applications = UserTour.objects.filter(applied_by=user)
-        
-        events_data = [
+
+        events_data = []
+        # Adding holidays
+        events_data.extend([
             {
                 "id": holiday.pk,
                 "title": holiday.title,
-                "start": holiday.start_date,
-                "end": holiday.end_date,
+                # Combine date with midnight time to create a naive datetime object
+                "start": timezone.localtime(timezone.make_aware(datetime.combine(holiday.start_date, datetime.min.time()))).isoformat(),
+                # Adjust the end date to be the next day and make it timezone-aware
+                "end": timezone.localtime(timezone.make_aware(datetime.combine(holiday.end_date, datetime.min.time()) + timezone.timedelta(days=1))).isoformat(),
                 "color": holiday.color_hex,
-                "url": "#!",
+                "url": "#!"
             }
             for holiday in holidays
-        ]
-        events_data.extend(
+        ])
+
+        # Adding tours
+        events_data.extend([
             {
-                "id": tour.pk,
+                "id": tour.slug,
                 "title": f"Tour -> {tour.approval_type}",
-                "start": f"{tour.start_date} {tour.start_time}",
-                "end": f"{tour.end_date} {tour.end_time}",
-                "url": reverse_lazy(
-                    "tour_application_detail", kwargs={"slug": tour.slug}
-                ),
+                "start": timezone.localtime(timezone.make_aware(datetime.combine(tour.start_date, tour.start_time))).isoformat(),
+                "end": timezone.localtime(timezone.make_aware(datetime.combine(tour.end_date, tour.end_time))).isoformat(),
+                "url": reverse_lazy("tour_application_detail", kwargs={"slug": tour.slug}),
             }
             for tour in tour_applications
-        )
-        events_data.extend(
+        ])
+
+        # Adding leave applications
+        events_data.extend([
             {
-                "id": leave.pk,
+                "id": leave.slug,
                 "title": leave.leave_type.leave_type,
-                "start": leave.startDate,
-                "end": leave.endDate,
+                "start": timezone.localtime(leave.startDate).isoformat(),   # Convert to local time
+                "end": timezone.localtime(leave.endDate).isoformat(),       # Convert to local time
                 "color": leave.leave_type.color_hex,
-                "url": reverse_lazy(
-                    "leave_application_detail", kwargs={"slug": leave.slug}
-                ),
+                "url": reverse_lazy("leave_application_detail", kwargs={"slug": leave.slug}),
             }
             for leave in leave_applications
-        )
-        for att in attendances:
-            events_data.append(
-                {
-                    "id": att.pk,
-                    "title": att.att_status,
-                    "start": make_naive(att.start_date).date(),
-                    "end": make_naive(att.end_date).date(),
-                    "color": att.color_hex,
-                    "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
-                }
-            )
-            if att.reg_status is not None:
-                events_data.append(
-                    {
-                        "id": att.pk,
-                        "title": att.reg_status,
-                        "start": make_naive(att.start_date),
-                        "end": make_naive(att.end_date),
-                        "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
-                    }
-                )
+        ])
 
+        # Adding attendance logs
+        for att in attendances:
+            events_data.append({
+                "id": att.slug,
+                "title": att.att_status,
+                "start": timezone.localtime(att.start_date).isoformat(),  # Convert to local time
+                "end": timezone.localtime(att.end_date).isoformat(),      # Convert to local time
+                "color": att.color_hex,
+                "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
+            })
+            if att.reg_status is not None:
+                events_data.append({
+                    "id": att.slug,
+                    "title": att.reg_status,
+                    "start": timezone.localtime(att.start_date).isoformat(),  # Convert to local time
+                    "end": timezone.localtime(att.end_date).isoformat(),      # Convert to local time
+                    "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
+                })
         return JsonResponse(events_data, safe=False)
 
 
@@ -694,7 +731,7 @@ def check_user_balance(request):
     leaveType = request.POST.get("leaveType")
     leave_bal = 0
     if LeaveBalanceOpenings.objects.filter(
-            user=request.user, leave_type=leaveType
+        user=request.user, leave_type=leaveType
     ).exists():
         leave = LeaveBalanceOpenings.objects.get(
             user=request.user, leave_type=leaveType
@@ -706,65 +743,7 @@ def check_user_balance(request):
     return JsonResponse({"success": True, "balance": leave_bal, "type": leaveType})
 
 
-class AddHolidaysView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
-    model = Holiday
-    template_name = "invent_app/feedback_form.html"
-    success_url = reverse_lazy("add_holidays")
-    permission_required = "hrms_app.add_holidays"
-
-    def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        holidays = Holiday.objects.all()
-        context["form"] = self.get_form()
-        context["holidays"] = holidays
-        return context
-
-    def post(self, request):
-        form = ExcelUploadForm(request.POST, request.FILES)
-        if form.is_valid():
-            excel_file = request.FILES["file"]
-            Holiday.objects.all().delete()
-            try:
-                df = pd.read_excel(excel_file)
-                for index, row in df.iterrows():
-                    try:
-                        date_str = row["Date"]
-                        formatted_start_date = date_str.strftime("%Y-%m-%d")
-                    except ValueError as e:
-                        error_message = f"Error converting date: {e}"
-                        return render(
-                            request,
-                            "hrms_app/holidays.html",
-                            {"form": form, "error_message": error_message},
-                        )
-                    holiday = Holiday.objects.create(
-                        title=row["Holiday Name"],
-                        date=formatted_start_date,
-                    )
-                    holiday.save()
-                messages.success(request, "Holidays uploaded successfully")
-                return redirect("add_holidays")
-
-            except Exception as e:
-                error_message = f"Error: {e}"
-                messages.error(request, "Error Occurred. Please try again later.")
-                form = ExcelUploadForm()
-                return render(request, "hrms_app/holidays.html", {"form": form})
-        else:
-            messages.error(request, "Error Occurred. Please try again later.")
-            return redirect("add_holidays")
-
-    def get_success_url(self):
-        """
-        Return the URL to redirect to after processing a valid form.
-        """
-        return self.success_url
-
-
-class TourTrackerView(LoginRequiredMixin,SingleTableMixin, FilterView):
+class TourTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
     template_name = "hrms_app/tour-tracker.html"
     model = UserTour
     table_class = UserTourTable
@@ -775,7 +754,9 @@ class TourTrackerView(LoginRequiredMixin,SingleTableMixin, FilterView):
         opts = self.model._meta
         perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"
         if not request.user.has_perm(perm):
-            raise PermissionDenied("You do not have permission to access this resource.")
+            raise PermissionDenied(
+                "You do not have permission to access this resource."
+            )
         return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
@@ -790,11 +771,15 @@ class TourTrackerView(LoginRequiredMixin,SingleTableMixin, FilterView):
         if search_term:
             # Perform a case-insensitive search across multiple fields
             user_tours = user_tours.filter(
-                Q(applied_by__username__icontains=search_term) |  # Search by username
-                Q(applied_by__first_name__icontains=search_term) |  # Search by first name
-                Q(applied_by__last_name__icontains=search_term) |  # Search by last name
-                Q(from_destination__icontains=search_term) |  # Search by from_destination
-                Q(to_destination__icontains=search_term)  # Search by to_destination
+                Q(applied_by__username__icontains=search_term)  # Search by username
+                | Q(
+                    applied_by__first_name__icontains=search_term
+                )  # Search by first name
+                | Q(applied_by__last_name__icontains=search_term)  # Search by last name
+                | Q(
+                    from_destination__icontains=search_term
+                )  # Search by from_destination
+                | Q(to_destination__icontains=search_term)  # Search by to_destination
             )
 
         return user_tours
@@ -809,31 +794,36 @@ class TourTrackerView(LoginRequiredMixin,SingleTableMixin, FilterView):
         user_tours = UserTour.objects.filter(applied_by=user)
 
         # Apply additional filters (status, date, etc.)
-        selected_status = form.cleaned_data.get("status", settings.PENDING) if form.is_valid() else settings.PENDING
-        from_date = form.cleaned_data.get("fromDate")
-        to_date = form.cleaned_data.get("toDate")
+        selected_status = (
+            form.cleaned_data.get("status", settings.PENDING)
+            if form.is_valid()
+            else settings.PENDING
+        )
+        from_date = form.cleaned_data.get("from_date")
+        to_date = form.cleaned_data.get("to_date")
 
         if selected_status:
             user_tours = user_tours.filter(status=selected_status)
         if from_date:
-            user_tours = user_tours.filter(startDate__gte=from_date)
+            user_tours = user_tours.filter(start_date__gte=from_date)
         if to_date:
-            user_tours = user_tours.filter(endDate__lte=to_date)
+            user_tours = user_tours.filter(end_date__lte=to_date)
 
         # Get the tours assigned to the user's employees (if the user is an RM)
         if user.is_rm:
-            employee_tours = UserTour.objects.filter(applied_by__in=user.employees.all())
-            context.update(
-                {
-                    "employee_tours": employee_tours,
-                }
+            employee_tours = UserTour.objects.filter(
+                applied_by__in=user.employees.all()
             )
-        else:
-            # If not RM, show both the user's own and the employees' tours
-            employee_tours = UserTour.objects.filter(applied_by__in=user.employees.all())
+            from_date = form.cleaned_data.get("from_date")
+            to_date = form.cleaned_data.get("to_date")
+            if selected_status:
+                employee_tours = employee_tours.filter(status=selected_status)
+            if from_date:
+                employee_tours = employee_tours.filter(start_date__gte=from_date)
+            if to_date:
+                employee_tours = employee_tours.filter(end_date__lte=to_date)
             context.update(
                 {
-                    "user_tours": user_tours,
                     "employee_tours": employee_tours,
                 }
             )
@@ -843,7 +833,10 @@ class TourTrackerView(LoginRequiredMixin,SingleTableMixin, FilterView):
             {
                 "current_date": now(),
                 "form": form,
-                "search_term": self.request.GET.get("search", ""),  # Add search term to context
+                "search_term": self.request.GET.get(
+                    "search", ""
+                ),
+                "selected_status":selected_status,
                 "urls": [
                     ("dashboard", {"label": "Dashboard"}),
                     ("tour_tracker", {"label": "Tour Tracker"}),
@@ -853,9 +846,11 @@ class TourTrackerView(LoginRequiredMixin,SingleTableMixin, FilterView):
 
         return context
 
+
 class ApplyTourView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = UserTour
     form_class = TourForm
+    title = _('Apply Tour')
     template_name = "hrms_app/apply-tour.html"
     success_url = reverse_lazy("tour_tracker")
     permission_required = "hrms_app.add_usertour"
@@ -903,8 +898,8 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         tour_application = super().get_object(queryset)
         user = self.request.user
         if (
-                tour_application.applied_by == user
-                or tour_application.applied_by.reports_to == user
+            tour_application.applied_by == user
+            or tour_application.applied_by.reports_to == user
         ):
             return tour_application
         return HttpResponseForbidden(
@@ -916,7 +911,7 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         tour_application = self.get_object()
         kwargs["user"] = self.request.user
         kwargs["is_manager"] = (
-                self.request.user == tour_application.applied_by.reports_to
+            self.request.user == tour_application.applied_by.reports_to
         )
         return kwargs
 
@@ -929,7 +924,7 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
             f"Regularization {form.cleaned_data.get('status')} Successfully",
         )
         return HttpResponseRedirect(
-            reverse("event_detail", kwargs={"slug": self.object.slug})
+            reverse("tour_application_detail", kwargs={"slug": self.object.slug})
         )
 
     def form_invalid(self, form, msg=None):
@@ -947,17 +942,15 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
             ),
         ]
         context["is_manager"] = (
-                self.request.user == tour_application.applied_by.reports_to
+            self.request.user == tour_application.applied_by.reports_to
         )
         context["urls"] = urls
         return context
-    
+
     def get_success_url(self):
         return reverse_lazy(
             "tour_application_detail", kwargs={"slug": self.object.slug}
         )
-
-
 
 
 class TourApplicationDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
@@ -1083,7 +1076,7 @@ TEMPLATES = {
 }
 
 
-class UserCreationWizard(LoginRequiredMixin,SessionWizardView):
+class UserCreationWizard(LoginRequiredMixin, SessionWizardView):
     file_storage = FileSystemStorage(location=settings.MEDIA_ROOT)
     template_name = "hrms_app/form_wizard.html"
     url_name = reverse_lazy("/")
@@ -1140,7 +1133,7 @@ class UserCreationWizard(LoginRequiredMixin,SessionWizardView):
 
         # Get user instance from the form or create if not found
         user = self.get_user_instance()
-        
+
         if not user:
             # If no user instance, create a new user from user_form data
             user = user_form.save(commit=False)
@@ -1197,7 +1190,6 @@ class UserCreationWizard(LoginRequiredMixin,SessionWizardView):
             logger.error(f"Error saving form data for step {current_step}: {e}")
             raise
 
-
     def render_error_page(self):
         return redirect("error_page")
 
@@ -1210,17 +1202,20 @@ def cancel_user_creation(request):
     return redirect("/")
 
 
-from django.views.generic import ListView
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Q
+from django.views.generic import ListView
 
 
-class EmployeeListView(LoginRequiredMixin, ListView):
+class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
     model = CustomUser
-    template_name = (
-        "hrms_app/employee/employees.html"  # Template for rendering user list
-    )
+    template_name = "hrms_app/employee/employees.html"
     context_object_name = "users"
-    paginate_by = 10  # Pagination limit
+    paginate_by = 20
+
+    def test_func(self):
+        # Allow access only to staff and superusers
+        return self.request.user.is_staff or self.request.user.is_superuser
 
     def get_queryset(self):
         queryset = CustomUser.objects.all()
@@ -1229,8 +1224,6 @@ class EmployeeListView(LoginRequiredMixin, ListView):
         is_active = self.request.GET.get("is_active")
         if is_active is not None and is_active != "":
             queryset = queryset.filter(is_active=is_active)
-        elif is_active == "":
-            queryset = queryset
 
         # Search by username, first name, last name, or email
         search_query = self.request.GET.get("q")
@@ -1256,5 +1249,3 @@ class EmployeeListView(LoginRequiredMixin, ListView):
         ]
         context["urls"] = urls
         return context
-
-

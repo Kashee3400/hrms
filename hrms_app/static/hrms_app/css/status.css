@@ -1,33 +1,41 @@
 .approved {
   color: green;
   background-color: #d8fff2;
-  border-radius: 0.2rem;
-  padding: 5px 8px 5px 8px;
-  font-size: 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  line-height: 1;
+  padding: .375rem .5625rem;
+  font-weight: normal;
 }
 
 .rejected {
   color: #b40000;
   background-color: #ffd1d1;
-  border-radius: 0.2rem;
-  padding: 5px 8px 5px 8px;
-  font-size: 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  line-height: 1;
+  padding: .375rem .5625rem;
+  font-weight: normal;
 }
 
 .pending {
   color: #646363;
   background-color: #8080808a;
-  border-radius: 0.2rem;
-  padding: 5px 8px 5px 8px;
-  font-size: 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  line-height: 1;
+  padding: .375rem .5625rem;
+  font-weight: normal;
 }
 
 .cancelled {
   color: #ffdbb1;
   background-color: #ff8900;
-  border-radius: 0.2rem;
-  padding: 5px 8px 5px 8px;
-  font-size: 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  line-height: 1;
+  padding: .375rem .5625rem;
+  font-weight: normal;
 
 }
 

@@ -134,3 +134,45 @@ def create_or_update_regularization(sender, instance, created, **kwargs):
     domain = current_site.domain
     send_tour_notifications.delay(instance.id, protocol, domain)
     
+
+@receiver(post_save, sender=LeaveApplication)
+def create_leave_days(sender, instance, created, **kwargs):
+    """
+    Create LeaveDay instances after LeaveApplication is saved.
+    """
+    if created and instance.startDate and instance.endDate:
+        current_date = instance.startDate.date()
+        end_date = instance.endDate.date()
+        
+        while current_date <= end_date:
+            if current_date == instance.startDate.date():
+                is_full_day = (instance.startDayChoice == settings.FULL_DAY)
+            elif current_date == instance.endDate.date():
+                is_full_day = (instance.endDayChoice == settings.FULL_DAY)
+            else:
+                is_full_day = True
+
+            LeaveDay.objects.create(
+                leave_application=instance,
+                date=current_date,
+                is_full_day=is_full_day,
+            )
+            current_date += timedelta(days=1)
+
+@receiver(post_save, sender=CustomUser)
+def create_employee_shift(sender, instance, created, **kwargs):
+    """
+    Create an EmployeeShift instance after a CustomUser is created.
+    """
+    if created:  # Only create shifts for newly created users
+        try:
+            default_shift_timing = ShiftTiming.objects.first()  # Replace with your logic for default shift
+            if default_shift_timing:
+                EmployeeShift.objects.create(
+                    employee=instance,
+                    shift_timing=default_shift_timing,
+                    created_by=instance,  # Assuming the user is self-created; adjust logic as needed
+                )
+        except Exception as e:
+            # Log the error or handle it if no default ShiftTiming exists
+            print(f"Error creating EmployeeShift: {e}")

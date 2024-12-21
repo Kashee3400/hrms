@@ -1,180 +1,200 @@
 from django.contrib.auth import get_user_model
-from itertools import chain
 from datetime import timedelta
-from django.utils.timezone import make_aware
-from django.conf import  settings
-from hrms_app.hrms.form import AttendanceReportFilterForm
-from django.db.models import Q
-from django.utils.html import format_html
-from ..models import OfficeLocation,AttendanceLog,UserTour
+from django.utils.timezone import make_aware, now
 from hrms_app.hrms.form import *
 from django.views.generic import (
-    FormView,
-    DetailView,
-    CreateView,
     TemplateView,
-    UpdateView,
-    DeleteView,
 )
-from django.shortcuts import render
+from django.utils.timezone import localtime
+from collections import defaultdict
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
-    UserPassesTestMixin,
-    PermissionRequiredMixin,
 )
 from django.utils.translation import gettext_lazy as _
-from django.conf import settings
-from django.core.exceptions import PermissionDenied
-from django.db import IntegrityError, transaction
 import logging
-from django.http import JsonResponse
-from django.views import View
-from django.utils.timezone import now
-from django.contrib.messages.views import SuccessMessageMixin
 
 logger = logging.getLogger(__name__)
+User = get_user_model()  # This gets the custom user model dynamically
 
 
-class MonthAttendanceReportView(LoginRequiredMixin,TemplateView):
+class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
+
     template_name = "hrms_app/reports/present_absent_report.html"
+    permission_denied_message = _("U are not authorized to access the page")
+    title = _("Attendance Report")
+
+    def _map_attendance_data(self, attendance_logs, leave_logs, holidays,tour_logs):
+        """
+        Generalized function to map both attendance and leave data with status and color under the same key.
+
+        Args:
+            attendance_logs: Queryset of AttendanceLog objects.
+            leave_logs: Queryset of LeaveApplication objects.
+            holidays: List of holiday objects.
+
+        Returns:
+            A nested dictionary with employee_id -> day -> data (status, color).
+        """
+        # Query both attendance and leave data
+        attendance_logs = attendance_logs.values(
+            "applied_by_id", "start_date", "att_status_short_code", "color_hex"
+        )
+
+        leave_logs = leave_logs.values(
+            "appliedBy_id",
+            "startDate",
+            "endDate",
+            "status",
+            "leave_type__color_hex",
+            "leave_type__leave_type_short_code",
+            "leave_type__half_day_short_code",
+        )
+        tour_logs = leave_logs.values(
+            "applied_by_id",
+            "start_date",
+            "end_date",
+            "status",
+        )
+
+        attendance_data = defaultdict(lambda: defaultdict(list))
+
+        # Populate the dictionary with attendance and leave data
+        for log in attendance_logs:
+            employee_id = log["applied_by_id"]
+            day = log["start_date"].day
+            attendance_data[employee_id][day].append({
+                "status": log["att_status_short_code"],
+                "color": log["color_hex"] or "#000000",  # Default color if None
+            })
+        for log in tour_logs:
+            employee_id = log['applied_by_id']
+            day = log['start_day'].day
+            attendance_data[employee_id][day].append({
+                "status": log["att_status_short_code"],
+                "color": log["color_hex"] or "#000000",  # Default color if None                
+            })
+        for log in leave_logs:
+            start_date = localtime(log["startDate"])
+            employee_id = log["appliedBy_id"]
+            start_day = start_date.day
+            end_day = localtime(log["endDate"]).day
+            for day in range(start_day, end_day + 1):
+                attendance_data[employee_id][day].append({
+                    "status": log["leave_type__leave_type_short_code"],
+                    "color": log["leave_type__color_hex"] or "#FF0000",
+                })
+
+        holiday_days = {holiday.start_date.day: {"status": holiday.short_code, "color": holiday.color_hex} for holiday in holidays}
+        for employee_id in attendance_data.keys():
+            for day, holiday_info in holiday_days.items():
+                attendance_data[employee_id][day].append(holiday_info)
+
+        return attendance_data
+
+
+    def _get_days_in_month(self, start_date, end_date):
+        """
+        Generate a list of days between the start and end date.
+        """
+        total_days = (end_date - start_date).days + 1
+        return [start_date + timedelta(days=i) for i in range(total_days)]
+
+    def _get_filtered_employees(self, location, active):
+        """
+        Return the filtered employees based on location and active status.
+        """
+        employees = CustomUser.objects.filter(is_active=active)
+        if location:
+            employees = employees.filter(device_location_id=location)
+
+        return employees.order_by("first_name")
 
     def get_context_data(self, **kwargs):
-        """Prepare the context for the template."""
         context = super().get_context_data(**kwargs)
-        
-        # Get the form for employee selection
         form = AttendanceReportFilterForm(self.request.GET)
 
-        # Extract parameters from the GET request (location, from_date, to_date)
-        location = self.request.GET.get('location')
-        from_date = self.request.GET.get('from_date')
-        to_date = self.request.GET.get('to_date')
-
-        if location and from_date and to_date:
+        if form.is_valid():
+            location = self.request.GET.get("location")
+            from_date = self.request.GET.get("from_date")
+            to_date = self.request.GET.get("to_date")
+            active = self.request.GET.get("active")
             try:
-                converted_from_datetime = make_aware(datetime.strptime(from_date, "%Y-%m-%d"))
-                converted_to_datetime = make_aware(datetime.strptime(to_date, "%Y-%m-%d"))
+                converted_from_datetime, converted_to_datetime = self._get_date_range(
+                    from_date, to_date
+                )
             except ValueError:
-                # Handle invalid date format, if needed
-                context['error'] = "Invalid date format. Please use YYYY-MM-DD."
+                context["error"] = "Invalid date format. Please use YYYY-MM-DD."
                 return context
-        
-            # Generate the attendance report HTML table
-            table_html = get_monthly_presence(converted_from_datetime, converted_to_datetime, location)
-            
-            # Add the attendance table to the context
+            active = True if active == "on" else False
+            employees = self._get_filtered_employees(location, active)
+
+            # Fetch attendance logs for all employees in the given date range in bulk
+            attendance_logs = self._get_attendance_logs(
+                employees, converted_from_datetime, converted_to_datetime
+            )
+            leave_logs = self._get_leave_logs(
+                employees, converted_from_datetime, converted_to_datetime
+            )
+            tour_logs = self._get_tour_logs(
+                employees, converted_from_datetime, converted_to_datetime
+            )
+            holidays = self._get_holiday_logs(
+                converted_from_datetime, converted_to_datetime
+            )
+            # Create a mapping of attendance data for quick lookup in the template
+            attendance_data = self._map_attendance_data(
+                attendance_logs=attendance_logs, leave_logs=leave_logs,holidays=holidays,tour_logs=tour_logs
+            )
+            context["days_in_month"] = self._get_days_in_month(
+                converted_from_datetime, converted_to_datetime
+            )
+            context["attendance_data"] = attendance_data
+            context["employees"] = employees
         else:
-            # If no filters are provided, just show a form with no data
-            start_date, end_date = get_payroll_start_end_date(now().date)
-            table_html = get_monthly_presence(start_date, end_date, location)
-            context.update(
-                {
-                    "form": form,
-                    "error": "Please select location and date range.",  # Provide error message
-                }
-            )
-            
-        context.update(
-                {
-                    "current_date": now(),
-                    "form": form,
-                    "table_html": table_html,  # Include the generated table HTML
-                    "urls": [
-                        ("dashboard", {"label": "Dashboard"}),
-                        ("calendar", {"label": "Attendance Report"}),
-                    ],
-                }
-            )
+            context["error"] = "Please select a location and date range."
+        context["form"] = form
+        context["title"] = self.title
         return context
 
+    def _get_date_range(self, from_date, to_date):
+        """
+        Converts the from_date and to_date strings into datetime objects.
+        """
+        converted_from_datetime = make_aware(datetime.strptime(from_date, "%Y-%m-%d"))
+        converted_to_datetime = make_aware(datetime.strptime(to_date, "%Y-%m-%d"))
+        return converted_from_datetime, converted_to_datetime
 
-def get_monthly_presence(converted_from_datetime, converted_to_datetime, location_name,is_active=True):
-    """
-    Generates the monthly attendance report for a given location.
-    
-    :param converted_from_datetime: The start datetime for the report period.
-    :param converted_to_datetime: The end datetime for the report period.
-    :param location_name: The location name to filter the employees by.
-    :return: HTML table containing attendance status for each employee.
-    """
-    # Fetch the start and end date in the correct format
-    start_fetch_date_str = converted_from_datetime.strftime('%Y-%m-%d %H:%M')
-    end_fetch_date_str = converted_to_datetime.strftime('%Y-%m-%d %H:%M')
-    office_location = OfficeLocation.objects.all()
-    
-    # Get the location dynamically based on the provided location_name from frontend
-    location =  office_location.filter(office_type=location_name) if location_name else  office_location.filter(office_type=settings.HEAD_OFFICE)
+    def _get_holiday_logs(self,start_date, end_date):
+        """
+        Fetch all attendance logs in one query for the selected employees and date range.
+        """
+        return Holiday.objects.filter(
+            start_date__gte=start_date, end_date__lte=end_date
+        )
 
-    # Fetch the users (dynamic user model) based on location
-    User = get_user_model()  # This gets the custom user model dynamically
-    
-    # Filter users by location and exclude specific emails
-    all_objects = User.objects.filter(location=location,is_active=is_active).exclude(
-        email__in=['admin@gmail.com']
-    )
+    def _get_attendance_logs(self, employees, start_date, end_date):
+        """
+        Fetch all attendance logs in one query for the selected employees and date range.
+        """
+        return AttendanceLog.objects.filter(
+            applied_by__in=employees, start_date__gte=start_date, end_date__lte=end_date
+        ).select_related("applied_by")
 
-    # Fetch all attendance logs for the specified period
-    attendance_logs = AttendanceLog.objects.filter(
-        applied_by__in=all_objects,
-        start_date__gte=converted_from_datetime,
-        end_date__lte=converted_to_datetime
-    )
+    def _get_leave_logs(self, employees, start_date, end_date):
+        """
+        Fetch all attendance logs in one query for the selected employees and date range.
+        """
+        return LeaveApplication.objects.filter(
+            appliedBy__in=employees, startDate__gte=start_date, endDate__lte=end_date,status=settings.APPROVED
+        ).select_related("appliedBy")
 
-    # Prepare a list of logs by employee code and date
-    attendance_dict = {}
-    for log in attendance_logs:
-        emp_code = log.applied_by.personal_detail.employee_code
-        # Add entry for each log with date keys
-        for date in log.date_range():
-            if emp_code not in attendance_dict:
-                attendance_dict[emp_code] = {}
-            status = log.att_status or "A"  # Default to "Absent" if no status
-            attendance_dict[emp_code][date.strftime('%Y-%m-%d')] = {
-                'status': status,
-                'att_status_short_code': log.att_status_short_code,
-                'color_hex': log.color_hex
-            }
-
-    # Generate table rows for HTML
-    table_rows = []
-    for emp in all_objects:
-        if emp.emp_code in attendance_dict:
-            row_data = [f'<td class="sticky-col">KMPCL-{format_emp_code(emp.emp_code)}</td>']
-            row_data.append(f'<td class="sticky-col">{emp.first_name} {emp.last_name}</td>')
-
-            # Loop through each day in the date range
-            for day in range((converted_to_datetime - converted_from_datetime).days + 1):
-                day_date = converted_from_datetime.date() + timedelta(days=day)
-                day_str = day_date.strftime('%Y-%m-%d')
-
-                # Determine the status for the current day
-                attendance_entry = attendance_dict.get(emp.emp_code, {}).get(day_str)
-                status = "A"  # Default to absent
-                if attendance_entry:
-                    status = attendance_entry['status']
-
-                # Define colors based on the status
-                color_class = {
-                    "P": "class=\"text-success\"",
-                    "A": "class=\"text-danger\"",
-                    "OFF": "class=\"text-muted\"",
-                    "L": "style=\"color:#9f4eb5;\"",
-                    "EL": "style=\"color:#9f4eb5;\"",
-                    "SL": "style=\"color:#9f4eb5;\"",
-                    "CL": "style=\"color:#9f4eb5;\"",
-                    "T": "style=\"color:rgb(0, 195, 204);\"",
-                    "FL": "style=\"color:#ffa500;\""
-                }.get(status, "text-black")
-
-                # Append the status with its respective color class
-                row_data.append(f'<td {color_class}>{status}</td>')
-
-            # Add this row to the table
-            table_rows.append(f"<tr>{''.join(row_data)}</tr>")
-
-    # Return the complete table HTML as a string
-    table_data = "".join(table_rows)
-    return table_data
+    def _get_tour_logs(self, employees, start_date, end_date):
+        """
+        Fetch all attendance logs in one query for the selected employees and date range.
+        """
+        return UserTour.objects.filter(
+            appliedBy__in=employees, start_date__gte=start_date, end_date__lte=end_date,status=settings.APPROVED
+        ).select_related("applied_by")
 
 def format_emp_code(emp_code):
     length = len(emp_code)
@@ -202,5 +222,5 @@ def get_payroll_start_end_date(date):
             end_fetch_date = datetime(date.year, date.month - 1, 20)
         start_fetch_date = start_fetch_date.replace(hour=0, minute=1)
         end_fetch_date = end_fetch_date.replace(hour=23, minute=59)
-    
+
     return start_fetch_date, end_fetch_date
