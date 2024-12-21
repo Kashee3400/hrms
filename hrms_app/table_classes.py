@@ -39,3 +39,27 @@ class LeaveApplicationTable(tables.Table):
         # Specify no fields initially; fields will be dynamically added.
         fields = []
         attrs = {"class": "table table-striped"}
+
+
+from .models import AttendanceLog
+
+class AttendanceLogTable(tables.Table):
+    from_date = tables.DateTimeColumn(format="d M Y, h:i A", verbose_name="From Date")
+    to_date = tables.DateTimeColumn(format="d M Y, h:i A", verbose_name="To Date")
+    actions = tables.Column(empty_values=(), verbose_name="Actions")
+
+    class Meta:
+        model = AttendanceLog
+        template_name = "django_tables2/bootstrap.html"
+        fields = ("applied_by", "reg_status", "status", "from_date", "to_date", "reg_duration", "is_submitted")
+        attrs = {"class": "table table-striped"}
+
+    def render_actions(self, record):
+        view_url = reverse('event_detail', args=[record.slug])
+        approve_url = reverse('attendance_log_action', args=[record.pk, 'approve'])
+        return format_html(
+            '<a href="{}" class="btn btn-primary btn-sm"><i class="fas fa-eye"></i> View Detail</a> '
+            '<a href="{}" class="btn btn-success btn-sm"><i class="fas fa-check"></i> Approve</a>',
+            view_url,
+            approve_url
+        )

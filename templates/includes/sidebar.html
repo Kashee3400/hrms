@@ -119,6 +119,7 @@
       </a>
     </li>
 
+
     <!-- Attendance Report -->
     {% url 'attendance_report' as attendance_report_url %}
     <li class="nav-item {% if request.path == attendance_report_url %} active {% endif %}">
@@ -127,6 +128,15 @@
         <span class="menu-title">{% trans 'Attendance Report' %}</span>
       </a>
     </li>
+    <!-- Attendance Report -->
+    {% url 'regularization' as regularization_url %}
+    <li class="nav-item {% if request.path == regularization_url %} active {% endif %}">
+      <a class="nav-link" href="{{ regularization_url }}">
+        <i class="mdi mdi-file-document menu-icon"></i>
+        <span class="menu-title">{% trans 'Regularizations' %}</span>
+      </a>
+    </li>
+
   </ul>
 </nav>
 <script>

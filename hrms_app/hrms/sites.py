@@ -52,6 +52,8 @@ site.register_view('leave-tracker/', views.LeaveTrackerView, name='leave_tracker
 site.register_view('apply-leave/', views.ApplyLeaveView, name='apply_leave')
 site.register_view('', views.EventPageView, name='calendar')
 site.register_view('attendance/<slug:slug>/', views.EventDetailPageView, name='event_detail')
+site.register_view('attendance-log/<slug:slug>/<str:action>/', views.AttendanceLogActionView, name='attendance_log_action')
+site.register_view('attendance-regularization/', views.AttendanceLogListView, name='regularization')
 site.register_view('profile/', views.ProfilePageView, name='profile')
 site.register_view('apply-leave/<int:pk>/', views.ApplyLeaveView, name='apply_leave_with_id')
 site.register_view('leave/<slug:slug>/', views.LeaveApplicationDetailView, name='leave_application_detail')
@@ -71,3 +73,5 @@ site.register_view('employee-profile/<int:pk>/', views.EmployeeProfileView, name
 ###############################################################################################
 site.register_view('attendance-report/', report_view.MonthAttendanceReportView, name='attendance_report')
 
+# path('attendance-log/<int:log_id>/<str:action>/', AttendanceLogActionView.as_view(), name='attendance_log_action'),
+# path('attendance-logs/', AttendanceLogListView.as_view(), name='attendance_log_list'),

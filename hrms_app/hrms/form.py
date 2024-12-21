@@ -849,6 +849,20 @@ class AttendanceStatusColorForm(forms.ModelForm):
         }
 
 
+class AttendanceLogFilterForm(forms.ModelForm):
+    search = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Search by title or user', "class": "form-control"})
+    )
+
+    class Meta:
+        model = AttendanceLog
+        fields = ("reg_status", "status", "is_submitted","is_regularisation")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['is_submitted'].initial = True
+
 class AttendanceLogForm(forms.ModelForm):
 
     class Meta:
@@ -1441,5 +1455,12 @@ class AttendanceReportFilterForm(forms.Form):
         required=False,
         label="Active Employees Only",
         initial=True,
+        widget=forms.CheckboxInput(attrs={"data-role": "checkbox"}),
+    )
+
+    detailed = forms.BooleanField(
+        required=False,
+        label="Detailed Reports Only",
+        initial=False,
         widget=forms.CheckboxInput(attrs={"data-role": "checkbox"}),
     )

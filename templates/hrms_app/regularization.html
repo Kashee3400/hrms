@@ -1,0 +1,93 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag humanize i18n %}
+{% load render_table from django_tables2 %}
+
+{% block title %}
+  {% trans 'Regularizations' %}| {{ title }}
+{% endblock %}
+
+{% block extrastyle %}
+  <style>
+    .center-row {
+      display: flex;
+      justify-content: center;
+    }
+    .pagination {
+        display: flex;
+        justify-content: center;
+        padding: 0;
+        list-style: none;
+    }
+    
+    .pagination li {
+        margin: 0 5px;
+    }
+    
+    .pagination li a {
+        display: block;
+        padding: 8px 16px;
+        text-decoration: none;
+        color: #007bff;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        transition: background-color 0.3s, color 0.3s;
+    }
+    
+    .pagination li a:hover {
+        background-color: #007bff;
+        color: #fff;
+    }
+    
+    .pagination li.active a {
+        background-color: #007bff;
+        color: #fff;
+        border-color: #007bff;
+    }
+    
+    .pagination li.disabled a {
+        color: #6c757d;
+        pointer-events: none;
+        cursor: not-allowed;
+    }
+    
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="bg-light my-2">
+    <form method="get">
+      <div class="row m-2">
+        <div class="col-md-3 col-12 mb-2">{{ form.search.label_tag }} {{ form.search }}</div>
+        <div class="col-md-3 col-12 mb-2">{{ form.status.label_tag }} {{ form.status }}</div>
+        <div class="col-md-3 col-12 mb-2">{{ form.reg_status.label_tag }} {{ form.reg_status }}</div>
+        {% if user.is_superuser %}
+        <div class="col-md-3 col-12 mb-2">{{ form.is_submitted.label_tag }} {{ form.is_submitted }}</div>
+        <div class="col-md-3 col-12 mb-2">{{ form.is_regularisation.label_tag }} {{ form.is_regularisation }}</div>
+        {% endif %}
+        <div class="col-md-3 col-12 mb-2">
+          <button type="submit" class="btn btn-sm btn-primary"><span class="mif-filter"></span> Filter</button>
+          <a class="btn btn-sm btn-secondary" href="{% url 'regularization' %}">Clear Filter</a>
+        </div>
+      </div>
+    </form>
+  </div>
+  <div class="bg-white my-2 p-2">
+    <div class="table-responsive">
+      {% render_table table %}
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script>
+    $(document).ready(function () {
+      $('.table').DataTable({
+        paging: true,
+        searching: true,
+        ordering: true,
+        dom: 'Bfrtip',
+        buttons: ['copy', 'csv', 'excel', 'print']
+      })
+    })
+  </script>
+{% endblock %}

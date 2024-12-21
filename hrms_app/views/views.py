@@ -8,6 +8,7 @@ from django.views.generic import (
     TemplateView,
     UpdateView,
     DeleteView,
+    ListView
 )
 from django.shortcuts import render
 from django.contrib.auth.mixins import (
@@ -17,7 +18,7 @@ from django.contrib.auth.mixins import (
 )
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
-from ..table_classes import UserTourTable, LeaveApplicationTable
+from ..table_classes import UserTourTable, LeaveApplicationTable,AttendanceLogTable
 import pandas as pd
 from django.urls import reverse, reverse_lazy
 from hrms_app.views.mixins import LeaveListViewMixin, ModelPermissionRequiredMixin
@@ -26,10 +27,6 @@ from datetime import datetime
 from django.conf import settings
 from urllib.parse import urlparse
 from django.shortcuts import get_object_or_404
-from hrms_app.utility.leave_utils import get_employee_requested_leave
-from django.utils.timezone import make_naive
-from rest_framework.views import APIView
-from rest_framework.response import Response
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
 import logging
@@ -565,11 +562,6 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     def form_valid(self, form):
         form.instance.is_submitted = True
         self.object = form.save()
-        self.object.add_action(
-            action=self.object.status,
-            performed_by=self.request.user,
-            comment=f"Approved By : {self.request.user.get_username()}",
-        )
         messages.success(self.request, "Regularization Updated Successfully")
         return HttpResponseRedirect(
             reverse("event_detail", kwargs={"slug": self.object.slug})
@@ -595,9 +587,29 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         context["urls"] = urls
         return context
 
-from django.http import JsonResponse
-from django.urls import reverse_lazy
-from django.utils import timezone
+class AttendanceLogActionView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        action = kwargs.get('action')
+        log_id = kwargs.get('log_id')
+        log = get_object_or_404(AttendanceLog, id=log_id)
+        reason = request.POST.get('reason', '')
+
+        if action == 'approve':
+            log.approve(action_by=request.user, reason=reason)
+            messages.success(request, _("Attendance log approved successfully."))
+        elif action == 'reject':
+            log.reject(action_by=request.user, reason=reason)
+            messages.success(request, _("Attendance log rejected successfully."))
+        elif action == 'recommend':
+            log.recommend(action_by=request.user, reason=reason)
+            messages.success(request, _("Attendance log recommended successfully."))
+        elif action == 'notrecommend':
+            log.notrecommend(action_by=request.user, reason=reason)
+            messages.success(request, _("Attendance log not recommended successfully."))
+        else:
+            messages.error(request, _("Invalid action."))
+
+        return redirect('attendance_log_detail', log_id=log.id)
 
 class EventListView(View):
     def get(self, request, *args, **kwargs):
@@ -672,6 +684,54 @@ class EventListView(View):
                     "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
                 })
         return JsonResponse(events_data, safe=False)
+
+
+class AttendanceLogListView(LoginRequiredMixin, SingleTableMixin, ListView):
+    model = AttendanceLog
+    table_class = AttendanceLogTable
+    template_name = "hrms_app/regularization.html"
+    context_object_name = "attendance_logs"
+    paginate_by = 100
+    form_class = AttendanceLogFilterForm
+    title = _("Regularizations")
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        form = self.form_class(self.request.GET)
+
+        if form.is_valid():
+            search_query = form.cleaned_data.get('search', '')
+            status_filter = form.cleaned_data.get('status', '')
+            reg_status_filter = form.cleaned_data.get('reg_status', '')
+            
+            # Default values for non-superuser or non-staff
+            is_submitted = True
+            is_regularisation = True
+
+            if self.request.user.is_superuser or self.request.user.is_staff:
+                is_submitted = form.cleaned_data.get('is_submitted', True)
+                is_regularisation = form.cleaned_data.get('is_regularisation', True)
+
+            if search_query:
+                queryset = queryset.filter(
+                    Q(title__icontains=search_query) |
+                    Q(applied_by__username__icontains=search_query)
+                )
+
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+
+            if reg_status_filter:
+                queryset = queryset.filter(reg_status=reg_status_filter)
+
+            queryset = queryset.filter(is_submitted=is_submitted, is_regularisation=is_regularisation)
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = self.form_class(self.request.GET)
+        return context
 
 
 class ProfilePageView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):

@@ -17,8 +17,7 @@
 {% block content %}
   <div class="bg-light my-2">
     <form method="get">
-      <div class="row">
-        <!-- Status Filter -->
+      <div class="row m-2">
         <div class="col-md-3 col-12 mb-2">{{ form.location.label_tag }} {{ form.location }}</div>
 
         <!-- From Date Filter -->
@@ -29,6 +28,7 @@
 
         <!-- Search Field -->
         <div class="col-md-3 col-12 mb-2">{{ form.active.label_tag }} {{ form.active }}</div>
+        <div class="col-md-3 col-12 mb-2">{{ form.detailed.label_tag }} {{ form.detailed }}</div>
 
         <!-- Buttons: Filter, Clear Filter, Apply Tour -->
         <div class="col-md-3 col-12 mb-2">
@@ -57,8 +57,22 @@
               <td>{{ employee.get_full_name }}</td>
               {% for day in days_in_month %}
                 <td>
-                  {% get_item attendance_data employee.id day.day as statuses %} {% for status in statuses %}
-                    <span style="color: {{ status.color }};">{{ status.status }}</span> {% if not forloop.last %} {% endif %}
+                  {% get_item attendance_data employee.id day.day as statuses %}
+                  {% for status in statuses %}
+                    <span style="color: {{ status.color }};">{{ status.status }}</span>
+                    {% comment %} <br /> {% endcomment %}
+                    {% comment %} {% if form.detailed.value %}
+                      <small>
+                        {% if status.start_date and status.end_date %}
+                        Start Date: {{ status.start_date }} {{ status.start_time }} <br/> End Date: {{ status.end_date }} {{ status.end_time }}
+                        {% elif status.start_date %}
+                          Start Date: {{ status.start_date }} {{ status.start_time }}
+                        {% elif status.end_date %}
+                          End Date: {{ status.end_date }} {{ status.end_time }}
+                        {% endif %}
+                      </small>
+                    {% endif %} {% endcomment %}
+                    {% if not forloop.last %} {% endif %}
                   {% endfor %}
                 </td>
               {% endfor %}
