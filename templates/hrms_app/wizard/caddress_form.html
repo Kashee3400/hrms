@@ -1,29 +1,35 @@
 {% extends 'hrms_app/wizard/form-wizard.html' %}
 
-{% block content %}
-  <div class="mx-auto" data-role="panel" data-collapsible="true" data-cls-panel="shadow-1" data-cls-title="bg-yellow fg-dark" data-cls-collapse-toggle="bg-dark fg-white marker-light" data-role="panel" data-title-caption="Step 2: Corresponding Address" data-title-icon="<span class='mif-apps'></span>">
-    <div class="row">
-      {% for field in wizard.form %}
-        <div class="cell-12 cell-md-4 cell-lg-3 cell-sm-12">
-          <label for="{{ field.id_for_label }}">
-            {{ field.label_tag }}
-            {% if field.field.required %}
-              <span class="fg-red">*</span> <!-- Red asterisk for required fields -->
+{% block content_form %}
+  <div class="card shadow-sm mt-5 mx-auto">
+    <div class="card-header bg-warning text-dark d-flex align-items-center">
+      <span class="bi bi-envelope me-2"></span>
+      <strong>Step 2: Corresponding Address</strong>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        {% for field in wizard.form %}
+          <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-3">
+            <label for="{{ field.id_for_label }}" class="form-label">
+              {{ field.label_tag }}
+              {% if field.field.required %}
+                <span class="text-danger">*</span> <!-- Red asterisk for required fields -->
+              {% endif %}
+            </label>
+            {{ field }}
+            {% if field.help_text %}
+              <small class="form-text text-muted">{{ field.help_text }}</small>
             {% endif %}
-          </label>
-          {{ field }}
-          {% if field.help_text %}
-            <small class="form-text text-muted">{{ field.help_text }}</small>
-          {% endif %}
-          {% if field.errors %}
-            <div class="fg-red">
-              {% for error in field.errors %}
-                <span>{{ error }}</span>
-              {% endfor %}
-            </div>
-          {% endif %}
-        </div>
-      {% endfor %}
+            {% if field.errors %}
+              <div class="text-danger">
+                {% for error in field.errors %}
+                  <span>{{ error }}</span>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
 {% endblock %}

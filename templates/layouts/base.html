@@ -8,6 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
     <title>
       {% block title %}
+
       {% endblock %}
     </title>
     {% include 'includes/styles.html' %}
@@ -40,14 +41,39 @@
             <div class="col-12">
               {% block messages %}
                 {% if messages %}
-                  <ul class="messagelist">
+                  <div class="messages">
                     {% for message in messages %}
-                      <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message|capfirst }}</li>
+                      <div class="alert {% if message.tags == 'success' %}
+                          
+                          alert-success
+
+                        {% elif message.tags == 'info' %}
+                          
+                          alert-info
+
+                        {% elif message.tags == 'warning' %}
+                          
+                          alert-warning
+
+                        {% elif message.tags == 'error' %}
+                          
+                          alert-danger
+
+                        {% else %}
+                          
+                          alert-secondary
+
+                        {% endif %} alert-dismissible fade show"
+                        role="alert">
+                        {{ message|capfirst }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                      </div>
                     {% endfor %}
-                  </ul>
+                  </div>
                 {% endif %}
               {% endblock %}
             </div>
+
             <div class="row">
               <div class="col-sm-12">
                 {% block content %}
@@ -67,8 +93,51 @@
       </div>
     </div>
     <!-- END Container -->
-
-    {% include 'includes/scripts.html' %}
+    {% include 'includes/mscripts.html' %}
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const toggleButton = document.getElementById('toggle-sidebar')
+        const sidebar = document.getElementById('right-sidebar')
+        const closeButton = sidebar.querySelector('.settings-close')
+      
+        // Open the sidebar
+        toggleButton.addEventListener('click', () => {
+          sidebar.classList.toggle('active')
+        })
+      
+        // Close the sidebar
+        closeButton.addEventListener('click', () => {
+          sidebar.classList.remove('active')
+        })
+      })
+      $(document).ready(function () {
+        // Initialize datepicker for fields with vDateField class
+        $('.vDateField').each(function () {
+          var fieldValue = $(this).val()
+          var dateValue = fieldValue;
+          $(this)
+            .datepicker({
+              dateFormat: 'yy-mm-dd', // Adjust the date format as needed
+              defaultDate: dateValue
+            })
+            .datepicker('setDate', dateValue)
+        })
+      
+        // Initialize timepicker for fields with vTimeField class
+      
+        // Initialize timepicker for fields with vTimeField class
+        $('.vTimeField').each(function () {
+          var fieldValue = $(this).val()
+          var timeValue = fieldValue
+          $(this)
+            .timepicker({
+              showMeridian: false, // Use 24-hour format
+              defaultTime: timeValue
+            })
+            .timepicker('setTime', timeValue)
+        })
+      })
+    </script>
     {% block extra_js %}
 
     {% endblock %}

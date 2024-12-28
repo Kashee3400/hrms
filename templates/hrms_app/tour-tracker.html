@@ -45,8 +45,10 @@
             <h5 class="card-title"><span class="mif-table"></span> Applied Tours</h5>
           </div>
           <div class="card-body">
-            <!-- Render the table for applied tours -->
-            {% render_table table %}
+            <div class="table-responsive">
+              <!-- Render the table for applied tours -->
+              {% render_table table %}
+            </div>
           </div>
         </div>
       </div>
@@ -70,25 +72,30 @@
                         <div class="card-header d-flex align-items-center">
                           {% if tour.applied_by.personal_detail.avatar %}
                             <!-- Avatar -->
-                            <img 
-                              src="{{ tour.applied_by.personal_detail.avatar.url }}" 
-                              class="avatar rounded-circle me-3" 
-                              alt="Avatar" 
-                              style="max-width: 50px; max-height: 50px;" 
-                            />
+                            <img src="{{ tour.applied_by.personal_detail.avatar.url }}" class="avatar rounded-circle me-3" alt="Avatar" style="max-width: 50px; max-height: 50px;" />
                           {% endif %}
                           <!-- Name -->
                           <h5>{{ tour.applied_by }}</h5>
                         </div>
-                        <div class="card-body bg-white" >
+                        <div class="card-body bg-white">
                           <ul class="list-group list-group-flush">
                             <li class="list-group-item">
-                              <div>Boarding -> <strong>{{ tour.from_destination }}</strong></div>
+                              <div>
+                                Boarding -> <strong>{{ tour.from_destination }}</strong>
+                              </div>
                               <div class="font-weight-bold">{{ tour.start_date }} {{ tour.start_time }}</div>
                             </li>
                             <li class="list-group-item">
-                              <div>Destination -><strong>{{ tour.to_destination }}</strong></div>
-                              <div class="font-weight-bold">{{ tour.end_date }} {{ tour.end_time }}</div>
+                              <div>
+                                Destination -><strong>{{ tour.to_destination }}</strong>
+                              </div>
+                              <div class="font-weight-bold">
+                                {% if tour.extended_end_date and tour.extended_end_time %}
+                                  {{ tour.extended_end_date }} - {{ tour.extended_end_time }}
+                                {% else %}
+                                  {{ tour.end_date }} - {{ tour.end_time }}
+                                {% endif %}
+                              </div>
                             </li>
                             <li class="list-group-item">
                               <div>Status</div>
@@ -99,7 +106,7 @@
                         <div class="card-footer text-center">
                           <a href="{% url 'tour_application_detail' tour.slug %}" class="btn btn-primary btn-sm">View Details</a>
                         </div>
-                      </div>                      
+                      </div>
                     </div>
                   {% endfor %}
                 </div>
@@ -117,17 +124,15 @@
 {% endblock %}
 
 {% block extra_js %}
-
-<script>
-  $(document).ready(function () {
-    $('.table').DataTable({
-      paging: true,
-      searching: true,
-      ordering: true,
-      dom: 'Bfrtip',
-      buttons: ['copy', 'csv', 'excel', 'pdf', 'print']
-    });
-  })
-</script>
-
+  <script>
+    $(document).ready(function () {
+      $('.table').DataTable({
+        paging: true,
+        searching: true,
+        ordering: false,
+        dom: 'Bfrtip',
+        buttons: ['copy', 'csv', 'excel']
+      })
+    })
+  </script>
 {% endblock %}

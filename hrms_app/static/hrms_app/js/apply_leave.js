@@ -1,31 +1,42 @@
 $(document).ready(function () {
+    // Hide elements initially
     $('#balances').hide();
     $('#leave_type_div').hide();
     $('#choices').hide();
-    
-    $('#id_startDate').change(function () {
-        var startDate = $(this).val();
-        $('#id_endDate').val(startDate);
-    });
-
-    $('#id_startDate, #id_endDate').change(function () {
+    $('.alert').text("");
+    $('.alert').hide();
+    // Function to update date-related calculations
+    function updateDateHandling() {
         var startDate = $('#id_startDate').val();
         var endDate = $('#id_endDate').val();
-        var startDateObj = new Date(startDate);
-        startDateObj.setDate(startDateObj.getDate() - 1);
-        var minDate = startDateObj.toISOString().split('T')[0];
-        $('#id_endDate').attr('data-min-date', minDate);
-        totalDays = calculateTotalDays(startDate, endDate);
-        bookedBalance = calculateBookedBalance(totalDays, startDate);
-        $('#balances').show();
-        // $('#choices').show();
+        if (startDate && endDate) {
+            // Adjust the end date logic as per the original functionality
+            var startDateObj = new Date(startDate);
+            startDateObj.setDate(startDateObj.getDate() - 1);
+            var minDate = startDateObj.toISOString().split('T')[0];
+            $('#id_endDate').attr('data-min-date', minDate);
+            totalDays = calculateTotalDays(startDate, endDate);
+            calculateBookedBalance(totalDays, startDate);
+            $('#balances').show();
+        }
+    }
+
+    // Bind the change event to both startDate and endDate
+    $('#id_startDate, #id_endDate').change(function () {
+        updateDateHandling();  // Call the update function when date is changed
     });
 
+    // Call the same function on page load to handle initial state
+    updateDateHandling();
+
+    // Handle leave option changes
     $(document).on('change', '.leaveOption', function () {
         var selectId = $(this).attr('id');
         var selectedValue = $(this).val();
         var startDate = $('#id_startDate').val();
         var endDate = $('#id_endDate').val();
+        var startDay, endDay;
+
         if (selectId && selectId.startsWith('id_startDayChoice')) {
             startDay = selectedValue;
             if (startDate === endDate) {
@@ -50,10 +61,15 @@ function updateTotalDays(startDay, endDay) {
     var startDate = $('#id_startDate').val();
     var endDate = $('#id_endDate').val();
     if (startDate == endDate) {
-        if (startDay == 1) {
+        if (startDay == 1 && totalDays>=1) {
             $('#totalDays').text(totalDays);
             setBalance(leaveBalance, parseFloat($('#totalDays').text()));
-        } else {
+        }
+        else if((totalDays - 0.5)<0){
+            $('#totalDays').text(totalDays);
+            setBalance(leaveBalance, parseFloat($('#totalDays').text()));
+        }
+         else {
             $('#totalDays').text(totalDays - 0.5);
             setBalance(leaveBalance, parseFloat($('#totalDays').text()));
         }
@@ -83,7 +99,6 @@ function updateTotalDays(startDay, endDay) {
     }
 }
 
-// Function to calculate total number of days between two dates
 function calculateTotalDays(startDate, endDate) {
     return generateDateOptions(startDate, endDate);
 }
@@ -99,15 +114,25 @@ function calculateBookedBalance(totalDays, startDate) {
     var formattedDate = day + '-' + monthNames[monthIndex] + '-' + year;
     $('#td_date').text('As of ' + formattedDate);
     setBalance(leaveBalance, totalDays);
-    return 0;
 }
 
 function setBalance(typeBal, totalDays) {
-    // $('#balance').text(typeBal);
     $('#currentlyBooked').text(totalDays);
     $('#remainingBal').text(typeBal - totalDays);
     $('#id_usedLeave').val(totalDays);
     $('#id_balanceLeave').val(typeBal - totalDays);
+    if(leaveTypeShortCode !== 'LWP'){
+        if($('#id_balanceLeave').val()<0){
+            $('.alert').show()
+            $('.alert').text('Insufficient leave balance.');
+            $('#applyLeaveButton').prop('disabled', true); 
+        }
+        else{
+            $('.alert').hide()
+            $('.alert').text("")
+            $('#applyLeaveButton').prop('disabled', false)
+        }
+    }
 }
 
 function generateDateOptions(startDate, endDate) {
@@ -151,28 +176,7 @@ function generateDateOptions(startDate, endDate) {
     }
 
     tableHTML += '</table>';
-
-    $('#dateOptions').html(tableHTML);
-    $('#totalDays').text(totalDays);
+    $('#dateOptions').html(tableHTML)
+    $('#totalDays').text(totalDays + ' Day(s)')
     return totalDays;
-}
-
-
-function showToast(message, cls) {
-    var toast = Metro.toast.create;
-    toast(message, null, 5000, cls);
-}
-function getCookie(name) {
-    var cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        var cookies = document.cookie.split(';');
-        for (var i = 0; i < cookies.length; i++) {
-            var cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
-            }
-        }
-    }
-    return cookieValue;
 }

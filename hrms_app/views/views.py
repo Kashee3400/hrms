@@ -1,5 +1,12 @@
-from hrms_app.hrms.form import *
-from django.http import HttpResponseForbidden, HttpResponseRedirect
+# Standard library imports
+import json
+import logging
+from datetime import datetime
+from urllib.parse import urlparse
+from hrms_app.utility.leave_utils import format_date
+
+# Third-party imports
+from django.http import HttpResponseForbidden, HttpResponseRedirect, JsonResponse
 from django.contrib import messages
 from django.views.generic import (
     FormView,
@@ -8,51 +15,74 @@ from django.views.generic import (
     TemplateView,
     UpdateView,
     DeleteView,
-    ListView
+    ListView,
 )
-from django.shortcuts import render
-from django.contrib.auth.mixins import (
-    LoginRequiredMixin,
-    UserPassesTestMixin,
-    PermissionRequiredMixin,
-)
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect,render
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.apps import apps
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
-from ..table_classes import UserTourTable, LeaveApplicationTable,AttendanceLogTable
-import pandas as pd
 from django.urls import reverse, reverse_lazy
-from hrms_app.views.mixins import LeaveListViewMixin, ModelPermissionRequiredMixin
-from django.utils.translation import gettext_lazy as _
-from datetime import datetime
-from django.conf import settings
-from urllib.parse import urlparse
-from django.shortcuts import get_object_or_404
 from django.core.exceptions import PermissionDenied
 from django.db import IntegrityError, transaction
-import logging
-from django.core.files.storage import FileSystemStorage
+from django.core.files.storage import FileSystemStorage, default_storage
 from django.forms.models import model_to_dict
-from django.http import JsonResponse
 from django.views import View
-from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.timezone import now
+from django.utils.timezone import now, localtime
 from django.contrib.messages.views import SuccessMessageMixin
+from django.utils.translation import gettext_lazy as _
+from django.conf import settings
+from django.views.generic.edit import ModelFormMixin
+
+# Local imports
+from hrms_app.hrms.form import *
+from hrms_app.views.mixins import LeaveListViewMixin
+from hrms_app.table_classes import (
+    UserTourTable,
+    LeaveApplicationTable,
+    AttendanceLogTable,
+)
+from django.contrib.auth import get_user_model
+from django.views.decorators.csrf import csrf_exempt
+User = get_user_model()
+
 
 logger = logging.getLogger(__name__)
 
 
+
+def custom_permission_denied(request, exception=None):
+    error_message = str(exception) if exception else "You do not have permission to access this page."
+    return render(request, '403.html', {'error_message': error_message})
+
 class HomePageView(LoginRequiredMixin, TemplateView):
-    template_name = "hrms_app/dashboard.html"
+    template_name = "admin/index.html"
+    title = _("Dashboard")
+    
+    def dispatch(self, request, *args, **kwargs):
+        # Check if the user is a superuser
+        if not request.user.is_superuser:
+            return PermissionDenied("You do not have permission to access this page.")
+        return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["current_date"] = datetime.now()
+
+        # Fetch all users to pass in the context
+        users = User.objects.all()  # Adjust this if you want to filter the users
+        context["users"] = users
+
         urls = [
             ("dashboard", {"label": "Dashboard"}),
         ]
         context["urls"] = urls
+        context["form"] = PopulateAttendanceForm()
+        context.update({
+            "title": self.title
+        })
         return context
 
     def get(self, request, *args, **kwargs):
@@ -104,6 +134,7 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
     template_name = "hrms_app/leave-tracker.html"
     model = LeaveApplication
     permission_action = "view"
+    title = _("Leave Tracker")
 
     def dispatch(self, request, *args, **kwargs):
         """Check if the user has the required permission dynamically."""
@@ -130,48 +161,6 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
                 fields = selected_columns
 
         return DynamicLeaveApplicationTable
-
-    def get_leave_balances(self, user):
-        """Fetch leave balances for the user."""
-        try:
-            leave_types = LeaveType.objects.all()
-            leave_balances = LeaveBalanceOpenings.objects.filter(
-                user=user, leave_type__in=leave_types
-            )
-            leave_balances_dict = {lb.leave_type: lb for lb in leave_balances}
-
-            leave_balances_list = [
-                {
-                    "balance": lb.remaining_leave_balances,
-                    "leave_type": lb.leave_type,
-                    "url": reverse("apply_leave_with_id", args=[lb.leave_type.pk]),
-                    "color": lb.leave_type.color_hex,
-                }
-                for lb in leave_balances
-            ]
-
-            # Include maternity leave if applicable
-            if user.personal_detail and user.personal_detail.gender.gender == "Female":
-                ml_balance = leave_balances_dict.get(settings.ML)
-                if ml_balance:
-                    leave_balances_list.append(
-                        {
-                            "balance": ml_balance.remaining_leave_balances,
-                            "leave_type": ml_balance.leave_type.leave_type,
-                            "url": reverse(
-                                "apply_leave_with_id", args=[ml_balance.leave_type.id]
-                            ),
-                            "color": "#ff9447",
-                        }
-                    )
-
-            return leave_balances_list
-        except LeaveBalanceOpenings.DoesNotExist:
-            logger.error(f"Leave balances not found for user {user}.")
-            return []
-        except Exception as e:
-            logger.exception(f"Unexpected error while fetching leave balances: {e}")
-            return []
 
     def get_filtered_leaves(self, user, form):
         """Apply filters to the leave applications."""
@@ -212,20 +201,18 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
         user_leaves = LeaveApplication.objects.filter(appliedBy=user)
 
         # Get the search query parameter (if any)
-        search_term = self.request.GET.get("search", "").strip()
-
+        search_term = self.request.GET.get("q", "").strip()
         if search_term:
-            # Perform a case-insensitive search across multiple fields
             user_leaves = user_leaves.filter(
-                Q(appliedby__username__icontains=search_term)  # Search by username
+                Q(appliedby__username__icontains=search_term)
                 | Q(
                     appliedby__first_name__icontains=search_term
                 )  # Search by first name
-                | Q(appliedby__last_name__icontains=search_term)  # Search by last name
+                | Q(appliedby__last_name__icontains=search_term)
                 | Q(
                     from_destination__icontains=search_term
                 )  # Search by from_destination
-                | Q(to_destination__icontains=search_term)  # Search by to_destination
+                | Q(to_destination__icontains=search_term)
             )
 
         return user_leaves
@@ -240,13 +227,11 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
 
         try:
             # Prepare leave balances and filtered leaves
-            leave_balances = self.get_leave_balances(user)
             combined_leaves = self.get_filtered_leaves(user, form)
             employee_leaves = combined_leaves.filter(appliedBy__in=user.employees.all())
             context.update(
                 {
                     "current_date": now(),
-                    "leave_balances": leave_balances,
                     "form": form,
                     "employee_leaves": [
                         {
@@ -268,13 +253,14 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
             all_columns = [
                 field.name
                 for field in LeaveApplication._meta.fields
-                if field.name not in ["id", "slug", "status", "reason"]
+                if field.name not in ["id", "slug", "reason"]
             ]
             selected_columns = self.request.session.get(
                 "selected_columns", ["appliedBy", "status", "startDate", "endDate"]
             )
             context["all_columns"] = all_columns
             context["selected_columns"] = selected_columns
+            context["title"] = self.title
         except Exception as e:
             logger.exception(f"Unexpected error in context preparation: {e}")
             messages.error(
@@ -283,10 +269,6 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
             )
 
         return context
-
-
-from django.http import JsonResponse
-import json
 
 
 def save_column_preferences(request):
@@ -298,26 +280,48 @@ def save_column_preferences(request):
     return JsonResponse({"status": "error"}, status=400)
 
 
-class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
+class ApplyOrUpdateLeaveView(
+    LoginRequiredMixin, SuccessMessageMixin, ModelFormMixin, FormView
+):
     model = LeaveApplication
     form_class = LeaveApplicationForm
     template_name = "hrms_app/apply-leave.html"
-    permission_action = "add"
-    success_message = "Leave applied successfully."
+    success_message_create = _("Leave applied successfully.")
+    success_message_update = _("Leave updated successfully.")
+    permission_action_create = "add"
+    permission_action_update = "change"
+    title = _("Create Update Leave Application")
 
     def dispatch(self, request, *args, **kwargs):
         """Check if the user has permission dynamically for the model."""
+        self.object = None
+        if "slug" in kwargs:  # 'slug' determines update vs. create
+            self.object = self.get_object()
+            permission_action = self.permission_action_update
+        else:
+            permission_action = self.permission_action_create
+
         opts = self.model._meta
-        perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"
+        perm = f"{opts.app_label}.{permission_action}_{opts.model_name}"
         if not request.user.has_perm(perm):
-            raise PermissionDenied("You do not have permission to apply for leave.")
+            raise PermissionDenied("You do not have permission to perform this action.")
         return super().dispatch(request, *args, **kwargs)
+
+    def get_form(self, form_class=None):
+        """Retrieve the form instance with the correct data."""
+        if form_class is None:
+            form_class = self.get_form_class()
+        # Just pass the form kwargs without adding instance again
+        return form_class(**self.get_form_kwargs())
 
     def get_form_kwargs(self):
         """Pass additional data to the form."""
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
-        kwargs["leave_type"] = self.kwargs.get("pk")  # Leave type ID from URL
+        kwargs["leave_type"] = (
+            self.object.leave_type.id if self.object else self.kwargs.get("leave_type")
+        )
+
         return kwargs
 
     def form_valid(self, form):
@@ -325,8 +329,11 @@ class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
         leave_application = form.save(commit=False)
         leave_application.appliedBy = self.request.user
         leave_application.save()
-        messages.success(self.request, self.success_message)
-
+        if self.object:  # Update
+            success_message = self.success_message_update
+        else:  # Create
+            success_message = self.success_message_create
+        messages.success(self.request, success_message)
         # Redirect to the next URL if provided, or fallback to leave tracker
         next_url = self.request.POST.get("next")
         if next_url and urlparse(next_url).netloc == "":
@@ -336,15 +343,20 @@ class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
     def form_invalid(self, form):
         """Handle form submission failure."""
         context = self.get_context_data(form=form)
-        messages.error(
-            self.request, "Leave application failed. Please correct the errors below."
+        error_message = (
+            _("Leave update failed. Please correct the errors below.")
+            if self.object
+            else _("Leave application failed. Please correct the errors below.")
         )
+        messages.error(self.request, error_message)
         return self.render_to_response(context)
 
     def get_context_data(self, **kwargs):
         """Prepare context data for the template."""
         context = super().get_context_data(**kwargs)
-        leave_type_id = self.kwargs.get("pk")
+        leave_type_id = (
+            self.object.leave_type.id if self.object else self.kwargs.get("leave_type")
+        )
 
         # Fetch leave balance for the specified leave type
         leave_balance = LeaveBalanceOpenings.objects.filter(
@@ -358,9 +370,12 @@ class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
                 "form": kwargs.get(
                     "form",
                     LeaveApplicationForm(
-                        user=self.request.user, leave_type=leave_type_id
+                        instance=self.object,  # Ensure instance is passed
+                        user=self.request.user,
+                        leave_type=leave_type_id,
                     ),
                 ),
+                "title": self.title,
                 "urls": [
                     ("dashboard", {"label": "Dashboard"}),
                     ("leave_tracker", {"label": "Leave Tracker"}),
@@ -368,6 +383,82 @@ class ApplyLeaveView(LoginRequiredMixin, SuccessMessageMixin, CreateView):
             }
         )
         return context
+
+    def get_object(self):
+        """Retrieve the object for update."""
+        if "slug" in self.kwargs:
+            return LeaveApplication.objects.get(slug=self.kwargs["slug"])
+        return None
+
+
+class GenericDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
+    template_name = "hrms_app/confirm_delete.html"
+    success_message = "Deleted successfully."
+    permission_action = "delete"
+
+    def dispatch(self, request, *args, **kwargs):
+        """Check if the user has permission dynamically for the model."""
+        self.model = self.get_model()
+        opts = self.model._meta
+        perm = f"{opts.app_label}.{self.permission_action}_{opts.model_name}"
+        if not request.user.has_perm(perm):
+            raise PermissionDenied("You do not have permission to delete this item.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_model(self):
+        """Get the model class based on the URL parameter."""
+        model_name = self.kwargs.get("model_name")
+        return apps.get_model("hrms_app", model_name)
+
+    def get_object(self):
+        """Get the object to be deleted."""
+        model = self.get_model()
+        return get_object_or_404(model, pk=self.kwargs.get("pk"))
+
+    def get_success_url(self):
+        """Get the URL to redirect to after successful deletion."""
+        return reverse_lazy("leave_tracker")
+
+    def delete(self, request, *args, **kwargs):
+        """Handle successful deletion."""
+        response = super().delete(request, *args, **kwargs)
+        messages.success(self.request, self.success_message)
+        return response
+
+    def get_context_data(self, **kwargs):
+        """Prepare context data for the template."""
+        context = super().get_context_data(**kwargs)
+        object_to_delete = self.get_object()
+
+        # Dynamically fetch related logs or objects
+        related_objects = self.get_related_objects(object_to_delete)
+
+        # Pass the related objects and data to the context
+        context["object_name"] = self.model._meta.verbose_name
+        context["related_objects"] = related_objects
+        context["cancel_url"] = self.get_success_url()
+        return context
+
+    def get_related_objects(self, object_to_delete):
+        """Dynamically fetch related objects."""
+        related_objects = []
+
+        for rel in object_to_delete._meta.related_objects:
+            if hasattr(rel, "related_model"):  # Check if the model has a related model
+                related_model = rel.related_model
+                accessor_name = rel.get_accessor_name()  # Correct field accessor name
+
+                # Fetch related objects using the accessor name
+                related_data = getattr(object_to_delete, accessor_name).all()
+                for related_item in related_data:
+                    related_objects.append(
+                        {
+                            "model_name": related_model._meta.verbose_name,  # Add verbose name here
+                            "item": related_item,
+                        }
+                    )
+
+        return related_objects
 
 
 class LeaveApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
@@ -385,19 +476,26 @@ class LeaveApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, Update
     def get_object(self, queryset=None):
         return get_object_or_404(LeaveApplication, slug=self.kwargs.get("slug"))
 
+    def update_leave_balance(self, leave_application):
+        leave_balance = LeaveBalanceOpenings.objects.get(
+            user=leave_application.appliedBy,
+            leave_type=leave_application.leave_type,
+            year=leave_application.startDate.year,
+        )
+        if leave_application.status == settings.APPROVED:
+            leave_balance.remaining_leave_balances -= leave_application.usedLeave
+        elif leave_application.status == settings.CANCELLED:
+            leave_balance.remaining_leave_balances += leave_application.usedLeave
+
+        leave_balance.save()
+
     def form_valid(self, form):
         response = super().form_valid(form)
         leave_application = form.instance
         action_by = self.request.user
-        if leave_application.status == settings.APPROVED:
-            LeaveLog.create_log(leave_application, action_by, settings.APPROVED)
-        elif leave_application.status == settings.REJECTED:
-            LeaveLog.create_log(leave_application, action_by, settings.REJECTED)
-        elif leave_application.status == settings.CANCELLED:
-            LeaveLog.create_log(leave_application, action_by, settings.CANCELLED)
-        else:
-            LeaveLog.create_log(leave_application, action_by, "Updated")
-        messages.success(self.request, _("Leave application updated successfully"))
+        self.update_leave_balance(leave_application)
+        LeaveLog.create_log(leave_application, action_by, leave_application.status)
+        messages.success(self.request, _(f"Leave application {leave_application.status} successfully"))
         return response
 
     def get_success_url(self):
@@ -405,60 +503,69 @@ class LeaveApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, Update
             "leave_application_detail", kwargs={"slug": self.object.slug}
         )
 
-
 class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = LeaveApplication
     template_name = "hrms_app/leave_application_detail.html"
     context_object_name = "leave_application"
     permission_denied_message = _("You do not have permission to access this page.")
     permission_required = "hrms_app.view_leaveapplication"
+    title = _("Leave Application Detail")
 
     def test_func(self):
         return self.request.user.has_perm(self.permission_required)
 
     def get_object(self, queryset=None):
         leave_application = super().get_object(queryset)
-        user = self.request.user
-
-        if (
-            leave_application.appliedBy == user
-            or leave_application.appliedBy.reports_to == user
-        ):
+        if self.has_permission_to_view(leave_application):
             return leave_application
+        raise PermissionDenied(self.permission_denied_message)
 
-        # If neither, raise a permission denied exception
-        raise PermissionDenied(
-            "You do not have permission to view this leave application."
+    def has_permission_to_view(self, leave_application):
+        user = self.request.user
+        return (
+            leave_application.appliedBy == user
+            or user.is_superuser
+            or user.is_staff
+            or leave_application.appliedBy.reports_to == user
+            or user.personal_detail.designation.department.department == 'admin'
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         leave_application = self.get_object()
-        urls = [
-            ("dashboard", {"label": "Dashboard"}),
-            ("leave_tracker", {"label": "Leave Tracker"}),
-            (
-                "leave_application_detail",
-                {
-                    "label": f"{leave_application.applicationNo}",
-                    "slug": leave_application.slug,
-                },
-            ),
-        ]
-        context["is_manager"] = (
-            self.request.user == leave_application.appliedBy.reports_to
-        )
-        context["status_form"] = LeaveStatusUpdateForm(
-            user=self.request.user, instance=self.object
-        )
-        context["urls"] = urls
+        print(self.get_leave_type_balance(leave_application))
+        context.update({
+            "is_manager": self.is_manager(leave_application),
+            "status_form": self.get_status_form(),
+            "leave_balance": self.get_leave_type_balance(leave_application),
+            "delete_url": self.get_delete_url(),
+            "edit_url": self.get_edit_url(),
+            "urls": self.get_breadcrumb_urls(leave_application),
+            "title": self.title,
+        })
         return context
 
+    def is_manager(self, leave_application):
+        return self.request.user == leave_application.appliedBy.reports_to
 
-from hrms_app.utility.leave_utils import format_date
-from django.http import JsonResponse
-from django.views import View
+    def get_status_form(self):
+        return LeaveStatusUpdateForm(user=self.request.user, instance=self.object)
 
+    def get_leave_type_balance(self,leave_application):
+        return LeaveBalanceOpenings.objects.filter(user=leave_application.appliedBy,year=leave_application.startDate.date().year,leave_type=leave_application.leave_type).first()
+
+    def get_delete_url(self):
+        return reverse("generic_delete", kwargs={"model_name": self.model.__name__, "pk": self.object.pk})
+
+    def get_edit_url(self):
+        return reverse("update_leave", kwargs={"slug": self.object.slug})
+
+    def get_breadcrumb_urls(self, leave_application):
+        return [
+            ("dashboard", {"label": "Dashboard"}),
+            ("leave_tracker", {"label": "Leave Tracker"}),
+            ("leave_application_detail", {"label": f"{leave_application.applicationNo}", "slug": leave_application.slug}),
+        ]
 
 class LeaveApplicationListView(View, LeaveListViewMixin):
     START_LEAVE_TYPE_CHOICES = {
@@ -501,6 +608,7 @@ class LeaveApplicationListView(View, LeaveListViewMixin):
 class EventPageView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/calendar.html"
     model = AttendanceLog
+    title = _("Attendance Log")
 
     def get_context_data(self, **kwargs):
         """Prepare the context for the template."""
@@ -520,6 +628,7 @@ class EventPageView(LoginRequiredMixin, TemplateView):
                 "current_date": now(),
                 "form": form,
                 "employee": employee,
+                "title": self.title,
                 "urls": [
                     ("dashboard", {"label": "Dashboard"}),
                     ("calendar", {"label": "Attendance Calendar"}),
@@ -535,7 +644,24 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     form_class = AttendanceLogForm
     slug_field = "slug"
     slug_url_kwarg = "slug"
+    title = _("Attendance Log")
     permission_required = "hrms_app.change_attendancelog"
+
+    def form_valid(self, form):
+        form.instance.is_submitted = True
+        self.object = form.save()
+        self.object.add_action(
+            action="Submitted regularization",
+            performed_by=self.request.user,
+            comment=form.instance.reason,
+        )
+        messages.success(self.request, _("Regularization Updated Successfully"))
+        return HttpResponseRedirect(
+            reverse("event_detail", kwargs={"slug": self.object.slug})
+        )
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
 
     def test_func(self):
         return self.request.user.has_perm(self.permission_required)
@@ -548,6 +674,7 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             or attendance_log.applied_by.reports_to == user
             or self.request.user.is_staff
             or self.request.user.is_superuser
+            or user.personal_detail.designation.department.department == "admin"
         ):
             return attendance_log
         raise PermissionDenied()
@@ -558,17 +685,6 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         kwargs["user"] = self.request.user
         kwargs["is_manager"] = self.request.user == attendance_log.applied_by.reports_to
         return kwargs
-
-    def form_valid(self, form):
-        form.instance.is_submitted = True
-        self.object = form.save()
-        messages.success(self.request, "Regularization Updated Successfully")
-        return HttpResponseRedirect(
-            reverse("event_detail", kwargs={"slug": self.object.slug})
-        )
-
-    def form_invalid(self, form):
-        return self.render_to_response(self.get_context_data(form=form))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -585,31 +701,157 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             ),
         ]
         context["urls"] = urls
+        context["action_form"] = AttendanceLogActionForm()
+        context.update(
+            {
+                "title": self.title,
+                "subtitle": self.get_object().slug,
+            }
+        )
         return context
 
+
 class AttendanceLogActionView(LoginRequiredMixin, View):
+    def fetch_static_data(self):
+        """Fetch static data used in attendance calculations."""
+        return {
+            "half_day_color": AttendanceStatusColor.objects.get(
+                status=settings.HALF_DAY
+            ),
+            "present_color": AttendanceStatusColor.objects.get(status=settings.PRESENT),
+            "absent_color": AttendanceStatusColor.objects.get(status=settings.ABSENT),
+            "asettings": AttendanceSetting.objects.first(),
+        }
+
+    def get_users(self, username):
+        """Retrieve users based on username or all users if not specified."""
+        queryset = User.objects.all().select_related("personal_detail")
+        return queryset.filter(username=username) if username else queryset
+
+    def parse_dates(self, from_date_str, to_date_str):
+        """Parse string dates into timezone-aware datetime objects."""
+        parse_date = lambda d: (
+            make_aware(datetime.strptime(d, "%Y-%m-%d")) if d else None
+        )
+        return parse_date(from_date_str), parse_date(to_date_str)
+
+    def get_user_shift(self, user):
+        """Retrieve the shift timing for a given user."""
+        emp_shift = (
+            EmployeeShift.objects.filter(employee=user)
+            .select_related("shift_timing")
+            .first()
+        )
+        return emp_shift.shift_timing if emp_shift else None
+
+    def handle_attendance_update(self, log, form_data, static_data):
+        """Update attendance log with approval adjustments."""
+        AttendanceLogHistory.objects.create(
+            attendance_log=log,
+            previous_data=make_json_serializable(model_to_dict(log)),
+            modified_by=self.request.user,
+        )
+
+        reason = form_data["reason"]
+        if log.reg_status == settings.EARLY_GOING:
+            log.end_date = log.to_date
+        elif log.reg_status == settings.LATE_COMING:
+            log.start_date = log.from_date
+
+        log.save()
+
+        from hrms_app.hrms.managers import AttendanceStatusHandler
+
+        status_handler = AttendanceStatusHandler(
+            self.get_user_shift(log.applied_by),
+            static_data["asettings"].full_day_hours,
+            static_data["half_day_color"],
+            static_data["present_color"],
+            static_data["absent_color"],
+        )
+
+        log_start_date = localtime(log.start_date)
+        log_end_date = localtime(log.end_date)
+        total_duration = log_end_date - log_start_date
+        user_expected_logout_time = log_start_date + timedelta(
+            hours=static_data["asettings"].full_day_hours
+        )
+
+        status_data = status_handler.determine_attendance_status(
+            log_start_date,
+            log_end_date,
+            total_duration,
+            user_expected_logout_time.time(),
+            user_expected_logout_time,
+        )
+
+        (
+            log.att_status,
+            log.color_hex,
+            log.reg_status,
+            log.is_regularisation,
+            log.from_date,
+            log.to_date,
+            log.reg_duration,
+            log.status,
+            log.att_status_short_code,
+        ) = status_data
+        total_minutes = total_duration.total_seconds() // 60
+
+        # Calculate hours and minutes
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+        time_difference = f"{int(hours):02}:{int(minutes):02}"
+        log.duration = time_difference
+        log.save()
+        log.approve(action_by=self.request.user, reason=reason)
+        return _("Attendance log approved and updated successfully.")
+
     def post(self, request, *args, **kwargs):
-        action = kwargs.get('action')
-        log_id = kwargs.get('log_id')
-        log = get_object_or_404(AttendanceLog, id=log_id)
-        reason = request.POST.get('reason', '')
+        action = request.POST.get("action")
+        log_id = kwargs.get("slug")
+        log = get_object_or_404(AttendanceLog, slug=log_id)
 
-        if action == 'approve':
-            log.approve(action_by=request.user, reason=reason)
-            messages.success(request, _("Attendance log approved successfully."))
-        elif action == 'reject':
-            log.reject(action_by=request.user, reason=reason)
-            messages.success(request, _("Attendance log rejected successfully."))
-        elif action == 'recommend':
-            log.recommend(action_by=request.user, reason=reason)
-            messages.success(request, _("Attendance log recommended successfully."))
-        elif action == 'notrecommend':
-            log.notrecommend(action_by=request.user, reason=reason)
-            messages.success(request, _("Attendance log not recommended successfully."))
-        else:
-            messages.error(request, _("Invalid action."))
+        form = AttendanceLogActionForm(request.POST)
 
-        return redirect('attendance_log_detail', log_id=log.id)
+        if form.is_valid():
+            static_data = self.fetch_static_data()
+            reason = form.cleaned_data["reason"]
+
+            action_handlers = {
+                "approve": lambda: self.handle_attendance_update(
+                    log, form.cleaned_data, static_data
+                ),
+                "reject": lambda: log.reject(action_by=request.user, reason=reason),
+                "recommend": lambda: log.recommend(
+                    action_by=request.user, reason=reason
+                ),
+                "notrecommend": lambda: log.notrecommend(
+                    action_by=request.user, reason=reason
+                ),
+            }
+
+            if action in action_handlers:
+                message = action_handlers[action]()
+                messages.success(request, message)
+            else:
+                messages.error(request, _("Invalid action."))
+
+            return HttpResponseRedirect(
+                reverse("event_detail", kwargs={"slug": log.slug})
+            )
+
+        messages.error(request, _("Invalid action or form data."))
+        return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": log.slug}))
+
+import json
+from django.forms.models import model_to_dict
+from django.core.serializers.json import DjangoJSONEncoder
+
+def make_json_serializable(data):
+    """Ensure data is JSON serializable."""
+    return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
+
 
 class EventListView(View):
     def get(self, request, *args, **kwargs):
@@ -626,111 +868,149 @@ class EventListView(View):
 
         events_data = []
         # Adding holidays
-        events_data.extend([
-            {
-                "id": holiday.pk,
-                "title": holiday.title,
-                # Combine date with midnight time to create a naive datetime object
-                "start": timezone.localtime(timezone.make_aware(datetime.combine(holiday.start_date, datetime.min.time()))).isoformat(),
-                # Adjust the end date to be the next day and make it timezone-aware
-                "end": timezone.localtime(timezone.make_aware(datetime.combine(holiday.end_date, datetime.min.time()) + timezone.timedelta(days=1))).isoformat(),
-                "color": holiday.color_hex,
-                "url": "#!"
-            }
-            for holiday in holidays
-        ])
+        events_data.extend(
+            [
+                {
+                    "id": holiday.pk,
+                    "title": holiday.title,
+                    # Combine date with midnight time to create a naive datetime object
+                    "start": timezone.localtime(
+                        timezone.make_aware(
+                            datetime.combine(holiday.start_date, datetime.min.time())
+                        )
+                    ).isoformat(),
+                    # Adjust the end date to be the next day and make it timezone-aware
+                    "end": timezone.localtime(
+                        timezone.make_aware(
+                            datetime.combine(holiday.end_date, datetime.min.time())
+                            + timezone.timedelta(days=1)
+                        )
+                    ).isoformat(),
+                    "color": holiday.color_hex,
+                    "url": "#!",
+                }
+                for holiday in holidays
+            ]
+        )
 
         # Adding tours
-        events_data.extend([
-            {
-                "id": tour.slug,
-                "title": f"Tour -> {tour.approval_type}",
-                "start": timezone.localtime(timezone.make_aware(datetime.combine(tour.start_date, tour.start_time))).isoformat(),
-                "end": timezone.localtime(timezone.make_aware(datetime.combine(tour.end_date, tour.end_time))).isoformat(),
-                "url": reverse_lazy("tour_application_detail", kwargs={"slug": tour.slug}),
-            }
-            for tour in tour_applications
-        ])
+        events_data.extend(
+            [
+                {
+                    "id": tour.slug,
+                    "title": f"Tour -> {tour.approval_type}",
+                    "start": timezone.localtime(
+                        timezone.make_aware(
+                            datetime.combine(tour.start_date, tour.start_time)
+                        )
+                    ).isoformat(),
+                    "end": timezone.localtime(
+                        timezone.make_aware(
+                            datetime.combine(tour.end_date, tour.end_time)
+                        )
+                    ).isoformat(),
+                    "url": reverse_lazy(
+                        "tour_application_detail", kwargs={"slug": tour.slug}
+                    ),
+                }
+                for tour in tour_applications
+            ]
+        )
 
         # Adding leave applications
-        events_data.extend([
-            {
-                "id": leave.slug,
-                "title": leave.leave_type.leave_type,
-                "start": timezone.localtime(leave.startDate).isoformat(),   # Convert to local time
-                "end": timezone.localtime(leave.endDate).isoformat(),       # Convert to local time
-                "color": leave.leave_type.color_hex,
-                "url": reverse_lazy("leave_application_detail", kwargs={"slug": leave.slug}),
-            }
-            for leave in leave_applications
-        ])
+        events_data.extend(
+            [
+                {
+                    "id": leave.slug,
+                    "title": leave.leave_type.leave_type,
+                    "start": timezone.localtime(
+                        leave.startDate
+                    ).isoformat(),  # Convert to local time
+                    "end": timezone.localtime(
+                        leave.endDate
+                    ).isoformat(),  # Convert to local time
+                    "color": leave.leave_type.color_hex,
+                    "url": reverse_lazy(
+                        "leave_application_detail", kwargs={"slug": leave.slug}
+                    ),
+                }
+                for leave in leave_applications
+            ]
+        )
 
         # Adding attendance logs
         for att in attendances:
-            events_data.append({
-                "id": att.slug,
-                "title": att.att_status,
-                "start": timezone.localtime(att.start_date).isoformat(),  # Convert to local time
-                "end": timezone.localtime(att.end_date).isoformat(),      # Convert to local time
-                "color": att.color_hex,
-                "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
-            })
-            if att.reg_status is not None:
-                events_data.append({
+            events_data.append(
+                {
                     "id": att.slug,
-                    "title": att.reg_status,
-                    "start": timezone.localtime(att.start_date).isoformat(),  # Convert to local time
-                    "end": timezone.localtime(att.end_date).isoformat(),      # Convert to local time
+                    "title": att.att_status,
+                    "start": timezone.localtime(
+                        att.start_date
+                    ).isoformat(),  # Convert to local time
+                    "end": timezone.localtime(
+                        att.end_date
+                    ).isoformat(),  # Convert to local time
+                    "color": att.color_hex,
                     "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
-                })
+                }
+            )
+            if att.reg_status is not None:
+                events_data.append(
+                    {
+                        "id": att.slug,
+                        "title": att.reg_status,
+                        "start": timezone.localtime(
+                            att.start_date
+                        ).isoformat(),  # Convert to local time
+                        "end": timezone.localtime(
+                            att.end_date
+                        ).isoformat(),  # Convert to local time
+                        "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
+                    }
+                )
         return JsonResponse(events_data, safe=False)
 
 
-class AttendanceLogListView(LoginRequiredMixin, SingleTableMixin, ListView):
+from django_filters.views import FilterView
+
+from hrms_app.hrms.filters import AttendanceLogFilter
+
+
+class AttendanceLogListView(LoginRequiredMixin, SingleTableMixin, FilterView):
     model = AttendanceLog
     table_class = AttendanceLogTable
     template_name = "hrms_app/regularization.html"
     context_object_name = "attendance_logs"
     paginate_by = 100
-    form_class = AttendanceLogFilterForm
+    filterset_class = AttendanceLogFilter
     title = _("Regularizations")
+
+    def filter_by_user_role(self, queryset):
+        user = self.request.user
+
+        if user.is_superuser or user.is_staff:
+            return queryset
+        elif hasattr(user, "employees"):
+            return queryset.filter(
+                Q(applied_by=user) | Q(applied_by__in=user.employees.all()),
+                is_regularisation=True,
+            )
+        else:
+            return queryset.filter(applied_by=user, is_regularisation=True)
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        form = self.form_class(self.request.GET)
+        return self.filter_by_user_role(queryset)
 
-        if form.is_valid():
-            search_query = form.cleaned_data.get('search', '')
-            status_filter = form.cleaned_data.get('status', '')
-            reg_status_filter = form.cleaned_data.get('reg_status', '')
-            
-            # Default values for non-superuser or non-staff
-            is_submitted = True
-            is_regularisation = True
-
-            if self.request.user.is_superuser or self.request.user.is_staff:
-                is_submitted = form.cleaned_data.get('is_submitted', True)
-                is_regularisation = form.cleaned_data.get('is_regularisation', True)
-
-            if search_query:
-                queryset = queryset.filter(
-                    Q(title__icontains=search_query) |
-                    Q(applied_by__username__icontains=search_query)
-                )
-
-            if status_filter:
-                queryset = queryset.filter(status=status_filter)
-
-            if reg_status_filter:
-                queryset = queryset.filter(reg_status=reg_status_filter)
-
-            queryset = queryset.filter(is_submitted=is_submitted, is_regularisation=is_regularisation)
-
-        return queryset
+    def get_filterset(self, filterset_class):
+        return filterset_class(
+            self.request.GET, queryset=self.get_queryset(), user=self.request.user
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['form'] = self.form_class(self.request.GET)
+        context["filter"] = self.get_filterset(self.filterset_class)
+        context.update({"title": self.title})
         return context
 
 
@@ -783,24 +1063,6 @@ class ChangePasswordView(LoginRequiredMixin, FormView):
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
         return kwargs
-
-
-def check_user_balance(request):
-    if request.method != "POST":
-        return JsonResponse({"success": False, "message": "Method not allowed"})
-    leaveType = request.POST.get("leaveType")
-    leave_bal = 0
-    if LeaveBalanceOpenings.objects.filter(
-        user=request.user, leave_type=leaveType
-    ).exists():
-        leave = LeaveBalanceOpenings.objects.get(
-            user=request.user, leave_type=leaveType
-        )
-        if leave.leave_type.leave_type in [settings.UP, settings.ML]:
-            leave_bal = 1
-        else:
-            leave_bal = leave.balance
-    return JsonResponse({"success": True, "balance": leave_bal, "type": leaveType})
 
 
 class TourTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
@@ -893,10 +1155,8 @@ class TourTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
             {
                 "current_date": now(),
                 "form": form,
-                "search_term": self.request.GET.get(
-                    "search", ""
-                ),
-                "selected_status":selected_status,
+                "search_term": self.request.GET.get("search", ""),
+                "selected_status": selected_status,
                 "urls": [
                     ("dashboard", {"label": "Dashboard"}),
                     ("tour_tracker", {"label": "Tour Tracker"}),
@@ -910,7 +1170,7 @@ class TourTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
 class ApplyTourView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     model = UserTour
     form_class = TourForm
-    title = _('Apply Tour')
+    title = _("Apply Tour")
     template_name = "hrms_app/apply-tour.html"
     success_url = reverse_lazy("tour_tracker")
     permission_required = "hrms_app.add_usertour"
@@ -946,13 +1206,24 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
     model = UserTour
     template_name = "hrms_app/tour_application_detail.html"
     context_object_name = "tour_application"
-    permission_required = "hrms_app.view_usertour"
     form_class = TourStatusUpdateForm
     slug_field = "slug"
     slug_url_kwarg = "slug"
 
     def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
+        # Determine the required permission dynamically based on the action
+        if self.request.method in ["GET"]:
+            permission_required = (
+                f"{self.model._meta.app_label}.view_{self.model._meta.model_name}"
+            )
+        elif self.request.method in ["POST", "PUT", "PATCH"]:
+            permission_required = (
+                f"{self.model._meta.app_label}.change_{self.model._meta.model_name}"
+            )
+        else:
+            permission_required = self.permission_required
+
+        return self.request.user.has_perm(permission_required)
 
     def get_object(self, queryset=None):
         tour_application = super().get_object(queryset)
@@ -962,7 +1233,7 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
             or tour_application.applied_by.reports_to == user
         ):
             return tour_application
-        return HttpResponseForbidden(
+        raise PermissionDenied(
             "Only Employee and Manager can view His/Her tour details."
         )
 
@@ -976,12 +1247,16 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         return kwargs
 
     def form_valid(self, form):
-        # if not form.cleaned_data.get('status'):
-        #     return self.form_invalid(form, _('Please select status.'))
         self.object = form.save()
         messages.success(
             self.request,
-            f"Regularization {form.cleaned_data.get('status')} Successfully",
+            f"Tour {form.cleaned_data.get('status')} Successfully",
+        )
+        TourStatusLog.create_log(
+            tour=self.object,
+            action_by=self.request.user,
+            action=form.cleaned_data.get("status"),
+            comments=form.cleaned_data.get("reason"),
         )
         return HttpResponseRedirect(
             reverse("tour_application_detail", kwargs={"slug": self.object.slug})
@@ -1004,6 +1279,16 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         context["is_manager"] = (
             self.request.user == tour_application.applied_by.reports_to
         )
+        context["delete_url"] = reverse(
+            "generic_delete",
+            kwargs={"model_name": self.model.__name__, "pk": self.get_object().pk},
+        )
+        context["edit_url"] = reverse(
+            "tour_application_update", kwargs={"slug": self.get_object().slug}
+        )
+        context["pdf_url"] = reverse(
+            "generate_tour_pdf", kwargs={"slug": self.get_object().slug}
+        )
         context["urls"] = urls
         return context
 
@@ -1011,24 +1296,6 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         return reverse_lazy(
             "tour_application_detail", kwargs={"slug": self.object.slug}
         )
-
-
-class TourApplicationDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = UserTour
-    permission_required = "hrms_app.delete_usertour"
-    success_url = reverse_lazy("tour_tracker")
-
-    def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
-
-    def post(self, request, *args, **kwargs):
-        # Call the superclass method to handle the deletion
-        response = super().post(request, *args, **kwargs)
-        messages.error(request, "Tour application deleted successfully.")
-        return response
-
-    def get_success_url(self):
-        return self.success_url
 
 
 class TourApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
@@ -1079,6 +1346,29 @@ class TourApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         return reverse_lazy(
             "tour_application_detail", kwargs={"slug": self.object.slug}
         )
+
+
+from django.http import HttpResponse
+from weasyprint import HTML
+from django.template.loader import render_to_string
+
+
+class GenerateTourPDFView(View):
+    def get(self, request, slug):
+        tour_details = get_object_or_404(UserTour, slug=slug)
+        logo = Logo.objects.all().first()
+        context = {
+            "object": tour_details,
+            "logo": logo,
+        }
+        html_template = "pdf/tour_details_pdf.html"
+        html_content = render_to_string(html_template, context, request=request)
+        pdf_file = HTML(
+            string=html_content, base_url=request.build_absolute_uri()
+        ).write_pdf()
+        response = HttpResponse(pdf_file, content_type="application/pdf")
+        response["Content-Disposition"] = 'inline; filename="tour_details.pdf"'
+        return response
 
 
 class UploadBillView(LoginRequiredMixin, UserPassesTestMixin, FormView):
@@ -1150,11 +1440,10 @@ class UserCreationWizard(LoginRequiredMixin, SessionWizardView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        urls = [
+        context["urls"] = [
             ("dashboard", {"label": "Dashboard"}),
             ("create_user", {"label": "Create Employee"}),
         ]
-        context["urls"] = urls
         return context
 
     def get_form_initial(self, step):
@@ -1165,14 +1454,11 @@ class UserCreationWizard(LoginRequiredMixin, SessionWizardView):
                 return progress.data
 
             model_class = self.form_list[step]._meta.model
-            instance = None
-
-            if model_class == CustomUser:
-                # Fetch the existing user instance for the user form
-                instance = model_class.objects.filter(pk=user.pk).first()
-            else:
-                instance = model_class.objects.filter(user_id=user.pk).first()
-
+            instance = (
+                model_class.objects.filter(user_id=user.pk).first()
+                if model_class != CustomUser
+                else model_class.objects.filter(pk=user.pk).first()
+            )
             return model_to_dict(instance) if instance else None
 
         return super().get_form_initial(step)
@@ -1180,30 +1466,22 @@ class UserCreationWizard(LoginRequiredMixin, SessionWizardView):
     def done(self, form_list, **kwargs):
         try:
             with transaction.atomic():
-                return self._extracted_from_done_4(form_list)
+                return self.save_forms(form_list)
         except Exception as e:
             logger.error(f"Error during form submission in done method: {e}")
             return self.render_error_page()
 
-    def _extracted_from_done_4(self, form_list):
-        user_form = form_list[0]
-        personal_details_form = form_list[1]
-        paddress_form = form_list[2]
-        caddress_form = form_list[3]
-
-        # Get user instance from the form or create if not found
+    def save_forms(self, form_list):
+        user_form, personal_details_form, paddress_form, caddress_form = form_list
         user = self.get_user_instance()
 
         if not user:
-            # If no user instance, create a new user from user_form data
             user = user_form.save(commit=False)
             user.set_password("12345@Kmpcl")  # Set a default password for new users
             user.save()
         else:
-            # If the user exists, update the existing user instance
-            user = user_form.save(commit=False)
+            user_form.save()
 
-        # Save or update related models (PersonalDetails, Addresses, etc.)
         personal_details = personal_details_form.save(commit=False)
         personal_details.user = user
         personal_details.save()
@@ -1216,13 +1494,8 @@ class UserCreationWizard(LoginRequiredMixin, SessionWizardView):
         caddress.user = user
         caddress.save()
 
-        # Update progress status once all data is saved
         FormProgress.objects.filter(user=user).update(status="completed")
         return redirect("employees")
-
-    def render_error_page(self):
-        # Render error page in case of failure
-        return redirect("error_page")
 
     def post(self, *args, **kwargs):
         current_step = self.steps.current
@@ -1254,17 +1527,9 @@ class UserCreationWizard(LoginRequiredMixin, SessionWizardView):
         return redirect("error_page")
 
 
-from django.shortcuts import redirect
-
-
 def cancel_user_creation(request):
     request.session.pop("current_step", None)
     return redirect("/")
-
-
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.db.models import Q
-from django.views.generic import ListView
 
 
 class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
@@ -1296,7 +1561,7 @@ class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 | Q(official_email__icontains=search_query)
             )
 
-        return queryset.order_by("-date_joined")  # Sort by date joined by default
+        return queryset.order_by("-date_joined")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

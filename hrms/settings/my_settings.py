@@ -5,9 +5,17 @@ LATE_COMING = "late coming"
 MIS_PUNCHING = "mis punching"
 PRE_APPROVAL = "pre approval"
 POST_APPROVAL = "post approval"
-ON_ROLE = 'on role'
-OFF_ROLE = 'off role'
+ON_ROLE = "on role"
+OFF_ROLE = "off role"
 FULL_DAY, FIRST_HALF, SECOND_HALF = "1", "2", "3"
+
+SALUTATION_CHOICES = [
+    ("Mr.", "Mr."),
+    ("Ms.", "Ms."),
+    ("Mrs.", "Mrs."),
+    ("Dr.", "Dr."),
+    ("Prof.", "Prof."),
+]
 
 
 HALF_DAY = "Half Day"
@@ -32,8 +40,8 @@ PENDING_CANCELLATION = "pending_cancellation"
 REJECTED = "rejected"
 COMPLETED = "completed"
 EXTENDED = "extended"
-RECOMMEND = 'recommended'
-NOT_RECOMMEND = 'not recommended'
+RECOMMEND = "recommended"
+NOT_RECOMMEND = "not recommended"
 
 ATTENDANCE_REGULARISED_STATUS_CHOICES = [
     (EARLY_GOING, _("Early Going")),
@@ -76,6 +84,8 @@ LEAVE_STATUS_CHOICES = [
     (REJECTED, _("Rejected")),
     (CANCELLED, _("Cancelled")),
     (PENDING_CANCELLATION, _("Pending Cancellation")),
+    (RECOMMEND, _("Recommended")),
+    (NOT_RECOMMEND, _("Not Recommended")),
 ]
 
 START_LEAVE_TYPE_CHOICES = [
@@ -111,44 +121,44 @@ LOCATION_CHOICES = [
     (ON_ROLE, "On-Role"),
     (OFF_ROLE, "Off-Role"),
 ]
-HEAD_OFFICE = 'head_office'
-CLUSTER_OFFICE = 'cluster_office'
-MCC = 'mcc'
-BMC = 'bmc'
-MPP = 'mpp'
+HEAD_OFFICE = "head_office"
+CLUSTER_OFFICE = "cluster_office"
+MCC = "mcc"
+BMC = "bmc"
+MPP = "mpp"
 
 OFFICE_TYPE_CHOICES = [
-        (HEAD_OFFICE, 'Head Office'),
-        (CLUSTER_OFFICE, 'Cluster Office'),
-        (MCC, 'MCC'),
-        (BMC, 'BMC'),
-        (MPP, 'BMC'),
-    ]
+    (HEAD_OFFICE, "Head Office"),
+    (CLUSTER_OFFICE, "Cluster Office"),
+    (MCC, "MCC"),
+    (BMC, "BMC"),
+    (MPP, "BMC"),
+]
 
-OPEN = 'open'
-CLAIMED = 'claimed'
-EXPIRED = 'expired'
+OPEN = "open"
+CLAIMED = "claimed"
+EXPIRED = "expired"
 
 CO_STATUS_CHOICES = [
-        (OPEN, 'Open'),
-        (CLAIMED, 'Claimed'),
-        (EXPIRED, 'Expired'),
-        (REJECTED, 'Rejected'),
-    ]
+    (OPEN, "Open"),
+    (CLAIMED, "Claimed"),
+    (EXPIRED, "Expired"),
+    (REJECTED, "Rejected"),
+]
 
-LEAVE_STATUS = 'leave_status'
-TOUR_STATUS = 'tour_status'
-CO_STATUS = 'comp_off_status'
-CHAT = 'chat'
-ATTENDANCE_REGULARISATION = 'attendance_reg'
+LEAVE_STATUS = "leave_status"
+TOUR_STATUS = "tour_status"
+CO_STATUS = "comp_off_status"
+CHAT = "chat"
+ATTENDANCE_REGULARISATION = "attendance_reg"
 
 NOTIFICATION_TYPES = [
-        (LEAVE_STATUS, 'Leave Status'),
-        (TOUR_STATUS, 'Tour Status'),
-        (CO_STATUS, 'Compensatory Off Status'),
-        (CHAT, 'Chat'),
-        (ATTENDANCE_REGULARISATION, 'Attendance Regularization'),
-    ]
+    (LEAVE_STATUS, "Leave Status"),
+    (TOUR_STATUS, "Tour Status"),
+    (CO_STATUS, "Compensatory Off Status"),
+    (CHAT, "Chat"),
+    (ATTENDANCE_REGULARISATION, "Attendance Regularization"),
+]
 
 
 customColorPalette = [
@@ -304,16 +314,15 @@ handler403 = "hrms_app.views.custom_permission_denied_view"
 from datetime import timedelta
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
+    "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     # 'DEFAULT_PERMISSION_CLASSES': (
     #     'rest_framework.permissions.IsAuthenticated',
     # ),
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10,  # Number of items per page
-
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 10,  # Number of items per page
 }
 
 SIMPLE_JWT = {
@@ -322,16 +331,13 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": False,
     "BLACKLIST_AFTER_ROTATION": False,
     "UPDATE_LAST_LOGIN": True,
-
     "ALGORITHM": "HS256",
     "LEEWAY": 0,
-
     "AUTH_HEADER_TYPES": ("Bearer",),
     "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
     "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
-
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
     "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",

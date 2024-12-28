@@ -176,3 +176,48 @@ def create_employee_shift(sender, instance, created, **kwargs):
         except Exception as e:
             # Log the error or handle it if no default ShiftTiming exists
             print(f"Error creating EmployeeShift: {e}")
+
+# signals.py
+
+from django.db.models.signals import pre_save, pre_delete
+from django.dispatch import receiver
+from django.core.exceptions import ImproperlyConfigured
+from .models import LeaveApplication, AttendanceLog, UserTour
+from hrms_app.hrms.utils import check_lock_status
+
+@receiver(pre_save, sender=LeaveApplication)
+@receiver(pre_save, sender=AttendanceLog)
+@receiver(pre_save, sender=UserTour)
+def prevent_save_if_locked(sender, instance, **kwargs):
+    """
+    Prevent saving an instance if the action is locked for the relevant period.
+    Dynamically fetches the correct date field for the instance.
+    """
+    instance_date = get_instance_date(instance, sender)
+    check_lock_status(instance_date=instance_date)
+
+@receiver(pre_delete, sender=LeaveApplication)
+@receiver(pre_delete, sender=AttendanceLog)
+@receiver(pre_delete, sender=UserTour)
+def prevent_delete_if_locked(sender, instance, **kwargs):
+    """
+    Prevent deleting an instance if the action is locked for the relevant period.
+    Dynamically fetches the correct date field for the instance.
+    """
+    instance_date = get_instance_date(instance, sender)
+    check_lock_status(instance_date=instance_date)
+
+
+def get_instance_date(instance, sender):
+    """
+    Dynamically retrieves the correct date field from the instance based on the model type.
+    Raises ImproperlyConfigured if the date field is not found.
+    """
+    if sender in (AttendanceLog, UserTour) and hasattr(instance, 'start_date'):
+        return instance.start_date
+    elif sender == LeaveApplication and hasattr(instance, 'startDate'):
+        return instance.startDate
+    else:
+        raise ImproperlyConfigured(
+            f"The model {sender.__name__} does not have a recognized date field for lock validation."
+        )

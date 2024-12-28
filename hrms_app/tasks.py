@@ -168,3 +168,8 @@ def send_regularization_notification(regularization_id, protocol, domain):
 def send_regularization_email(subject, message, recipient_list):
     send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
+from django.core.management import call_command
+
+@shared_task
+def populate_attendance_log(from_date, to_date):
+    call_command('pop_att', '--from-date', from_date, '--to-date', to_date)

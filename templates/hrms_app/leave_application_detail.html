@@ -1,12 +1,11 @@
 {% extends 'hrms_app/base.html' %}
-{% load static %}
-{% load hrms_tag humanize %}
+{% load static hrms_tag humanize i18n %}
 {{ form.media }}
 {% block title %}
   {{ leave_application.appliedBy }} | {{ leave_application.applicationNo }}
 {% endblock %}
 {% block extrastyle %}
-<link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}">
+  <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
 {% endblock %}
 {% block content %}
   {% render_breadcrumb 'Leave Detail' urls %}
@@ -18,7 +17,7 @@
       {% endfor %}
     </div>
   {% endif %}
-  <div class="container bg-light p-4">
+  <div class="bg-light p-4">
     <div class="row">
       <div class="col-12 col-md-6 mb-4">
         <div class="card">
@@ -35,6 +34,10 @@
             <ul class="list-group list-group-flush">
               <li class="list-group-item">
                 <strong>{{ leave_application.leave_type.leave_type_short_code }} Leave Balance:</strong>
+                <span class="float-end fw-bold">{{ leave_balance.remaining_leave_balances }}</span>
+              </li>
+              <li class="list-group-item">
+                <strong>Leave Balance after approval:</strong>
                 <span class="float-end fw-bold">{{ leave_application.balanceLeave }}</span>
               </li>
               <li class="list-group-item">
@@ -90,7 +93,7 @@
                 <div class="col-md-6">
                   <button type="button" class="btn btn-primary btn-sm w-100 {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %}" data-bs-toggle="modal" data-bs-target="#updateDialog">
                     {% if is_manager %}
-                       Update
+                      Update
                     {% else %}
                       Request Cancellation
                     {% endif %}
@@ -120,6 +123,15 @@
                   </div>
                 </div>
               </div>
+            </form>
+          </div>
+          <div class="card-footer">
+            <form id="action-form" method="post" action="{% url 'attendance_log_action' slug=object.slug %}">
+              {% csrf_token %}
+              {% if leave_application.appliedBy == user and leave_application.status|in_list:'pending,cancelled,rejected' %}
+                <a class="btn btn-sm btn-danger" href="{{delete_url}}">{% trans 'Delete' %}</a>
+                <a class="btn btn-sm btn-info" href="{{edit_url}}">{% trans 'Edit' %}</a>
+              {% endif %}
             </form>
           </div>
         </div>

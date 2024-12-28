@@ -1,29 +1,45 @@
 <!DOCTYPE html>
-{% load static %}
-<html lang="en">
-<head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="stylesheet" href="{% static 'hrms_app/source/vendors/metro4/css/metro-all.min.css' %}">
-    <link rel="stylesheet" href="{% static 'hrms_app/source/css/index.css' %}">
-    <title>HRMS :: 403 Permission Denied</title>
-</head>
-<body class="m4-cloak h-vh-100 d-flex flex-justify-center flex-align-center">
-    <div class="container text-center">
+{% load static i18n %}
 
-        <img src="{% static 'hrms_app/source/images/kashee.png' %}" >
+<html lang="id" dir="ltr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <meta name="description" content="" />
+    <meta name="author" content="" />
+    <style>
+      #footer {
+        text-align: center;
+        position: fixed;
+        margin-left: 530px;
+        bottom: 0px;
+      }
+    </style>
+    <!-- Title -->
+    <title>Sorry, This Page Can&#39;t Be Accessed</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css" />
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous" />
+  </head>
 
-        <div class="display4 fg-orange mt-0">403</div>
-        <div class="h1 text-center m-8">Oops!<br>Permission Denied</div>
-
-        <div class="text-leader2 text-center page-error-box mx-auto">
-            It seems you don't have permission to view this page.
-            <br>Meanwhile, you may <a href="{% url 'dashboard' %}">return to dashboard</a> or try using the search form.
+  <body class="bg-light text-dark py-5">
+    <div class="container py-5">
+      <div class="row">
+        <div class="col-md-2 text-center">
+          <p>
+            <i class="fa fa-exclamation-triangle fa-5x"></i><br />Status Code: 403
+          </p>
         </div>
+        <div class="col-md-10">
+          <h3>{% trans "OPPSSS!!!! Sorry..." %}</h3>
+          <p>
+            {% trans "Sorry, your access is refused due to security reasons of our server and also our sensitive data.<br />Please go back to the previous page to continue browsing." %}
+          </p>
+          <p><strong>{% trans "Error Message:" %} {{ error_message }}</strong></p>
+          <a class="btn btn-danger" href="javascript:history.back()">{% trans "Go Back" %}</a>
+        </div>
+      </div>
     </div>
 
-    <script src="{% static 'hrms_app/source/vendors/jquery/jquery-3.4.1.min.js' %}"></script>
-    <script src="{% static 'hrms_app/source/vendors/metro4/js/metro.min.js' %}"></script>
-</body>
+    <div id="footer" class="text-center">{% trans "Kashee Milk Producer Company LTD" %}</div>
+  </body>
 </html>

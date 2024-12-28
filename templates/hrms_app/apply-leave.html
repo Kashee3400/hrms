@@ -2,7 +2,7 @@
 {% load static hrms_tag %}
 {{ form.media }}
 {% block title %}
-  {{user}} | Apply Leave
+  {{ user }} | Apply Leave
 {% endblock %}
 {% block extrastyle %}
   <style>
@@ -42,14 +42,15 @@
   {% if form.non_field_errors %}
     <div class="notifications">
       {% for error in form.non_field_errors %}
-        <div class="notification error">{{ error }}</div>
+        <div class="bg-danger p-2 text-white">{{ error }}</div>
       {% endfor %}
     </div>
   {% endif %}
   <div class="bg-light p-3 mt-3">
+    <div class="alert alert-danger" role="alert"></div>
     <form method="post">
       {% csrf_token %}
-      <div id="leave_type_div">{{ form.leave_type}}</div>
+      <div id="leave_type_div">{{ form.leave_type }}</div>
       <div class="row g-3">
         <div class="col-md-6">
           <div id="dates" class="row mb-3">
@@ -178,10 +179,9 @@
               </div>
             </div>
           </div>
-
           <div class="row mt-3 d-flex justify-content-center align-items-center">
             <div class="col-12">
-              <button type="submit" class="btn btn-success shadow mt-2">Apply Leave</button>
+              <button id="applyLeaveButton" type="submit" class="btn btn-primary shadow mt-2">Apply Leave ({{ leave_balance.leave_type.leave_type_short_code }})</button>
             </div>
           </div>
         </div>
@@ -192,11 +192,17 @@
 
 {% block extra_js %}
   <script>
-    var leaveBalance = `{{leave_balance.remaining_leave_balances}}`
+    var leaveBalance = {{ leave_balance.remaining_leave_balances|default:0 }};
+    var leaveTypeShortCode = '{{ leave_balance.leave_type.leave_type_short_code }}'
     var totalDays = 0
     var bookedBalance = 0
     var endDay = 0
     var startDay = 0
+    $(document).ready(function () {
+      if (leaveBalance === 0 && leaveTypeShortCode !== 'LWP') {
+        $('#applyLeaveButton').prop('disabled', true)
+      }
+    })
   </script>
   <script src="{% static 'hrms_app/js/apply_leave.js' %}"></script>
   <script src="{% static 'hrms_app/source/js/charts.js' %}"></script>

@@ -41,18 +41,6 @@ class Command(BaseCommand):
             )
         return User.objects.all().select_related("personal_detail")
 
-    def parse_dates(self, from_date_str, to_date_str):
-        from_date = (
-            make_aware(datetime.strptime(from_date_str, "%Y-%m-%d"))
-            if from_date_str
-            else None
-        )
-        to_date = (
-            make_aware(datetime.strptime(to_date_str, "%Y-%m-%d"))
-            if to_date_str
-            else None
-        )
-        return from_date, to_date
     def get_user_shift(self, user):
         emp_shift = (
             EmployeeShift.objects.filter(employee=user)
@@ -65,17 +53,22 @@ class Command(BaseCommand):
         self.stdout.write("Starting to populate AttendanceLog data...")
 
         # Fetch static data
+        # AttendanceLog.objects.all().delete()
         half_day_color, present_color, absent_color, asettings = self.fetch_static_data()
         users = self.get_users(options["username"])
-        from_date, to_date = self.parse_dates(options["from_date"], options["to_date"])
-        device_instance = DeviceInformation.objects.first()
-        result = call_soap_api(device_instance=device_instance,from_date=from_date,to_date=to_date)
-        # Prepare to bulk insert attendance logs
+        from_date, to_date = options["from_date"], options["to_date"]
         attendance_logs_to_create = []
         kolkata_tz = pytz.timezone("Asia/Kolkata")
 
         # Iterate over users and match them with API result efficiently
         for user in users:
+            office_location = user.device_location
+            device_instance = DeviceInformation.objects.filter(device_location=office_location).first()
+            if device_instance is None:
+                continue
+            result = call_soap_api(device_instance=device_instance,from_date=from_date,to_date=to_date)
+            # Prepare to bulk insert attendance logs
+
             emp_code = user.personal_detail.employee_code
             if emp_code not in result:
                 continue
@@ -137,8 +130,18 @@ class AttendanceLogCreator:
     def create_logs(self, user, date, login_date_time, logout_date_time, duration, status_data):
         att_status, color_hex_code, reg_status, is_regularization, rfrom_date, rto_date, reg_duration, status, att_status_short_code = status_data
         
-        rfrom_date_aware = self.kolkata_tz.localize(rfrom_date) if rfrom_date else None
-        rto_date_aware = self.kolkata_tz.localize(rto_date) if rto_date else None
+        def ensure_timezone_aware(dt, timezone):
+            """
+            Ensures the given datetime is timezone-aware.
+            If it's naive, localize it using the provided timezone.
+            """
+            if dt and dt.tzinfo is None:  # Check if the datetime is naive
+                return self.kolkata_tz.localize(dt)
+            return dt  # Return as-is if already timezone-aware
+
+        # Ensure rfrom_date and rto_date are timezone-aware
+        rfrom_date_aware = ensure_timezone_aware(rfrom_date, self.kolkata_tz)
+        rto_date_aware = ensure_timezone_aware(rto_date, self.kolkata_tz)
 
         return AttendanceLog(
             applied_by=user,

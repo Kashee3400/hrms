@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     'django_tables2',
     'django_extensions',
     "django_ckeditor_5",
+    "django_celery_beat",
     "django.contrib.humanize",
     "admin_star.apps.AdminStarConfig",
     "django.contrib.admin",

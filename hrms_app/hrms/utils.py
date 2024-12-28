@@ -6,8 +6,10 @@ import requests
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
-from hrms_app.models import Holiday
+from hrms_app.models import Holiday, LockStatus
 from rest_framework.response import Response
+from django.core.exceptions import PermissionDenied
+
 
 def send_email(subject, template_name, context, from_email, recipient_list):
     """
@@ -31,10 +33,12 @@ def send_email(subject, template_name, context, from_email, recipient_list):
     )
 
 
-def call_soap_api(device_instance,from_date , to_date):
+def call_soap_api(device_instance, from_date, to_date):
     url = device_instance.api_link
     headers = {"Content-Type": "text/xml"}
     params = {"op": "GetTransactionsLog"}
+    print(f"From date: {from_date}")
+    print(f"To date: {to_date}")
     attendance_start_date = device_instance.from_date if from_date is None else from_date
     attendance_to_date = device_instance.to_date if to_date is None else to_date
     body = f"""<?xml version="1.0" encoding="utf-8"?>
@@ -71,7 +75,7 @@ def call_soap_api(device_instance,from_date , to_date):
                 log_time_str = " ".join(
                     parts[1:]
                 )  # Join the remaining parts as log_time_str
-                
+
                 try:
                     if not device_instance.include_seconds:
                         # Remove the seconds part if present
@@ -81,7 +85,7 @@ def call_soap_api(device_instance,from_date , to_date):
                         time_format = "%Y-%m-%d %H:%M:%S"
 
                     log_time = datetime.strptime(log_time_str, time_format)
-                    
+
                     date_key = log_time.date()
                     grouped_data[emp_code][date_key].append(log_time)
                 except ValueError as e:
@@ -112,11 +116,34 @@ def get_non_working_days(start, end):
     return non_working_days
 
 
-def create_response(status: str, message: str, data: dict = None, status_code: int = 200) -> Response:
-    response_data = {
-        "status": status,
-        "message": message,
-        "data": data
-    }
+def create_response(
+    status: str, message: str, data: dict = None, status_code: int = 200
+) -> Response:
+    response_data = {"status": status, "message": message, "data": data}
     return Response(response_data, status=status_code)
 
+
+from datetime import date, timedelta
+
+from django.core.exceptions import PermissionDenied
+
+
+def check_lock_status(instance_date=None):
+    """
+    Checks if the global lock is active for a specific date.
+    The lock applies based on the `from_date` and `to_date` range.
+    """
+    if instance_date is None:
+        instance_date = (
+            datetime.now()
+        )  # Default to today's date if no instance date is provided
+    # Query to find a lock status where instance_date falls between from_date and to_date
+    lock_status = LockStatus.objects.filter(
+        from_date__lte=instance_date, to_date__gte=instance_date, is_locked="locked"
+    ).first()
+
+    if lock_status:
+        raise PermissionDenied(
+            f"Action is locked for the period from {lock_status.from_date} to {lock_status.to_date}. "
+            f"Reason: {lock_status.reason or 'No reason provided'}"
+        )

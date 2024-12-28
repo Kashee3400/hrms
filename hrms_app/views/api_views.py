@@ -1238,3 +1238,28 @@ class DeviceInformationViewSet(viewsets.ModelViewSet):
             data=serializer.data,
             status_code=status.HTTP_200_OK,
         )
+
+
+from django.core.management import call_command
+from rest_framework.views import APIView
+
+class ExecutePopulateAttendanceView(APIView):
+    """
+    API endpoint to manually execute the `populate_attendance` command.
+    """
+
+    def post(self, request, *args, **kwargs):
+        # Parse input data
+        userid = request.data.get("username")
+        from_date = request.data.get("from_date")
+        to_date = request.data.get("to_date")
+        if userid:
+            user = get_object_or_404(get_user_model(),pk=userid)
+        try:
+            call_command("pop_att", "--username", user.username, "--from-date", from_date, "--to-date", to_date)
+            return Response({"message": "Command executed successfully!"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response(
+                {"error": f"Failed to execute command: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

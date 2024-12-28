@@ -33,6 +33,7 @@ urlpatterns = [
     path('users/<int:pk>/', CustomUserDetailAPIView.as_view(), name='custom_user_detail'),
     path('notifications/', UserMonthlyNotificationsListView.as_view(), name='user_notifications'),
     path('notifications/<int:id>/update-read-status/', UpdateNotificationStatusView.as_view(), name='update-notification-status'),
+    path("execute-populate-attendance/", ExecutePopulateAttendanceView.as_view(), name="execute_populate_attendance"),
     
 ]
 

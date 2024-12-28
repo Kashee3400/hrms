@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from hrms_app.hrms.form import *
-from hrms_app.hrms.resources import  CustomUserResource,HolidayResource
+from hrms_app.hrms.resources import  CustomUserResource,HolidayResource,UserTourResource
 from .models import *
 from django_ckeditor_5.widgets import CKEditor5Widget
 from django.utils.safestring import mark_safe
@@ -30,7 +30,7 @@ class LeaveTypeAdmin(admin.ModelAdmin):
                     'updated_by','consecutive_restriction']
     
     fields = ('leave_type', 'leave_type_short_code','half_day_short_code', 'min_notice_days'
-        ,'max_days_limit', 'min_days_limit', 'allowed_days_per_year', 'leave_fy_start', 'leave_fy_end','consecutive_restriction')
+        ,'max_days_limit', 'min_days_limit', 'allowed_days_per_year', 'leave_fy_start', 'leave_fy_end','consecutive_restriction','restricted_after_leave_types')
 
     
     search_fields = ['leave_type']
@@ -110,16 +110,33 @@ class AttendanceLogActionAdmin(admin.ModelAdmin):
 
 admin.site.register(AttendanceLogAction, AttendanceLogActionAdmin)
 
-
-class UserTourAdmin(admin.ModelAdmin):
-    list_display = ('applied_by', 'from_destination', 'to_destination', 'start_date', 'end_date', 'status','total')
-    search_fields = ['username','user__first_name', 'user__last_name']
+class UserTourAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+    resource_class = UserTourResource
+    list_display = ('approval_type', 'applied_by', 'from_destination', 'to_destination', 'start_date','start_time', 'end_date','end_time','extended_end_date','extended_end_time', 'status', 'total','bills_submitted')
+    search_fields = ['applied_by__username', 'applied_by__first_name', 'applied_by__last_name']
+    list_filter = ['start_date','approval_type']
     formfield_overrides = {
         models.TextField: {'widget': CKEditor5Widget()},
     }
 
-
 admin.site.register(UserTour, UserTourAdmin)
+
+from django.contrib import messages
+
+@admin.register(AttendanceLogHistory)
+class AttendanceLogHistoryAdmin(admin.ModelAdmin):
+    actions = ['revert_to_this_state']
+    list_display = ('attendance_log', 'modified_by', 'modified_at')
+    search_fields = ('attendance_log__id', 'modified_by__username')
+    list_filter = ('modified_at', 'modified_by')
+    readonly_fields = ('modified_at',)
+
+    def revert_to_this_state(self, request, queryset):
+        for history in queryset:
+            history.revert()
+            messages.success(request, f"Reverted attendance log {history.attendance_log} to the state from {history.modified_at}.")
+
+    revert_to_this_state.short_description = "Revert selected attendance logs to this state"
 
 
 class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
@@ -127,12 +144,45 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
         'user', 'leave_type', 'year', 'no_of_leaves', 'remaining_leave_balances', 'opening_balance','closing_balance','created_at', 'created_by',
         'updated_at',
         'updated_by')
-    search_fields = ['username','user__first_name', 'user__last_name']
+    search_fields = ['user__username','user__first_name', 'user__last_name']
+    list_filter = ('user',)
     
     readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
 
 
 admin.site.register(LeaveBalanceOpenings, LeaveBalanceOpeningAdmin)
+
+
+class ReligionAdmin(admin.ModelAdmin):
+    list_display = ('religion', 'is_active', 'created_at')  # Display these fields in the list view
+    search_fields = ('religion',)  # Make 'religion' field searchable
+    list_filter = ('is_active',)  # Add filter by 'is_active' field
+    ordering = ('created_at',)  # Order the records by 'created_at'
+
+# Register the model with the custom admin
+admin.site.register(Religion, ReligionAdmin)
+
+
+class LockStatusAdmin(admin.ModelAdmin):
+    list_display = ('is_locked','from_date','to_date', 'locked_at')
+    actions = ['toggle_lock']
+    
+    def toggle_lock(self, request, queryset):
+        for lock in queryset:
+            lock.is_locked = 'locked' if lock.is_locked == 'unlocked' else 'unlocked'
+            lock.save()
+            action = 'locked' if lock.is_locked == 'locked' else 'unlocked'
+            self.message_user(request, f"System has been {action}.")
+    toggle_lock.short_description = "Toggle Lock Status"
+    
+admin.site.register(LockStatus, LockStatusAdmin)
+
+@admin.register(LeaveStatusPermission)
+class LeaveStatusPermissionAdmin(admin.ModelAdmin):
+    list_display = ("role", "user", "status")  # Fields to display in the admin list view
+    list_filter = ("role", "status")  # Filters for the list view
+    search_fields = ("role", "user__username", "status")  # Search functionality
+    # autocomplete_fields = ("user",)
 
 class PersonalDetailAdmin(admin.ModelAdmin):
     list_display = (
@@ -302,7 +352,6 @@ class LeaveDayChoiceAdjustmentAdmin(admin.ModelAdmin):
 class LogoAdmin(admin.ModelAdmin):
     list_display = ('logo', 'logo_image')
     search_fields = ('logo',)
-    readonly_fields = ('logo_image',)  # Making logo_image read-only
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
@@ -317,8 +366,23 @@ class DesignationAdmin(admin.ModelAdmin):
     list_display = ('designation', 'department', 'is_active', 'created_at', 'updated_at')
     search_fields = ('designation', 'department__department')
     list_filter = ('is_active', 'department')
+    list_editable = ('department',)  # Fields to be editable in the list view
     prepopulated_fields = {'slug': ('designation',)}
     readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
+
+    # Add bulk action to save selected entries
+    actions = ['bulk_save']
+
+    def bulk_save(self, request, queryset):
+        updated_count = 0
+        for obj in queryset:
+            # Perform any logic you need for bulk updates here (if needed)
+            obj.save()  # Save each object
+            updated_count += 1
+
+        self.message_user(request, f'{updated_count} Designations were successfully saved.')
+
+    bulk_save.short_description = "Save selected designations"
 
 @admin.register(Gender)
 class GenderAdmin(admin.ModelAdmin):
@@ -341,3 +405,4 @@ class LeaveDayAdmin(admin.ModelAdmin):
     search_fields = ("leave_application__applicationNo", "leave_application__appliedBy__username")
     date_hierarchy = "date"
     ordering = ("-date",)
+

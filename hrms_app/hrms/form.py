@@ -15,8 +15,6 @@ from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from django_ckeditor_5.widgets import CKEditor5Widget
 from colorfield.widgets import ColorWidget
-from hrms_app.hrms.utils import is_holiday, is_weekend
-from hrms_app.utility.leave_utils import apply_leave_policies, check_overlapping_leaves
 from django.core.validators import RegexValidator
 from bootstrap_datepicker_plus.widgets import (
     DatePickerInput,
@@ -230,6 +228,7 @@ class AuthenticationForm(forms.Form):
                 "data-validate": "required",
                 "data-role": "input",
                 "autofocus": True,
+                "class": "form-control",
                 "placeholder": "Enter username",
             }
         )
@@ -244,6 +243,7 @@ class AuthenticationForm(forms.Form):
                 "data-validate": "required",
                 "data-role": "input",
                 "autocomplete": "current-password",
+                "class": "form-control",
                 "placeholder": "Enter password",
             }
         ),
@@ -426,14 +426,24 @@ class SetPasswordForm(forms.Form):
     }
     new_password1 = forms.CharField(
         label=_("New password"),
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "new-password",
+                "class": "form-control",
+            }
+        ),
         strip=False,
         help_text=password_validation.password_validators_help_text_html(),
     )
     new_password2 = forms.CharField(
         label=_("New password confirmation"),
         strip=False,
-        widget=forms.PasswordInput(attrs={"autocomplete": "new-password"}),
+        widget=forms.PasswordInput(
+            attrs={
+                "autocomplete": "new-password",
+                "class": "form-control",
+            }
+        ),
     )
 
     def __init__(self, user, *args, **kwargs):
@@ -617,6 +627,7 @@ class ChangeUserPasswordForm(SetPasswordForm):
                 "autocomplete": "current-password",
                 "autofocus": True,
                 "data-role": "input",
+                "class": "form-control",
                 "data-prepend": "Old Password: ",
             }
         ),
@@ -739,6 +750,9 @@ class LeaveTypeForm(forms.ModelForm):
         }
 
 
+from hrms_app.utility.leave_utils import LeavePolicyManager
+
+
 class LeaveApplicationForm(forms.ModelForm):
     class Meta:
         model = LeaveApplication
@@ -804,6 +818,8 @@ class LeaveApplicationForm(forms.ModelForm):
         endDate = cleaned_data.get("endDate")
         usedLeave = cleaned_data.get("usedLeave")
         leaveTypeId = cleaned_data.get("leave_type")
+        startDayChoice = cleaned_data.get("startDayChoice")
+        endDayChoice = cleaned_data.get("endDayChoice")
 
         if not startDate or not endDate:
             raise ValidationError(_("Start Date and End Date are required."))
@@ -811,21 +827,19 @@ class LeaveApplicationForm(forms.ModelForm):
         if startDate > endDate:
             raise ValidationError(_("End Date must be after Start Date."))
 
-        current_date = startDate
-        while current_date <= endDate:
-            if leaveTypeId.leave_type_short_code == "CL" and (
-                is_weekend(current_date) or is_holiday(current_date)
-            ):
-                usedLeave -= 1
-            current_date += timedelta(days=1)
-
         cleaned_data["usedLeave"] = usedLeave
-
-        apply_leave_policies(self.user, leaveTypeId, startDate, endDate, usedLeave)
-
-        # Check for overlapping leave applications
-        if check_overlapping_leaves(self.user, startDate, endDate):
-            self.add_error(None, _("You have overlapping leave applications."))
+        try:
+            policy_manager = LeavePolicyManager(
+                user=self.user,
+                leave_type=leaveTypeId,
+                start_date=startDate,
+                end_date=endDate,
+                start_day_choice=startDayChoice,
+                end_day_choice=endDayChoice,
+            )
+            policy_manager.validate_policies()
+        except ValidationError as e:
+            raise ValidationError(f"{str(e)}")
 
         return cleaned_data
 
@@ -852,16 +866,19 @@ class AttendanceStatusColorForm(forms.ModelForm):
 class AttendanceLogFilterForm(forms.ModelForm):
     search = forms.CharField(
         required=False,
-        widget=forms.TextInput(attrs={'placeholder': 'Search by title or user', "class": "form-control"})
+        widget=forms.TextInput(
+            attrs={"placeholder": "Search by title or user", "class": "form-control"}
+        ),
     )
 
     class Meta:
         model = AttendanceLog
-        fields = ("reg_status", "status", "is_submitted","is_regularisation")
+        fields = ("reg_status", "status", "is_submitted", "is_regularisation")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['is_submitted'].initial = True
+        self.fields["is_submitted"].initial = True
+
 
 class AttendanceLogForm(forms.ModelForm):
 
@@ -880,8 +897,12 @@ class AttendanceLogForm(forms.ModelForm):
         ]
         widgets = {
             "reg_status": forms.Select(attrs={"class": "form-control"}),
-            "duration": TimePickerInput(attrs={"class": "form-control","readonly": "readonly"}),
-            "reg_duration": forms.TextInput(attrs={"class": "form-control","readonly": "readonly"}),
+            "duration": TimePickerInput(
+                attrs={"class": "form-control", "readonly": "readonly"}
+            ),
+            "reg_duration": forms.TextInput(
+                attrs={"class": "form-control", "readonly": "readonly"}
+            ),
             "start_date": DateTimePickerInput(
                 options={
                     "showClear": True,
@@ -889,12 +910,12 @@ class AttendanceLogForm(forms.ModelForm):
                     "useCurrent": False,
                 },
                 format="%Y-%m-%d %H:%M",
-                attrs={"class": "form-control ","readonly": "readonly"},
+                attrs={"class": "form-control ", "readonly": "readonly"},
             ),
             "end_date": DateTimePickerInput(
                 range_from="start_date",
                 format="%Y-%m-%d %H:%M",
-                attrs={"class": "form-control","readonly": "readonly"},
+                attrs={"class": "form-control", "readonly": "readonly"},
             ),
             "from_date": DateTimePickerInput(
                 options={
@@ -952,29 +973,47 @@ class LeaveStatusUpdateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
+        filtered_choices = settings.LEAVE_STATUS_CHOICES
         if user is not None:
             current_status = self.instance
             if user.is_rm and user != current_status.appliedBy:
-                filtered_choices = [
-                    choice
-                    for choice in settings.LEAVE_STATUS_CHOICES
-                    if choice[0]
-                    in [settings.APPROVED, settings.REJECTED, settings.CANCELLED]
-                ]
+                # Reporting Manager can choose from APPROVED, REJECTED, CANCELLED
+                if (
+                    user.personal_detail.designation.department.department != "admin"
+                    and current_status.leave_type.leave_type_short_code == "LWP"
+                ):
+                    filtered_choices = [
+                        choice
+                        for choice in settings.LEAVE_STATUS_CHOICES
+                        if choice[0] in [settings.RECOMMEND, settings.NOT_RECOMMEND]
+                    ]
+
+                else:
+                    filtered_choices = [
+                        choice
+                        for choice in settings.LEAVE_STATUS_CHOICES
+                        if choice[0]
+                        in [settings.APPROVED, settings.REJECTED, settings.CANCELLED]
+                    ]
+
             elif user == current_status.appliedBy:  # Employee
                 if current_status.status == settings.CANCELLED:
+                    # Employee can only choose CANCELLED if already cancelled
                     filtered_choices = [
                         choice
                         for choice in settings.LEAVE_STATUS_CHOICES
                         if choice[0] == settings.CANCELLED
                     ]
                 else:
+                    # If not cancelled, employee can choose PENDING_CANCELLATION
                     filtered_choices = [
                         choice
                         for choice in settings.LEAVE_STATUS_CHOICES
                         if choice[0] == settings.PENDING_CANCELLATION
                     ]
-            self.fields["status"].widget = forms.Select(choices=filtered_choices)
+
+        # Ensure that we always set the 'status' field with the filtered choices
+        self.fields["status"].widget = forms.Select(choices=filtered_choices)
 
 
 class TourStatusUpdateForm(forms.ModelForm):
@@ -1121,14 +1160,14 @@ class CustomUserForm(forms.ModelForm):
     permissions = forms.ModelMultipleChoiceField(
         queryset=Permission.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={"data-role": "select"}),
+        widget=forms.SelectMultiple(attrs={"class": "form-control"}),
         label="Permissions",
     )
     # Field for selecting groups
     groups = forms.ModelMultipleChoiceField(
         queryset=Group.objects.all(),
         required=False,
-        widget=forms.SelectMultiple(attrs={"data-role": "select"}),
+        widget=forms.SelectMultiple(attrs={"class": "form-control"}),
         label="Groups",
     )
 
@@ -1142,6 +1181,7 @@ class CustomUserForm(forms.ModelForm):
             "official_email",
             "is_rm",
             "reports_to",
+            "device_location",
         ]
         labels = {
             "username": _("User Name"),
@@ -1151,32 +1191,32 @@ class CustomUserForm(forms.ModelForm):
             "official_email": _("Official Email"),
             "is_rm": _("Is Reporting Manager"),
             "reports_to": _("Select Manager (Reports To)"),
+            "device_location": _("Employee Location"),
         }
 
         widgets = {
             "username": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("example12@#")}
+                attrs={"class": "form-control", "placeholder": _("example12@#")}
             ),
             "first_name": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter First Name")}
+                attrs={"class": "form-control", "placeholder": _("Enter First Name")}
             ),
             "last_name": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Last Name")}
+                attrs={"class": "form-control", "placeholder": _("Enter Last Name")}
             ),
             "email": forms.EmailInput(
-                attrs={"data-role": "input", "placeholder": _("example@gmail.com")}
+                attrs={"class": "form-control", "placeholder": _("example@gmail.com")}
             ),
             "official_email": forms.EmailInput(
                 attrs={
-                    "data-role": "input",
+                    "class": "form-control",
                     "placeholder": _("example@companydomain.com"),
                 }
             ),
-            "reports_to": forms.Select(attrs={"data-role": "select"}),
             "is_rm": forms.CheckboxInput(
                 attrs={
                     "type": "checkbox",
-                    "data-role": "switch",
+                    "class": "form-check-input",
                     "data-material": "true",
                 }
             ),
@@ -1197,6 +1237,7 @@ class PersonalDetailsForm(forms.ModelForm):
     class Meta:
         model = PersonalDetails
         fields = [
+            "salutation",
             "avatar",
             "employee_code",
             "mobile_number",
@@ -1238,13 +1279,23 @@ class PersonalDetailsForm(forms.ModelForm):
         # Define widgets with placeholders
         widgets = {
             "avatar": forms.FileInput(
-                attrs={"type": "file", "data-role": "file", "data-mode": "drop"}
+                attrs={
+                    "class": "form-control",
+                    "type": "file",
+                    "data-role": "file",
+                    "data-mode": "drop",
+                }
             ),
             "employee_code": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Employee Code")}
+                attrs={
+                    "class": "form-control",
+                    "data-role": "input",
+                    "placeholder": _("Enter Employee Code"),
+                }
             ),
             "mobile_number": forms.TextInput(
                 attrs={
+                    "class": "form-control",
                     "data-role": "input, input-mask",
                     "data-mask": "+91 _____-_____",
                     "placeholder": _("Enter Mobile Number"),
@@ -1252,58 +1303,66 @@ class PersonalDetailsForm(forms.ModelForm):
             ),
             "alt_mobile_number": forms.TextInput(
                 attrs={
+                    "class": "form-control",
                     "data-role": "input,input-mask",
                     "data-mask": "+91 _____-_____",
                     "placeholder": _("Enter Alternate Mobile Number"),
                 }
             ),
-            "gender": forms.Select(attrs={"data-role": "select"}),
-            "designation": forms.Select(attrs={"data-role": "select"}),
+            "gender": forms.Select(attrs={"class": "form-control"}),
+            "designation": forms.Select(attrs={"class": "form-control"}),
             "official_mobile_number": forms.TextInput(
                 attrs={
+                    "class": "form-control",
                     "data-role": "input,input-mask",
                     "data-mask": "+91 _____-_____",
                     "placeholder": _("Enter Official Mobile Number"),
                 }
             ),
-            "religion": forms.Select(attrs={"data-role": "select"}),
-            "marital_status": forms.Select(attrs={"data-role": "select"}),
+            "religion": forms.Select(
+                attrs={"class": "form-control", "data-role": "select"}
+            ),
+            "marital_status": forms.Select(attrs={"class": "form-control"}),
             "ctc": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter CTC")}
+                attrs={
+                    "class": "form-control",
+                    "data-role": "input",
+                    "placeholder": _("Enter CTC"),
+                }
             ),
             "birthday": forms.DateInput(
                 attrs={
-                    "data-role": "calendarpicker",
+                    "class": "form-control datepicker",
                     "placeholder": _("Select Birthday"),
                 }
             ),
             "ann_date": forms.DateInput(
                 attrs={
-                    "data-role": "calendarpicker",
+                    "class": "form-control datepicker",
                     "placeholder": _("Select Anniversary Date"),
                 }
             ),
             "doj": forms.DateInput(
                 attrs={
-                    "data-role": "calendarpicker",
+                    "class": "form-control datepicker",
                     "placeholder": _("Select Date of Joining"),
                 }
             ),
             "dol": forms.DateInput(
                 attrs={
-                    "data-role": "calendarpicker",
+                    "class": "form-control datepicker",
                     "placeholder": _("Select Date of Leaving"),
                 }
             ),
             "dor": forms.DateInput(
                 attrs={
-                    "data-role": "calendarpicker",
+                    "class": "form-control datepicker",
                     "placeholder": _("Select Date of Resignation"),
                 }
             ),
             "dof": forms.DateInput(
                 attrs={
-                    "data-role": "calendarpicker",
+                    "class": "form-control datepicker",
                     "placeholder": _("Select Date of Final Settlement"),
                 }
             ),
@@ -1337,24 +1396,30 @@ class PermanentAddressForm(forms.ModelForm):
         # Define widgets with placeholders
         widgets = {
             "address_line_1": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Address Line 1")}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Enter Address Line 1"),
+                }
             ),
             "address_line_2": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Address Line 2")}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Enter Address Line 2"),
+                }
             ),
             "country": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Country")}
+                attrs={"class": "form-control", "placeholder": _("Enter Country")}
             ),
             "district": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter District")}
+                attrs={"class": "form-control", "placeholder": _("Enter District")}
             ),
             "state": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter State")}
+                attrs={"class": "form-control", "placeholder": _("Enter State")}
             ),
             "zipcode": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter ZIP Code")}
+                attrs={"class": "form-control", "placeholder": _("Enter ZIP Code")}
             ),
-            "is_active": forms.CheckboxInput(attrs={"data-role": "checkbox"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
         validators = {
@@ -1390,22 +1455,28 @@ class CorrespondingAddressForm(forms.ModelForm):
         # Define widgets with placeholders
         widgets = {
             "address_line_1": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Address Line 1")}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Enter Address Line 1"),
+                }
             ),
             "address_line_2": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Address Line 2")}
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Enter Address Line 2"),
+                }
             ),
             "country": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter Country")}
+                attrs={"class": "form-control", "placeholder": _("Enter Country")}
             ),
             "district": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter District")}
+                attrs={"class": "form-control", "placeholder": _("Enter District")}
             ),
             "state": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter State")}
+                attrs={"class": "form-control", "placeholder": _("Enter State")}
             ),
             "zipcode": forms.TextInput(
-                attrs={"data-role": "input", "placeholder": _("Enter ZIP Code")}
+                attrs={"class": "form-control", "placeholder": _("Enter ZIP Code")}
             ),
         }
 
@@ -1455,12 +1526,67 @@ class AttendanceReportFilterForm(forms.Form):
         required=False,
         label="Active Employees Only",
         initial=True,
-        widget=forms.CheckboxInput(attrs={"data-role": "checkbox"}),
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "form-check-input",
+            }
+        ),
     )
 
-    detailed = forms.BooleanField(
+
+class AttendanceLogActionForm(forms.Form):
+    reason = forms.CharField(
+        widget=forms.Textarea(attrs={"class": "form-control", "rows": 4, "cols": 40}),
         required=False,
-        label="Detailed Reports Only",
-        initial=False,
-        widget=forms.CheckboxInput(attrs={"data-role": "checkbox"}),
+        label="Remark",
     )
+
+
+class PopulateAttendanceForm(forms.Form):
+
+    user = forms.ModelChoiceField(
+        queryset=User.objects.all(),
+        label=_("User"),
+        required=False,
+        help_text=_("Select a specific user or leave blank to process all users."),
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    from_date = forms.DateTimeField(
+        label=_("From Date"),
+        required=True,
+        widget=DateTimePickerInput(
+            options={
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            attrs={"class": "form-control"},
+        ),
+    )
+    to_date = forms.DateTimeField(
+        label=_("To Date"),
+        required=True,
+        widget=DateTimePickerInput(
+            options={
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            range_from="from_date",
+            attrs={"class": "form-control"},
+        ),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        from_date = cleaned_data.get("from_date")
+        to_date = cleaned_data.get("to_date")
+
+        # Validation: Ensure `from_date` is not greater than `to_date`
+        if from_date and to_date and from_date > to_date:
+            raise forms.ValidationError(
+                _("The from-date cannot be later than the to-date.")
+            )
+
+        return cleaned_data

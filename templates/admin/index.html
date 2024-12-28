@@ -1,6 +1,9 @@
 {% extends 'layouts/base.html' %}
-{% load static %}
-
+{% load static hrms_tag i18n %}
+{{ form.media }}
+{% block title %}
+  {{ request.user.get_short_name }} | {{ title }}
+{% endblock %}
 {% block extrastyle %}
   <link rel="stylesheet" href="{% static 'js/select.dataTables.min.css' %}" />
 {% endblock %}
@@ -104,49 +107,19 @@
           <div class="col-lg-4 d-flex flex-column">
             <div class="row flex-grow">
               <div class="col-md-6 col-lg-12 grid-margin stretch-card">
-                <div class="card bg-primary card-rounded">
+                <div class="card bg-white card-rounded">
                   <div class="card-body pb-0">
-                    <h4 class="card-title card-title-dash text-white mb-4">Status Summary</h4>
+                    <h4 class="card-title card-title-dash text-dark mb-4">{% trans 'Populate User Specific attendance' %}</h4>
                     <div class="row">
-                      <div class="col-sm-4">
-                        <p class="status-summary-ight-white mb-1">Closed Value</p>
-                        <h2 class="text-info">357</h2>
-                      </div>
-                      <div class="col-sm-8">
-                        <div class="status-summary-chart-wrapper pb-4">
-                          <canvas id="status-summary"></canvas>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-md-6 col-lg-12 grid-margin stretch-card">
-                <div class="card card-rounded">
-                  <div class="card-body">
-                    <div class="row">
-                      <div class="col-sm-6">
-                        <div class="d-flex justify-content-between align-items-center mb-2 mb-sm-0">
-                          <div class="circle-progress-width">
-                            <div id="totalVisitors" class="progressbar-js-circle pr-2"></div>
-                          </div>
-                          <div>
-                            <p class="text-small mb-2">Total Visitors</p>
-                            <h4 class="mb-0 fw-bold">26.80%</h4>
+                      <form method="post">
+                        {% csrf_token %}
+                        <div class="col-sm-12">{{ form.as_p }}</div>
+                        <div class="col-sm-8">
+                          <div class="status-summary-chart-wrapper pb-4">
+                            <button type="button" id="executeCommandButton" class="btn btn-sm btn-primary text-white">Run Command</button>
                           </div>
                         </div>
-                      </div>
-                      <div class="col-sm-6">
-                        <div class="d-flex justify-content-between align-items-center">
-                          <div class="circle-progress-width">
-                            <div id="visitperday" class="progressbar-js-circle pr-2"></div>
-                          </div>
-                          <div>
-                            <p class="text-small mb-2">Visits per day</p>
-                            <h4 class="mb-0 fw-bold">9065</h4>
-                          </div>
-                        </div>
-                      </div>
+                      </form>
                     </div>
                   </div>
                 </div>
@@ -162,64 +135,14 @@
                   <div class="card-body">
                     <div class="d-sm-flex justify-content-between align-items-start">
                       <div>
-                        <h4 class="card-title card-title-dash">Market Overview</h4>
-                        <p class="card-subtitle card-subtitle-dash">Lorem ipsum dolor sit amet consectetur adipisicing elit</p>
-                      </div>
-                      <div>
-                        <div class="dropdown">
-                          <button class="btn btn-secondary dropdown-toggle toggle-dark btn-lg mb-0 me-0" type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">This month</button>
-                          <div class="dropdown-menu" aria-labelledby="dropdownMenuButton2">
-                            <h6 class="dropdown-header">Settings</h6>
-                            <a class="dropdown-item" href="#">Action</a>
-                            <a class="dropdown-item" href="#">Another action</a>
-                            <a class="dropdown-item" href="#">Something else here</a>
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="#">Separated link</a>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="d-sm-flex align-items-center mt-1 justify-content-between">
-                      <div class="d-sm-flex align-items-center mt-4 justify-content-between">
-                        <h2 class="me-2 fw-bold">$36,2531.00</h2><h4 class="me-2">USD</h4><h4 class="text-success">(+1.37%)</h4>
-                      </div>
-                      <div class="me-3">
-                        <div id="marketing-overview-legend"></div>
-                      </div>
-                    </div>
-                    <div class="chartjs-bar-wrapper mt-3">
-                      <canvas id="marketingOverview"></canvas>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="row flex-grow">
-              <div class="col-12 grid-margin stretch-card">
-                <div class="card card-rounded table-darkBGImg">
-                  <div class="card-body">
-                    <div class="col-sm-8">
-                      <h3 class="text-white upgrade-info mb-0">Enhance your <span class="fw-bold">Campaign</span> for better outreach</h3>
-                      <a href="#" class="btn btn-info upgrade-btn">Upgrade Account!</a>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="row flex-grow">
-              <div class="col-12 grid-margin stretch-card">
-                <div class="card card-rounded">
-                  <div class="card-body">
-                    <div class="d-sm-flex justify-content-between align-items-start">
-                      <div>
                         <h4 class="card-title card-title-dash">Pending Requests</h4>
                         <p class="card-subtitle card-subtitle-dash">You have 50+ new requests</p>
                       </div>
                       <div>
-                        <button class="btn btn-primary btn-lg text-white mb-0 me-0" type="button"><i class="mdi mdi-account-plus"></i>Add new member</button>
+                        <a class="btn btn-primary btn-lg text-white mb-0 me-0" href="{% url 'create_user' %}"><i class="mdi mdi-account-plus"></i>Add new member</a>
                       </div>
                     </div>
-                    <div class="table-responsive mt-1">
+                    <div class="dt-responsive table-responsive mt-1">
                       <table class="table select-table">
                         <thead>
                           <tr>
@@ -228,183 +151,43 @@
                                 <label class="form-check-label"><input type="checkbox" class="form-check-input" aria-checked="false" /><i class="input-helper"></i></label>
                               </div>
                             </th>
-                            <th>Customer</th>
-                            <th>Company</th>
-                            <th>Progress</th>
-                            <th>Status</th>
+                            <th>User</th>
+                            <th>Designation</th>
+                            <th>Last Login</th>
+                            <th>Active</th>
                           </tr>
                         </thead>
                         <tbody>
-                          <tr>
-                            <td>
-                              <div class="form-check form-check-flat mt-0">
-                                <label class="form-check-label"><input type="checkbox" class="form-check-input" aria-checked="false" /><i class="input-helper"></i></label>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="d-flex">
-                                <img src="{% static 'images/faces/face1.jpg' %}" alt="" />
-                                <div>
-                                  <h6>Brandon Washington</h6>
-                                  <p>Head admin</p>
+                          {% for muser in users %}
+                            <tr>
+                              <td>
+                                <div class="form-check form-check-flat mt-0">
+                                  <label class="form-check-label"><input type="checkbox" class="form-check-input" aria-checked="false" /><i class="input-helper"></i></label>
                                 </div>
-                              </div>
-                            </td>
-                            <td>
-                              <h6>Company name 1</h6>
-                              <p>company type</p>
-                            </td>
-                            <td>
-                              <div>
-                                <div class="d-flex justify-content-between align-items-center mb-1 max-width-progress-wrap">
-                                  <p class="text-success">79%</p>
-                                  <p>85/162</p>
+                              </td>
+                              <td>
+                                <div class="d-flex">
+                                  <img {% if muser.personal_detail.avatar %} src="{{muser.personal_detail.avatar.url}}" {% else %} src="{% static 'images/faces/face1.jpg' %}"{% endif %} alt="" />
+                                  <div>
+                                    <h6>{{ muser.username }}</h6> <!-- Display the username -->
+                                    <p>{{ muser.get_full_name }}</p> <!-- Optionally display the full name of the user -->
+                                  </div>
                                 </div>
-                                <div class="progress progress-md">
-                                  <div class="progress-bar bg-success" role="progressbar" style="width: 85%" aria-valuenow="25" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="badge badge-opacity-warning">In progress</div>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td>
-                              <div class="form-check form-check-flat mt-0">
-                                <label class="form-check-label"><input type="checkbox" class="form-check-input" aria-checked="false" /><i class="input-helper"></i></label>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="d-flex">
-                                <img src="{% static 'images/faces/face2.jpg' %}" alt="" />
-                                <div>
-                                  <h6>Laura Brooks</h6>
-                                  <p>Head admin</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <h6>Company name 1</h6>
-                              <p>company type</p>
-                            </td>
-                            <td>
-                              <div>
-                                <div class="d-flex justify-content-between align-items-center mb-1 max-width-progress-wrap">
-                                  <p class="text-success">65%</p>
-                                  <p>85/162</p>
-                                </div>
-                                <div class="progress progress-md">
-                                  <div class="progress-bar bg-success" role="progressbar" style="width: 65%" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="badge badge-opacity-warning">In progress</div>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td>
-                              <div class="form-check form-check-flat mt-0">
-                                <label class="form-check-label"><input type="checkbox" class="form-check-input" aria-checked="false" /><i class="input-helper"></i></label>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="d-flex">
-                                <img src="{% static 'images/faces/face3.jpg' %}" alt="" />
-                                <div>
-                                  <h6>Wayne Murphy</h6>
-                                  <p>Head admin</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <h6>Company name 1</h6>
-                              <p>company type</p>
-                            </td>
-                            <td>
-                              <div>
-                                <div class="d-flex justify-content-between align-items-center mb-1 max-width-progress-wrap">
-                                  <p class="text-success">65%</p>
-                                  <p>85/162</p>
-                                </div>
-                                <div class="progress progress-md">
-                                  <div class="progress-bar bg-warning" role="progressbar" style="width: 38%" aria-valuenow="38" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="badge badge-opacity-warning">In progress</div>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td>
-                              <div class="form-check form-check-flat mt-0">
-                                <label class="form-check-label"><input type="checkbox" class="form-check-input" aria-checked="false" /><i class="input-helper"></i></label>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="d-flex">
-                                <img src="{% static 'images/faces/face4.jpg' %}" alt="" />
-                                <div>
-                                  <h6>Matthew Bailey</h6>
-                                  <p>Head admin</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <h6>Company name 1</h6>
-                              <p>company type</p>
-                            </td>
-                            <td>
-                              <div>
-                                <div class="d-flex justify-content-between align-items-center mb-1 max-width-progress-wrap">
-                                  <p class="text-success">65%</p>
-                                  <p>85/162</p>
-                                </div>
-                                <div class="progress progress-md">
-                                  <div class="progress-bar bg-danger" role="progressbar" style="width: 15%" aria-valuenow="15" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="badge badge-opacity-danger">Pending</div>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td>
-                              <div class="form-check form-check-flat mt-0">
-                                <label class="form-check-label"><input type="checkbox" class="form-check-input" aria-checked="false" /><i class="input-helper"></i></label>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="d-flex">
-                                <img src="{% static 'images/faces/face5.jpg' %}" alt="" />
-                                <div>
-                                  <h6>Katherine Butler</h6>
-                                  <p>Head admin</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <h6>Company name 1</h6>
-                              <p>company type</p>
-                            </td>
-                            <td>
-                              <div>
-                                <div class="d-flex justify-content-between align-items-center mb-1 max-width-progress-wrap">
-                                  <p class="text-success">65%</p>
-                                  <p>85/162</p>
-                                </div>
-                                <div class="progress progress-md">
-                                  <div class="progress-bar bg-success" role="progressbar" style="width: 65%" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100"></div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <div class="badge badge-opacity-success">Completed</div>
-                            </td>
-                          </tr>
+                              </td>
+                              <td>
+                                <h6>{{ muser.personal_detail.designation.designation }}</h6>
+                                <p>{{ muser.personal_detail.designation.department.department|upper }}</p>
+                              </td>
+                              <td>{{ muser.last_login }}</td>
+                              <td>
+                                {% if muser.is_active %}
+                                  <i class="fas fa-check-circle text-success"></i> <!-- Green check icon -->
+                                {% else %}
+                                  <i class="fas fa-times-circle text-danger"></i> <!-- Red cross icon -->
+                                {% endif %}
+                              </td>
+                            </tr>
+                          {% endfor %}
                         </tbody>
                       </table>
                     </div>
@@ -412,10 +195,7 @@
                 </div>
               </div>
             </div>
-
             <div class="row flex-grow">
-              {% include 'admin/includes/recent_logs.html' %}
-
               <div class="col-md-6 col-lg-6 grid-margin stretch-card">
                 <div class="card card-rounded">
                   <div class="card-body">
@@ -559,12 +339,10 @@
                 <div class="card card-rounded">
                   <div class="card-body">
                     <div class="row">
-                      <div class="col-lg-12">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                          <h4 class="card-title card-title-dash">Type By Amount</h4>
+                      <div class="col-lg-12 " style="max-height: 500px; overflow-y: auto;">
+                        <div  class="d-flex justify-content-between align-items-center mb-3">
+                          {% include 'admin/includes/recent_logs.html' %}
                         </div>
-                        <canvas class="my-auto" id="doughnutChart" height="200"></canvas>
-                        <div id="doughnut-chart-legend" class="mt-5 text-center"></div>
                       </div>
                     </div>
                   </div>
@@ -677,6 +455,56 @@
 {% endblock %}
 
 {% block extra_js %}
-
   <!-- End custom js for this page -->
+  <script>
+    // Function to get CSRF token
+    function getCSRFToken() {
+      const cookies = document.cookie.split('; ')
+      for (let cookie of cookies) {
+        const [name, value] = cookie.split('=')
+        if (name === 'csrftoken') {
+          return value
+        }
+      }
+      return null
+    }
+    
+    $(document).ready(function () {
+      $('#executeCommandButton').click(function (e) {
+        e.preventDefault() // Prevent the default form submission behavior
+    
+        // Collect data from the form fields
+        const username = $('#id_user').val()
+        const from_date = $('#id_from_date').val()
+        const to_date = $('#id_to_date').val()
+    
+        // Perform a POST request
+        $.ajax({
+          url: `{% url 'execute_populate_attendance' %}`,
+          type: 'POST',
+          headers: {
+            'X-CSRFToken': getCSRFToken() // Use CSRF token from cookies
+          },
+          data: JSON.stringify({
+            username: username,
+            from_date: from_date,
+            to_date: to_date
+          }),
+          contentType: 'application/json',
+          success: function (response) {
+            alert(response.message) // Display success message
+          },
+          error: function (xhr) {
+            const errorMessage = xhr.responseJSON?.error || 'An error occurred'
+            alert(`Error: ${errorMessage}`) // Display error message
+          }
+        })
+      })
+      $('.table').DataTable({
+        paging: true,
+        searching: true,
+        ordering: false
+      })
+    })
+  </script>
 {% endblock %}

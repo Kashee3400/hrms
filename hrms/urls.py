@@ -3,11 +3,16 @@ from django.urls import path,include
 from hrms_app.hrms.sites import site
 from django.conf.urls.static import static
 from hrms_app.views.views import *
+# urls.py
+
+from django.conf.urls import handler403
+
+handler403 = custom_permission_denied
+
 
 urlpatterns = [
     path('admin/doc/', include('django.contrib.admindocs.urls')),
     path('admin/', admin.site.urls),
-    path('check-user-balance/', check_user_balance, name='check_user_balance'),
     path('leaves/', LeaveApplicationListView.as_view(), name='leave-application-list'),
     path("save-column-preferences/", save_column_preferences, name="save_column_preferences"),
     path('', include(site.get_urls())),

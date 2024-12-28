@@ -8,12 +8,13 @@
 
   <ul class="nav flex-column">
     {% if request.user.is_superuser %}
-    <li class="nav-item {% if request.path == '/admin/'%} active {% endif %}">
-        <a class="nav-link" href="{% url 'admin:index' %}">
+    {% url 'dashboard' as index_url %}
+      <li class="nav-item {% if request.path == index_url %} active {% endif %}">
+        <a class="nav-link" href="{{index_url}}">
           <i class="mdi mdi-grid-large menu-icon"></i>
           <span class="menu-title">{% trans 'Dashboard' %}</span>
         </a>
-    </li>
+      </li>
     {% endif %}
 
     <!-- Leave Tracker -->
@@ -24,82 +25,104 @@
         <span class="menu-title">{% trans 'Attendance' %}</span>
       </a>
     </li>
-    
-    <!-- Django dynamic menu items -->
-    {% admin_get_menu as app_list %}
-    {% if app_list %}
-      {% for app in app_list %}
-        {% if app.has_perms and not app.pinned %}
-          <li class="nav-item {% if app.app_label in request.path %} active {% endif %}">
-            <a class="nav-link"
-              data-bs-toggle="collapse"
-              href="#submenu-{{ app.app_label }}"
-              aria-expanded="{% if app.app_label in request.path %}
-                true{% else %}false{% endif %}"
-              aria-controls="submenu-{{ app.app_label }}">
-              <i class="menu-icon mdi {% if app.icon %}
-                  {{ app.icon }}
+
+    {% if user.is_superuser or user.is_staff %}
+      <!-- Django dynamic menu items -->
+      {% admin_get_menu as app_list %}
+      {% if app_list %}
+        {% for app in app_list %}
+          {% if app.has_perms and not app.pinned %}
+            <li class="nav-item {% if app.app_label in request.path %} active {% endif %}">
+              <a class="nav-link"
+                data-bs-toggle="collapse"
+                href="#submenu-{{ app.app_label }}"
+                aria-expanded="{% if app.app_label in request.path %}
+                  
+                  
+                
+                
+                true
+
+
+
                 {% else %}
+                  
+                  
+                
+                false
+
+
+
+                {% endif %}"
+                aria-controls="submenu-{{ app.app_label }}">
+                <i class="menu-icon mdi {% if app.icon %}
+                    {{ app.icon }}
+                  {% else %}
+                    
+                    
+                  
+                  
                   mdi-octagon
-                {% endif %}">
-              </i>
-              <span class="menu-title">{{ app.label|slice:10 }}{% if app.label|length > 10 %}..{% endif %}</span>
-              <i class="menu-arrow"></i>
-            </a>
-            <div class="collapse {% if app.app_label in request.path %}show{% endif %}" id="submenu-{{ app.app_label }}">
-              {% if app.models %}
-                <ul class="nav flex-column sub-menu">
-                  {% for model in app.models %}
-                    {% if model.url %}
-                      <li class="nav-item">
-                        <a class="nav-link {% if model.url in request.path %} active {% endif %}" href="{{ model.url }}"><p>{{ model.label }}</p></a>
-                      </li>
-                    {% else %}
-                      <li class="nav-item">{{ model.label }}</li>
-                    {% endif %}
-                  {% endfor %}
-                </ul>
-              {% endif %}
-            </div>
-          </li>
-        {% endif %}
-      {% endfor %}
+
+
+
+
+                  {% endif %}">
+
+                </i>
+                <span class="menu-title">{{ app.label|slice:10 }}{% if app.label|length > 10 %}..{% endif %}</span>
+                <i class="menu-arrow"></i>
+              </a>
+              <div class="collapse {% if app.app_label in request.path %}show{% endif %}" id="submenu-{{ app.app_label }}">
+                {% if app.models %}
+                  <ul class="nav flex-column sub-menu">
+                    {% for model in app.models %}
+                      {% if model.url %}
+                        <li class="nav-item">
+                          <a class="nav-link {% if model.url in request.path %} active {% endif %}" href="{{ model.url }}"><p>{{ model.label }}</p></a>
+                        </li>
+                      {% else %}
+                        <li class="nav-item">{{ model.label }}</li>
+                      {% endif %}
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </div>
+            </li>
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+      <!-- Loop through all registered URLs -->
+
+      <!-- HRMS URLs (manually registered) -->
+      {% url 'employees' as employees_url %}
+      {% url 'create_user' as create_user_url %}
+      <li class="nav-item nav-category">Employee</li>
+      <li class="nav-item {% if request.path|is_active:employees_url|add:create_user_url %} active {% endif %}">
+        <a class="nav-link" data-bs-toggle="collapse" href="#emp" aria-expanded="{{ request.path|is_active:employees_url|add:create_user_url }}" aria-controls="emp">
+          <i class="mdi mdi-account-group menu-icon"></i>
+          <span class="menu-title">Employees</span>
+          <i class="menu-arrow"></i>
+        </a>
+        <div class="collapse {% if request.path|is_active:employees_url|add:create_user_url %} show {% endif %}" id="emp">
+          <ul class="nav flex-column sub-menu">
+            <!-- Employees -->
+            <li class="nav-item {% if request.path == employees_url %} active {% endif %}">
+              <a class="nav-link" href="{{ employees_url }}">
+                <i class="mdi mdi-account-group menu-icon"></i>
+                <span class="menu-title">{% trans 'Employees' %}</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.path == create_user_url %} active {% endif %}">
+              <a class="nav-link" href="{{ create_user_url }}">
+                <i class="mdi mdi-account-plus menu-icon"></i>
+                <span class="menu-title">{% trans 'Create User' %}</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
     {% endif %}
-
-    <!-- Loop through all registered URLs -->
-
-    <!-- HRMS URLs (manually registered) -->
-    {% url 'employees' as employees_url %}
-    {% url 'create_user' as create_user_url %}
-    <li class="nav-item nav-category">Employee</li>
-    <li class="nav-item {% if request.path|is_active:employees_url|add:create_user_url %} active {% endif %}">
-      <a class="nav-link"
-        data-bs-toggle="collapse"
-        href="#emp"
-        aria-expanded="{{ request.path|is_active:employees_url|add:create_user_url }}"
-        aria-controls="emp">
-        <i class="mdi mdi-account-group menu-icon"></i>
-        <span class="menu-title">Employees</span>
-        <i class="menu-arrow"></i>
-      </a>
-      <div class="collapse {% if request.path|is_active:employees_url|add:create_user_url %} show {% endif %}" id="emp">
-        <ul class="nav flex-column sub-menu">
-          <!-- Employees -->
-          <li class="nav-item {% if request.path == employees_url %} active {% endif %}">
-            <a class="nav-link" href="{{ employees_url }}">
-              <i class="mdi mdi-account-group menu-icon"></i>
-              <span class="menu-title">{% trans 'Employees' %}</span>
-            </a>
-          </li>
-          <li class="nav-item {% if request.path == create_user_url %} active {% endif %}">
-            <a class="nav-link" href="{{ create_user_url }}">
-              <i class="mdi mdi-account-plus menu-icon"></i>
-              <span class="menu-title">{% trans 'Create User' %}</span>
-            </a>
-          </li>
-        </ul>
-      </div>
-    </li>
 
     <!-- Leave Tracker -->
     {% url 'leave_tracker' as leave_tracker_url %}
@@ -119,24 +142,25 @@
       </a>
     </li>
 
-
-    <!-- Attendance Report -->
-    {% url 'attendance_report' as attendance_report_url %}
-    <li class="nav-item {% if request.path == attendance_report_url %} active {% endif %}">
-      <a class="nav-link" href="{{ attendance_report_url }}">
-        <i class="mdi mdi-file-document menu-icon"></i>
-        <span class="menu-title">{% trans 'Attendance Report' %}</span>
-      </a>
-    </li>
-    <!-- Attendance Report -->
+    {% if user.is_superuser or user.is_staff %}
+      <!-- Attendance Report -->
+      {% url 'attendance_report' as attendance_report_url %}
+      <li class="nav-item {% if request.path == attendance_report_url %} active {% endif %}">
+        <a class="nav-link" href="{{ attendance_report_url }}">
+          <i class="mdi mdi-file-document menu-icon"></i>
+          <span class="menu-title">{% trans 'Attendance Report' %}</span>
+        </a>
+      </li>
+    {% endif %}
+    <!-- Regularizations -->
     {% url 'regularization' as regularization_url %}
     <li class="nav-item {% if request.path == regularization_url %} active {% endif %}">
       <a class="nav-link" href="{{ regularization_url }}">
-        <i class="mdi mdi-file-document menu-icon"></i>
+        <!-- Update to check-circle or clipboard icon -->
+        <i class="mdi mdi-check-circle menu-icon"></i>
         <span class="menu-title">{% trans 'Regularizations' %}</span>
       </a>
     </li>
-
   </ul>
 </nav>
 <script>

@@ -575,6 +575,14 @@ class Family(models.Model):
 
 
 class PersonalDetails(models.Model):
+
+    salutation = models.CharField(
+        max_length=10,
+        choices=settings.SALUTATION_CHOICES,
+        default="Mr.",
+        verbose_name=_("Salutation"),
+        help_text=_("Select the salutation for the employee."),
+    )
     employee_code = models.CharField(
         max_length=100,
         unique=True,
@@ -1049,6 +1057,7 @@ class LeaveApplication(models.Model):
         verbose_name=_("Status"),
         help_text=_("Current status of the leave application."),
     )
+
     startDayChoice = models.CharField(
         max_length=20,
         default=settings.FULL_DAY,
@@ -1187,7 +1196,6 @@ class LeaveDay(models.Model):
 
     class Meta:
         unique_together = ("leave_application", "date")
-
 
 class OfficeLocation(models.Model):
     id = models.UUIDField(
@@ -1407,7 +1415,7 @@ class LeaveType(models.Model):
         null=True,
         verbose_name=_("Maximum Days Limit"),
         help_text=_(
-            "Set the maximum number of consecutive days that can be taken for this leave type."
+            "Set the maximum number of days that can be taken for this leave type."
         ),
     )
     min_days_limit = models.FloatField(
@@ -1415,7 +1423,7 @@ class LeaveType(models.Model):
         null=True,
         verbose_name=_("Minimum Days Limit"),
         help_text=_(
-            "Set the minimum number of consecutive days that can be taken for this leave type."
+            "Set the minimum number of days that can be taken for this leave type."
         ),
     )
     allowed_days_per_year = models.FloatField(
@@ -1519,6 +1527,39 @@ class LeaveType(models.Model):
         managed = True
         verbose_name = _("Leave Type")
         verbose_name_plural = _("Leave Types")
+
+
+class LeaveStatusPermission(models.Model):
+    role = models.CharField(max_length=100, blank=True, null=True, verbose_name="Role")
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        verbose_name="User",
+    )
+    leave_type= models.ForeignKey(
+        LeaveType,
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        verbose_name="Leave Type",
+    )
+    status = models.CharField(
+        max_length=30,
+        choices=settings.LEAVE_STATUS_CHOICES,
+        verbose_name="Leave Status",
+    )
+
+    class Meta:
+        unique_together = ("role", "user", "status")
+        verbose_name = "Leave Status Permission"
+        verbose_name_plural = "Leave Status Permissions"
+
+    def __str__(self):
+        if self.user:
+            return f"{self.user} -> {self.status}"
+        return f"{self.role} -> {self.status}"
 
 
 class LeaveBalanceOpenings(models.Model):
@@ -2143,6 +2184,7 @@ class UserTour(models.Model):
         null=True,
         help_text=_("Select the end time of the tour."),
     )
+    
     updated_at = models.DateTimeField(auto_now=True, verbose_name=_("Updated At"))
     created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Created At"))
     remarks = models.TextField(
@@ -2574,6 +2616,7 @@ class AttendanceLog(models.Model):
             raise ValidationError(_("To date must be after from date."))
 
     def save(self, *args, **kwargs):
+        # Automatically generate slug if not provided
         if not self.slug:
             self.slug = slugify(self.title)
         super(AttendanceLog, self).save(*args, **kwargs)
@@ -2582,18 +2625,12 @@ class AttendanceLog(models.Model):
         return self.title
 
     def approve(self, action_by, reason=None):
-        self.status = settings.APPROVED
-        self.att_status_short_code = "P"
-        self.att_status = settings.PRESENT
         self.save(
             update_fields=[
-                "status",
                 "updated_at",
-                "att_status_short_code",
-                "att_status",
             ]
         )
-        self.add_action(action=self.status, performed_by=action_by, comment=reason)
+        self.add_action(action=settings.APPROVED, performed_by=action_by, comment=reason)
 
     def reject(self, action_by, reason=None):
         self.status = settings.REJECTED
@@ -2628,6 +2665,48 @@ class AttendanceLog(models.Model):
             self, action=action, action_by=performed_by, notes=comment
         )
 
+class AttendanceLogHistory(models.Model):
+    attendance_log = models.ForeignKey(AttendanceLog, on_delete=models.CASCADE, related_name='history')
+    previous_data = models.JSONField()  # Store the old data
+    modified_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True)
+    modified_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"History for {self.attendance_log} at {self.modified_at}"
+
+    def revert(self):
+        """
+        Reverts the associated AttendanceLog to the state in previous_data.
+        Handles foreign key relationships correctly by assigning the instances.
+        """
+        for field, value in self.previous_data.items():
+            # If the field is a ForeignKey, assign the actual instance, not just the ID
+            try:
+                field_object = self.attendance_log._meta.get_field(field)
+                if isinstance(field_object, models.ForeignKey):
+                    # Assuming `value` is the ID, we need to get the related instance
+                    related_model = field_object.related_model
+                    if value is not None:
+                        value = related_model.objects.get(id=value)  # Get the related instance
+            except models.FieldDoesNotExist:
+                pass  # Skip fields that do not exist on the model
+
+            setattr(self.attendance_log, field, value)
+
+        self.attendance_log.save()
+
+    class Meta:
+        verbose_name = "Attendance Log History"
+        verbose_name_plural = "Attendance Log Histories"
+        ordering = ['-modified_at']
+        db_table = "attendance_log_history"
+        indexes = [
+            models.Index(fields=['attendance_log']),  # Index for faster queries on attendance_log
+            models.Index(fields=['modified_at']),     # Index for filtering/sorting by modified_at
+        ]
+        permissions = [
+            ("can_view_history", "Can view attendance log history"),
+        ]
 
 class AttendanceLogAction(models.Model):
     log = models.ForeignKey(
@@ -2784,3 +2863,31 @@ class OffDay(models.Model):
 
     def __str__(self):
         return f"{self.employee} - {self.date} - {self.off_type}"
+
+
+class LockStatus(models.Model):
+    LOCK_CHOICES = (
+        ('locked', _('Locked')),
+        ('unlocked', _('Unlocked')),
+    )
+
+    is_locked = models.CharField(
+        max_length=10,
+        choices=LOCK_CHOICES,
+        default='unlocked',
+        verbose_name=_("Lock Status"),
+        help_text=_("Determines whether certain models are locked for modifications."),
+    )
+    reason = models.TextField(null=True, blank=True, verbose_name=_("Lock Reason"), help_text=_("The reason for locking the actions."))
+    locked_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Lock Timestamp"))
+    from_date = models.DateField(blank=True,null=True,help_text=_("Provide the from date to lock the attendance"),verbose_name=_("From Date"))
+    to_date = models.DateField(blank=True,null=True,help_text=_("Provide the to date to lock the attendance"),verbose_name=_("To Date"))
+    lock_month = models.PositiveIntegerField(null=True, blank=True, verbose_name=_("Lock Month"))
+    lock_year = models.PositiveIntegerField(null=True, blank=True, verbose_name=_("Lock Year"))
+    
+    def __str__(self):
+        return f"Lock Status: {self.is_locked} - Reason: {self.reason or 'No reason provided'}"
+    
+    class Meta:
+        verbose_name = _("Lock Status")
+        verbose_name_plural = _("Lock Statuses")

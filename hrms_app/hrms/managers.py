@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from datetime import datetime, timedelta
+from django.utils.timezone import is_naive, make_aware
+import pytz
 
 class AttendanceStatusHandler:
     def __init__(self, user_shift, full_day_hours, half_day_color, present_color, absent_color):
@@ -15,7 +17,7 @@ class AttendanceStatusHandler:
         login_date_time, # this is the user's logged in date and time
         logout_date_time,  # this is the user's logged out date and time
         total_duration, # this is the user's total working duration
-        user_expected_logout_time,   # this is the user's  user expected logout time
+        user_expected_logout_time,
         user_expected_logout_date_time,  # this is the user's  user expected logout date time
     ):
         total_hours = total_duration.total_seconds() / 3600
@@ -54,6 +56,7 @@ class AttendanceStatusHandler:
             rto_date,
             reg_duration,
             att_status_short_code,
+            None
         )
 
     def _is_full_day(self, login_date_time, logout_date_time, total_hours, user_expected_logout_date_time):
@@ -95,12 +98,27 @@ class AttendanceStatusHandler:
             "P",
         )
 
+
     def _handle_late_coming(self, login_date_time, user_shift, half_day_color):
+        # Define the Asia/Kolkata timezone
+        kolkata_timezone = pytz.timezone('Asia/Kolkata')
+
+        # Ensure login_date_time is timezone-aware
+        if is_naive(login_date_time):
+            login_date_time = make_aware(login_date_time, timezone=kolkata_timezone)
+
+        # Create rfrom_date as timezone-aware
         str_from_date = f"{login_date_time.date()} {user_shift.grace_start_time}"
         rfrom_date = datetime.strptime(str_from_date, "%Y-%m-%d %H:%M:%S")
+        rfrom_date = make_aware(rfrom_date, timezone=kolkata_timezone)
+
+        # Calculate rto_date and rtotal_duration
         rto_date = login_date_time
-        rtotal_duration = (rto_date - rfrom_date)
+        rtotal_duration = rto_date - rfrom_date
+
+        # Convert rtotal_duration to a time object
         reg_duration = (datetime.min + rtotal_duration).time()
+
         return (
             settings.HALF_DAY,
             half_day_color.color_hex,
@@ -114,13 +132,29 @@ class AttendanceStatusHandler:
         )
 
     def _handle_early_going(self, logout_date_time, user_shift, user_expected_logout_date_time, half_day_color):
+        # Define the Asia/Kolkata timezone
+        kolkata_timezone = pytz.timezone('Asia/Kolkata')
+        
+        # Ensure logout_date_time and user_expected_logout_date_time are timezone-aware
+        if is_naive(logout_date_time):
+            logout_date_time = make_aware(logout_date_time, timezone=kolkata_timezone)
+        
+        if is_naive(user_expected_logout_date_time):
+            user_expected_logout_date_time = make_aware(user_expected_logout_date_time, timezone=kolkata_timezone)
+        
         rfrom_date = logout_date_time
+
+        # Recalculate user_expected_logout_date_time if needed
         if user_expected_logout_date_time.time() < user_shift.end_time:
             str_to_date = f"{logout_date_time.date()} {user_shift.end_time}"
             user_expected_logout_date_time = datetime.strptime(str_to_date, "%Y-%m-%d %H:%M:%S")
+            # Make the recalculated datetime timezone-aware
+            user_expected_logout_date_time = make_aware(user_expected_logout_date_time, timezone=kolkata_timezone)
+        
         rto_date = user_expected_logout_date_time
         rtotal_duration = rto_date - rfrom_date
         reg_duration = (datetime.min + rtotal_duration).time()
+
         return (
             settings.HALF_DAY,
             half_day_color.color_hex,

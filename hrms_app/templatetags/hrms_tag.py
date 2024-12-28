@@ -101,6 +101,68 @@ def render_employee_navigation(context):
         'is_parent_active': any(item['is_active'] for item in navigation_items)
     }
 
+
+
+from ..models import LeaveType, LeaveBalanceOpenings, LeaveApplication
+
+@register.inclusion_tag('leave_balances/leave_balance_list.html')
+def get_leave_balances(user):
+    """Fetch leave balances for the user."""
+    try:
+        leave_types = LeaveType.objects.all()
+        leave_balances = LeaveBalanceOpenings.objects.filter(
+            user=user, leave_type__in=leave_types
+        )
+        leave_balances_dict = {lb.leave_type: lb for lb in leave_balances}
+
+        # Fetch pending leave applications
+        pending_leaves = LeaveApplication.objects.filter(
+            appliedBy__in=user.employees.all(), status=settings.PENDING
+        )
+
+        leave_balances_list = []
+        for lb in leave_balances:
+            # Calculate on hold used leave
+            on_hold_leave = sum(
+                leave.usedLeave for leave in pending_leaves if leave.leave_type == lb.leave_type
+            )
+            leave_balances_list.append(
+                {
+                    "balance": lb.remaining_leave_balances,
+                    "on_hold": on_hold_leave,
+                    "total_balance": lb.remaining_leave_balances - on_hold_leave,
+                    "leave_type": lb.leave_type,
+                    "url": reverse("apply_leave_with_id", args=[lb.leave_type.pk]),
+                    "color": lb.leave_type.color_hex,
+                }
+            )
+
+        # Include maternity leave if applicable
+        if user.personal_detail and user.personal_detail.gender.gender == "Female":
+            ml_balance = leave_balances_dict.get(settings.ML)
+            if ml_balance:
+                on_hold_leave = sum(
+                    leave.usedLeave for leave in pending_leaves if leave.leave_type == ml_balance.leave_type
+                )
+                leave_balances_list.append(
+                    {
+                        "balance": ml_balance.remaining_leave_balances,
+                        "on_hold": on_hold_leave,
+                        "total_balance": ml_balance.remaining_leave_balances - on_hold_leave,
+                        "leave_type": ml_balance.leave_type.leave_type,
+                        "url": reverse(
+                            "apply_leave_with_id", args=[ml_balance.leave_type.id]
+                        ),
+                        "color": "#ff9447",
+                    }
+                )
+
+        return {'leave_balances': leave_balances_list}
+    except LeaveBalanceOpenings.DoesNotExist:
+        return {'leave_balances': []}
+    except Exception as e:
+        return {'leave_balances': []}
+
 from hrms_app.models import AttendanceLog
 
 @register.simple_tag
@@ -181,3 +243,9 @@ def is_active(request_path, urls):
     """
     url_list = urls.split(',')
     return request_path.strip() in url_list
+
+
+
+@register.filter
+def in_list(value, arg):
+    return value in arg.split(',')
