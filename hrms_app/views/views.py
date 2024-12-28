@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from urllib.parse import urlparse
 from hrms_app.utility.leave_utils import format_date
-
+from django.utils.http import urlencode
 # Third-party imports
 from django.http import HttpResponseForbidden, HttpResponseRedirect, JsonResponse
 from django.contrib import messages
@@ -417,7 +417,15 @@ class GenericDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):
 
     def get_success_url(self):
         """Get the URL to redirect to after successful deletion."""
-        return reverse_lazy("leave_tracker")
+        # Extract 'next' parameter from the request
+        # next_url = self.request.GET.get('next')
+        # if next_url:
+        #     # Validate the 'next' URL to ensure it's safe
+        #     parsed_url = urlparse(next_url)
+        #     if parsed_url.netloc == "" or parsed_url.netloc == self.request.get_host():
+        #         return next_url
+        # # Fallback to a default URL
+        return reverse_lazy("calendar")
 
     def delete(self, request, *args, **kwargs):
         """Handle successful deletion."""
@@ -1268,6 +1276,8 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         tour_application = self.get_object()
+        current_url = self.request.get_full_path()
+        
         urls = [
             ("dashboard", {"label": "Dashboard"}),
             ("tour_tracker", {"label": "Tour Tracker"}),
@@ -1279,13 +1289,19 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         context["is_manager"] = (
             self.request.user == tour_application.applied_by.reports_to
         )
+        # Add the 'next' parameter to the delete URL
         context["delete_url"] = reverse(
             "generic_delete",
             kwargs={"model_name": self.model.__name__, "pk": self.get_object().pk},
         )
+        context["delete_url"] += "?" + urlencode({"next": current_url})
+
+        # Add the 'next' parameter to the edit URL
         context["edit_url"] = reverse(
             "tour_application_update", kwargs={"slug": self.get_object().slug}
         )
+        context["edit_url"] += "?" + urlencode({"next": current_url})
+
         context["pdf_url"] = reverse(
             "generate_tour_pdf", kwargs={"slug": self.get_object().slug}
         )
