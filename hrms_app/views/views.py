@@ -64,7 +64,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
     def dispatch(self, request, *args, **kwargs):
         # Check if the user is a superuser
         if not request.user.is_superuser:
-            return PermissionDenied("You do not have permission to access this page.")
+            return HttpResponseForbidden("You do not have permission to access this page.")
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
