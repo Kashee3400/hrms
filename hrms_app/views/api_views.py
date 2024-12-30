@@ -1253,13 +1253,16 @@ class ExecutePopulateAttendanceView(APIView):
         userid = request.data.get("username")
         from_date = request.data.get("from_date")
         to_date = request.data.get("to_date")
+        username = None
         if userid:
             user = get_object_or_404(get_user_model(),pk=userid)
+            username = user.username
+        
         try:
-            call_command("pop_att", "--username", user.username, "--from-date", from_date, "--to-date", to_date)
-            return Response({"message": "Command executed successfully!"}, status=status.HTTP_200_OK)
+            call_command("pop_att", "--username", username, "--from-date", from_date, "--to-date", to_date)
+            return Response({"message": "Data synced successfully!"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response(
-                {"error": f"Failed to execute command: {str(e)}"},
+                {"error": f"Failed to sync data: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

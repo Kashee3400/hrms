@@ -2,14 +2,25 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import datetime, timedelta
 from hrms_app.models import LeaveApplication
-import requests
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from hrms_app.models import Holiday, LockStatus
 from rest_framework.response import Response
 from django.core.exceptions import PermissionDenied
+import logging
+import requests
 
+# Set up logging configuration
+logging.basicConfig(
+    level=logging.DEBUG,  # You can change this to INFO or ERROR based on your needs
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Output to console
+        # Uncomment the following line to log to a file:
+        # logging.FileHandler('api_logs.log')  # Output to a file
+    ]
+)
 
 def send_email(subject, template_name, context, from_email, recipient_list):
     """
@@ -33,12 +44,12 @@ def send_email(subject, template_name, context, from_email, recipient_list):
     )
 
 
+
+
 def call_soap_api(device_instance, from_date, to_date):
     url = device_instance.api_link
     headers = {"Content-Type": "text/xml"}
     params = {"op": "GetTransactionsLog"}
-    print(f"From date: {from_date}")
-    print(f"To date: {to_date}")
     attendance_start_date = device_instance.from_date if from_date is None else from_date
     attendance_to_date = device_instance.to_date if to_date is None else to_date
     body = f"""<?xml version="1.0" encoding="utf-8"?>
@@ -56,46 +67,54 @@ def call_soap_api(device_instance, from_date, to_date):
     </soap:Envelope>
     """
 
-    response = requests.post(url, params=params, data=body, headers=headers)
+    try:
+        response = requests.post(url, params=params, data=body, headers=headers)
+        response.raise_for_status()  # This will raise an exception if the response status code is not 200
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request failed: {e}")
+        return None
+
     if response.status_code == 200:
-        root = ET.fromstring(response.content)
+        try:
+            root = ET.fromstring(response.content)
 
-        # Extracting data from the response
-        log_result = root.find(".//{http://tempuri.org/}GetTransactionsLogResult").text
-        str_data_list = root.find(".//{http://tempuri.org/}strDataList").text
+            # Extracting data from the response
+            log_result = root.find(".//{http://tempuri.org/}GetTransactionsLogResult").text
+            str_data_list = root.find(".//{http://tempuri.org/}strDataList").text
 
-        # Dictionary to store grouped data
-        grouped_data = defaultdict(lambda: defaultdict(list))
+            # Dictionary to store grouped data
+            grouped_data = defaultdict(lambda: defaultdict(list))
 
-        # Splitting and processing each line of str_data_list
-        for line in str_data_list.strip().split("\n"):
-            parts = line.split()
-            if len(parts) >= 2:
-                emp_code = parts[0]
-                log_time_str = " ".join(
-                    parts[1:]
-                )  # Join the remaining parts as log_time_str
+            # Splitting and processing each line of str_data_list
+            for line in str_data_list.strip().split("\n"):
+                parts = line.split()
+                if len(parts) >= 2:
+                    emp_code = parts[0]
+                    log_time_str = " ".join(parts[1:])  # Join the remaining parts as log_time_str
 
-                try:
-                    if not device_instance.include_seconds:
-                        # Remove the seconds part if present
-                        log_time_str = log_time_str.rsplit(":", 1)[0]
-                        time_format = "%Y-%m-%d %H:%M"
-                    else:
-                        time_format = "%Y-%m-%d %H:%M:%S"
+                    try:
+                        if not device_instance.include_seconds:
+                            # Remove the seconds part if present
+                            log_time_str = log_time_str.rsplit(":", 1)[0]
+                            time_format = "%Y-%m-%d %H:%M"
+                        else:
+                            time_format = "%Y-%m-%d %H:%M:%S"
 
-                    log_time = datetime.strptime(log_time_str, time_format)
+                        log_time = datetime.strptime(log_time_str, time_format)
 
-                    date_key = log_time.date()
-                    grouped_data[emp_code][date_key].append(log_time)
-                except ValueError as e:
-                    print(f"Issue parsing line: {line}. Error: {e}")
-            else:
-                print(f"Issue parsing line: {line}. Insufficient data.")
+                        date_key = log_time.date()
+                        grouped_data[emp_code][date_key].append(log_time)
+                    except ValueError as e:
+                        logging.warning(f"Issue parsing line: {line}. Error: {e}")
+                else:
+                    logging.warning(f"Issue parsing line: {line}. Insufficient data.")
 
-        return grouped_data
+            return grouped_data
+        except Exception as e:
+            logging.error(f"Error processing XML response: {e}")
+            return None
     else:
-        print(f"Error: Response returned with status code {response.status_code}")
+        logging.error(f"Error: Response returned with status code {response.status_code}")
         return None
 
 

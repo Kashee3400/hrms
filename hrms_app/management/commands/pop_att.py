@@ -35,12 +35,10 @@ class Command(BaseCommand):
         return half_day_color, present_color, absent_color, asettings
 
     def get_users(self, username):
-        if username:
-            return User.objects.filter(username=username).select_related(
-                "personal_detail"
-            )
+        if username is not None and username != 'None':  # Check for None and 'None' string explicitly
+            return User.objects.filter(username=username).select_related("personal_detail")
         return User.objects.all().select_related("personal_detail")
-
+    
     def get_user_shift(self, user):
         emp_shift = (
             EmployeeShift.objects.filter(employee=user)
@@ -59,45 +57,46 @@ class Command(BaseCommand):
         from_date, to_date = options["from_date"], options["to_date"]
         attendance_logs_to_create = []
         kolkata_tz = pytz.timezone("Asia/Kolkata")
-
         # Iterate over users and match them with API result efficiently
-        for user in users:
-            office_location = user.device_location
-            device_instance = DeviceInformation.objects.filter(device_location=office_location).first()
-            if device_instance is None:
-                continue
-            result = call_soap_api(device_instance=device_instance,from_date=from_date,to_date=to_date)
-            # Prepare to bulk insert attendance logs
+        if users:
+            for user in users:
+                office_location = user.device_location
+                device_instance = DeviceInformation.objects.filter(device_location=office_location).first()
+                if device_instance is None:
+                    continue
+                result = call_soap_api(device_instance=device_instance,from_date=from_date,to_date=to_date)
+                # Prepare to bulk insert attendance logs
 
-            emp_code = user.personal_detail.employee_code
-            if emp_code not in result:
-                continue
-            user_shift = self.get_user_shift(user)
-            if not user_shift:
-                self.stdout.write(f"No shift found for user: {user.get_full_name()}")
-                continue
+                emp_code = user.personal_detail.employee_code
+                if emp_code not in result:
+                    continue
+                user_shift = self.get_user_shift(user)
+                if not user_shift:
+                    self.stdout.write(f"No shift found for user: {user.get_full_name()}")
+                    continue
 
-            # Initialize the handler and creator objects
-            status_handler = AttendanceStatusHandler(
-                user_shift,
-                asettings.full_day_hours,
-                half_day_color,
-                present_color,
-                absent_color,
-            )
-            log_creator = AttendanceLogCreator(kolkata_tz)
-
-            # Process the logs for the user
-            attendance_logs_to_create.extend(
-                self.process_user_attendance(
-                    user, asettings, result[emp_code], log_creator, status_handler
+                # Initialize the handler and creator objects
+                status_handler = AttendanceStatusHandler(
+                    user_shift,
+                    asettings.full_day_hours,
+                    half_day_color,
+                    present_color,
+                    absent_color,
                 )
-            )
+                log_creator = AttendanceLogCreator(kolkata_tz)
 
-        # Bulk create the attendance logs
-        AttendanceLog.objects.bulk_create(attendance_logs_to_create)
-        self.stdout.write("Completed populating AttendanceLog data.")
+                # Process the logs for the user
+                attendance_logs_to_create.extend(
+                    self.process_user_attendance(
+                        user, asettings, result[emp_code], log_creator, status_handler
+                    )
+                )
 
+            # Bulk create the attendance logs
+            AttendanceLog.objects.bulk_create(attendance_logs_to_create)
+            self.stdout.write("Completed populating AttendanceLog data.")
+        else:
+            self.stdout.write("No Users found.")
     def process_user_attendance(self, user, asettings, logs, log_creator, status_handler):
         attendance_logs = []
         full_day_hours = asettings.full_day_hours

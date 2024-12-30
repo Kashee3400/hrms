@@ -206,7 +206,6 @@ class PersonalDetailAdmin(admin.ModelAdmin):
     # Add filters
     list_filter = (
         'gender',
-        'designation',
         'religion',
         'marital_status',
         'doj',
