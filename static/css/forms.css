@@ -149,13 +149,11 @@ form .aligned ul li {
     /*list-style: none;*/
 }
 input[type="text"],
-input[type="number"],
 input[type="email"],
 input[type="password"],
 select {
     display: block;
     width: 100%;
-    height: auto;
     padding: 0.5rem 20px;
     font-size: 0.875rem;
     font-weight: 400;

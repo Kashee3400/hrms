@@ -113,15 +113,13 @@
       $(document).ready(function () {
         // Initialize datepicker for fields with vDateField class
         $('.vDateField').each(function () {
-          var fieldValue = $(this).val()
-          var dateValue = fieldValue;
-          $(this)
-            .datepicker({
-              dateFormat: 'yy-mm-dd', // Adjust the date format as needed
+          var fieldValue = $(this).val();
+          var dateValue = new Date(fieldValue); // Manually parse the date string
+          $(this).datepicker({
+              dateFormat: 'yy-mm-dd', // Ensure the correct date format
               defaultDate: dateValue
-            })
-            .datepicker('setDate', dateValue)
-        })
+          });
+      });
       
         // Initialize timepicker for fields with vTimeField class
       
@@ -134,7 +132,6 @@
               showMeridian: false, // Use 24-hour format
               defaultTime: timeValue
             })
-            .timepicker('setTime', timeValue)
         })
       })
     </script>
