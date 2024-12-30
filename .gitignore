@@ -49,3 +49,7 @@ secrets.json
 *.bak
 *.dat
 *.dir
+
+celerybeat-schedule.bak
+celerybeat-schedule.dat
+celerybeat-schedule.dir
