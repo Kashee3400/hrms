@@ -11,9 +11,21 @@ import base64
 from decouple import config
 import os
 import subprocess
+import logging
 
 
 USER = get_user_model()
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),  # Output to console
+        # Uncomment the following line to log to a file:
+        # logging.FileHandler('api_logs.log')  # Output to a file
+    ]
+)
+
 
 @shared_task
 def send_leave_application_notifications(application_id, protocol, domain):
@@ -124,6 +136,8 @@ def send_tour_notifications(tour_id, protocol, domain):
 @shared_task
 def send_tour_application_email(subject, message, recipient_list):
     send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
+    logging.info("Tour application status email sent")
+    
 
 
 @shared_task
@@ -168,15 +182,17 @@ def send_regularization_notification(regularization_id, protocol, domain):
         f"You can review the tour detail at the following link:"
     )
     send_email(
-        "Tour Application Status",
+        "Regularization Status",
         manager_content,
         manager.official_email if manager.official_email else manager.email,
     )
+    logging.info("Regularization Status email sent")
 
 
 @shared_task
 def send_regularization_email(subject, message, recipient_list):
     send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
+    logging.info("Tour Application Status sent")
 
 @shared_task
 def populate_attendance_log():
@@ -196,6 +212,8 @@ def send_reminder_email():
         ['all@kasheemilk.com'],
     )
     email.send()
+    logging.info(f"reminder mail sent at {timezone.now()}")
+    
     
 
 def send_greeting_email(obj, occasion_type):
@@ -204,13 +222,13 @@ def send_greeting_email(obj, occasion_type):
     occasion_name = None
     
     if occasion_type == 'birthday':
-        date_to_check = obj.dob
+        date_to_check = obj.birthday
         occasion_name = WishingCard.BirthdayCard
     elif occasion_type == 'marriage_anniversary':
-        date_to_check = obj.anniversary
+        date_to_check = obj.ann_date
         occasion_name = WishingCard.MarriageAnniversaryCard
     elif occasion_type == 'job_anniversary':
-        date_to_check = obj.date_of_joining
+        date_to_check = obj.doj
         occasion_name = WishingCard.JobAnniversaryCard
     
     if date_to_check and date_to_check.day == today.day and date_to_check.month == today.month:
@@ -240,8 +258,10 @@ def send_greeting_email(obj, occasion_type):
             )
             emp_email.attach_alternative(html_content, 'text/html')  # Attach HTML content with base64-encoded image
             emp_email.send()
+            logging.info(f"Greeting email sent: {timezone.now()}")
         except Exception as e:
-            print(f"Error sending {occasion_name} email: {e}")
+            logging.error(f"Error while sending the greeting email: {e}")
+            
 
 @shared_task
 def send_greeting_emails():
@@ -297,23 +317,21 @@ def backup_database(include_schema=True):
         dept = Department.objects.get(department='IT')
         emp_emails = PersonalDetails.objects.filter(designation__department=dept).values_list('user__email', flat=True)
         send_backup_email('Database backup successful:', message, emp_emails)
-        print('Backup successful')
         return True
     return False
 
 def send_backup_email(subject, message, recipients):
     from django.core.mail import EmailMessage
     emp_email = EmailMessage(subject, message, settings.DEFAULT_FROM_EMAIL, recipients)
+    logging.info(f"Backup email sent")
     emp_email.send()
 
 def create_backup(DB_NAME, backup_dir, mysqldump_cmd, backup_name, error_message, seven_zip_path):
     if subprocess.call(mysqldump_cmd, shell=True) != 0:
-        print(error_message)
         return False
     backup_zip_name = f'{backup_dir}/{DB_NAME}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.zip'
     seven_zip_cmd = f'"{seven_zip_path}" a -tzip "{backup_zip_name}" "{backup_name}"'
     if subprocess.call(seven_zip_cmd, shell=True) != 0:
-        print('Backup compression failed: error during archive creation')
         return False
     os.remove(backup_name)
     return backup_zip_name

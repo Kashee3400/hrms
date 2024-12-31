@@ -1,7 +1,6 @@
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import datetime, timedelta
-from hrms_app.models import LeaveApplication
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
@@ -13,7 +12,7 @@ import requests
 
 # Set up logging configuration
 logging.basicConfig(
-    level=logging.DEBUG,  # You can change this to INFO or ERROR based on your needs
+    level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),  # Output to console
