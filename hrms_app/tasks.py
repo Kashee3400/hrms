@@ -3,7 +3,17 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.urls import reverse
 from celery import shared_task
+from django.core.mail import EmailMessage
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.mail import EmailMultiAlternatives
+import base64
+from decouple import config
+import os
+import subprocess
 
+
+USER = get_user_model()
 
 @shared_task
 def send_leave_application_notifications(application_id, protocol, domain):
@@ -168,8 +178,143 @@ def send_regularization_notification(regularization_id, protocol, domain):
 def send_regularization_email(subject, message, recipient_list):
     send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
-from django.core.management import call_command
+@shared_task
+def populate_attendance_log():
+    now = datetime.now()
+    from_date = now.strftime('%Y-%m-%d 00:01:00')
+    to_date = now.strftime('%Y-%m-%d 23:59:00')
+    call_command('pop_att', '--from-date', from_date, '--to-date', to_date)
+
 
 @shared_task
-def populate_attendance_log(from_date, to_date):
-    call_command('pop_att', '--from-date', from_date, '--to-date', to_date)
+def send_reminder_email():
+    subject = f'Reminder For Attendance Regularization'
+    email = EmailMessage(
+        subject,
+        "It is requested to all the employee the check attendance status(Leave, Tour, Late Coming, Early Going, Mis punching) and take approval for salary finalization if any.",
+        settings.DEFAULT_FROM_EMAIL,
+        ['all@kasheemilk.com'],
+    )
+    email.send()
+    
+
+def send_greeting_email(obj, occasion_type):
+    today = datetime.now().date()
+    date_to_check = None
+    occasion_name = None
+    
+    if occasion_type == 'birthday':
+        date_to_check = obj.dob
+        occasion_name = WishingCard.BirthdayCard
+    elif occasion_type == 'marriage_anniversary':
+        date_to_check = obj.anniversary
+        occasion_name = WishingCard.MarriageAnniversaryCard
+    elif occasion_type == 'job_anniversary':
+        date_to_check = obj.date_of_joining
+        occasion_name = WishingCard.JobAnniversaryCard
+    
+    if date_to_check and date_to_check.day == today.day and date_to_check.month == today.month:
+        subject = f'Wishing Happy {occasion_name} {obj.admin.first_name} {obj.admin.last_name}'
+        flag = 'Shri' if obj.gender.gender == 'Male' else 'Miss'
+        salutation = f"Dear {flag} {obj.admin.first_name} {obj.admin.last_name},<br><br>"
+        regards = '<br><br>Regards,<br>HR Team'
+        random_card = WishingCard.objects.filter(type=occasion_name).order_by('?').first()
+        
+        with open(random_card.image.path, 'rb') as f:
+            image_data = f.read()
+            encoded_image = base64.b64encode(image_data).decode('utf-8')
+        
+        if occasion_type == 'job_anniversary':
+            years = today.year - obj.date_of_joining.year
+            anniversary_msg = f"Congratulations on your {ordinal(years)} job anniversary with Kashee!<br><br>"
+            html_content = f"<html><body>{salutation}{anniversary_msg}<img style='height:350px;width:200px' src='data:image/jpeg;base64,{encoded_image}' alt='{occasion_name} Card'><br><br>{regards}</body></html>"
+        else:
+            html_content = f"<html><body>{salutation}<img style='height:350px;width:200px' src='data:image/jpeg;base64,{encoded_image}' alt='{occasion_name} Card'><br><br>{regards}</body></html>"
+        
+        try:
+            emp_email = EmailMultiAlternatives(
+                subject,
+                '',  # Leave the plain text version empty
+                settings.DEFAULT_FROM_EMAIL,
+                ['all@kasheemilk.com'],  # Send to employee's email
+            )
+            emp_email.attach_alternative(html_content, 'text/html')  # Attach HTML content with base64-encoded image
+            emp_email.send()
+        except Exception as e:
+            print(f"Error sending {occasion_name} email: {e}")
+
+@shared_task
+def send_greeting_emails():
+    today = datetime.now().date()
+    emp_objs = PersonalDetails.objects.filter(user__is_active=True)
+    for obj in emp_objs:
+        if obj.birthday and obj.birthday.day == today.day and obj.birthday.month == today.month:
+            send_greeting_email(obj, 'birthday')
+        if obj.ann_date and obj.ann_date.day == today.day and obj.ann_date.month == today.month:
+            send_greeting_email(obj, 'marriage_anniversary')
+        if obj.doj and obj.doj.day == today.day and obj.doj.month == today.month:
+            send_greeting_email(obj, 'job_anniversary')
+
+
+def ordinal(n):
+    """
+    Convert an integer into its ordinal representation:
+    1 -> 1st, 2 -> 2nd, 3 -> 3rd, etc.
+    """
+    if 10 <= n % 100 <= 20:
+        suffix = 'th'
+    else:
+        suffix = {1: 'st', 2: 'nd', 3: 'rd'}.get(n % 10, 'th')
+    return str(n) + suffix
+
+
+def get_database_config():
+    DB_NAME = config("DB_NAME")
+    mysql_user = config("DB_USER")
+    mysql_password = config("DB_PASSWORD")
+    mysql_host = config("DB_HOST", default="localhost")
+    mysql_port = config("DB_PORT", default="5432")
+    return DB_NAME, mysql_user, mysql_password, mysql_host, mysql_port
+
+@shared_task
+def backup_database(include_schema=True):
+    DB_NAME, mysql_user, mysql_password, mysql_host, mysql_port = get_database_config()
+    backup_dir = os.getenv('BACKUP_DIR', "E:/MySQLBackups/DBBACKUP")
+    mysqldump_path = 'E:/postgres/16/bin/pg_dump.exe'
+    seven_zip_path = 'C:/Program Files/7-Zip/7z.exe'
+
+    backup_name = os.path.join(backup_dir, f'hrms_db_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.sql')
+    
+    if include_schema:
+        mysqldump_cmd = f'"{mysqldump_path}" --user={mysql_user} --password={mysql_password} --host={mysql_host} --port={mysql_port} {DB_NAME} > "{backup_name}"'
+    else:
+        mysqldump_cmd = f'"{mysqldump_path}" --user={mysql_user} --password={mysql_password} --host={mysql_host} --port={mysql_port} --no-create-info {DB_NAME} > "{backup_name}"'
+
+    backup_zip_name = create_backup(DB_NAME, backup_dir, mysqldump_cmd, backup_name, 'Backup failed: error during dump creation', seven_zip_path)
+    
+    if backup_zip_name:
+        message = f'Database backup successful for the HRMS employee data: {backup_name}'
+        dept = Department.objects.get(department='IT')
+        emp_emails = PersonalDetails.objects.filter(designation__department=dept).values_list('user__email', flat=True)
+        send_backup_email('Database backup successful:', message, emp_emails)
+        print('Backup successful')
+        return True
+    return False
+
+def send_backup_email(subject, message, recipients):
+    from django.core.mail import EmailMessage
+    emp_email = EmailMessage(subject, message, settings.DEFAULT_FROM_EMAIL, recipients)
+    emp_email.send()
+
+def create_backup(DB_NAME, backup_dir, mysqldump_cmd, backup_name, error_message, seven_zip_path):
+    if subprocess.call(mysqldump_cmd, shell=True) != 0:
+        print(error_message)
+        return False
+    backup_zip_name = f'{backup_dir}/{DB_NAME}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.zip'
+    seven_zip_cmd = f'"{seven_zip_path}" a -tzip "{backup_zip_name}" "{backup_name}"'
+    if subprocess.call(seven_zip_cmd, shell=True) != 0:
+        print('Backup compression failed: error during archive creation')
+        return False
+    os.remove(backup_name)
+    return backup_zip_name
+

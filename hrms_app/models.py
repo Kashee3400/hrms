@@ -2891,3 +2891,26 @@ class LockStatus(models.Model):
     class Meta:
         verbose_name = _("Lock Status")
         verbose_name_plural = _("Lock Statuses")
+
+
+class WishingCard(models.Model):
+    JobAnniversaryCard = _("Job Anniversary")
+    BirthdayCard = _("Birthday")
+    MarriageAnniversaryCard = ("Marriage Anniversary")
+    
+    Card_TYPES = [
+        (JobAnniversaryCard,JobAnniversaryCard ),
+        (BirthdayCard, BirthdayCard),
+        (MarriageAnniversaryCard, MarriageAnniversaryCard),
+    ]
+    type = models.CharField(max_length=100, choices=Card_TYPES, blank=True, null=True, verbose_name=_('Card Type'))
+    image = models.ImageField(upload_to='wishing_images/', blank=True, null=True, verbose_name=_('Image'))
+    created_at = models.DateField(auto_now_add=True,blank=True, null=True)
+    
+    def __str__(self):
+        return f'{self.type} - {self.image}'
+    
+    class Meta:
+        db_table = 'tbl_wishing_card'
+        verbose_name = _('Wishing Card')
+        verbose_name_plural = _('Wishing Cards')
