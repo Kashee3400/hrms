@@ -356,7 +356,7 @@ class ApplyOrUpdateLeaveView(
 
         # Fetch leave balance for the specified leave type
         leave_balance = LeaveBalanceOpenings.objects.filter(
-            user=self.request.user, leave_type_id=leave_type_id
+            user=self.request.user, leave_type_id=leave_type_id,year=timezone.now().year
         ).first()
 
         # Add data to the context
