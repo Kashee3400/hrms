@@ -10,6 +10,7 @@ from django.core.exceptions import PermissionDenied
 import logging
 import requests
 
+
 # Set up logging configuration
 logging.basicConfig(
     level=logging.INFO,
@@ -140,10 +141,6 @@ def create_response(
     response_data = {"status": status, "message": message, "data": data}
     return Response(response_data, status=status_code)
 
-
-from datetime import date, timedelta
-
-from django.core.exceptions import PermissionDenied
 
 
 def check_lock_status(instance_date=None):

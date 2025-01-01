@@ -47,11 +47,7 @@ from hrms_app.table_classes import (
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
 User = get_user_model()
-
-
 logger = logging.getLogger(__name__)
-
-
 
 def custom_permission_denied(request, exception=None):
     error_message = str(exception) if exception else "You do not have permission to access this page."
@@ -1589,4 +1585,40 @@ class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
             ("employees", {"label": "Employee List"}),
         ]
         context["urls"] = urls
+        return context
+
+class LeaveTransactionCreateView(FormView):
+    form_class = LeaveTransactionForm
+    template_name = 'hrms_app/leave_transaction.html'
+    title = _("Leave Transaction")
+    
+    def get_success_url(self):
+        # Redirect back to the same form for creating a new transaction
+        return reverse_lazy('leave_transaction_create')
+
+    def form_valid(self, form):
+        try:
+            # Process the form and create transactions
+            form.process()
+            messages.success(self.request, "Leave transaction applied successfully.")
+        except ValueError as e:
+            messages.error(self.request, f"Error: {e}")
+            return self.form_invalid(form)  # Return form with errors if process fails
+        return redirect(self.get_success_url())
+
+    def form_invalid(self, form):
+        # Add an error message and render the form again
+        messages.error(self.request, "There was an error with your submission. Please check the form and try again.")
+        return super().form_invalid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        urls = [
+            ("dashboard", {"label": "Dashboard"}),
+            ("leave_transaction_create", {"label": "Leave Transaction"}),
+        ]
+        context.update({
+            "urls": urls,
+            "title": self.title
+        })
         return context

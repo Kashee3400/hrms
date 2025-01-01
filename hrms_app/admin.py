@@ -145,7 +145,7 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
         'updated_at',
         'updated_by')
     search_fields = ['user__username','user__first_name', 'user__last_name']
-    list_filter = ('user',)
+    list_filter = ('year','leave_type')
     
     readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
 

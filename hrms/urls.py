@@ -24,4 +24,5 @@ urlpatterns = [
     path('create-user/<int:pk>/', UserCreationWizard.as_view(FORMS), name='edit_user_wizard'),
     path('cancel-user-creation/', cancel_user_creation, name='cancel_user_creation'),
     path("api/v1/", include('hrms_app.urls')),
+    path('<str:title>/success/', TemplateView.as_view(template_name='hrms_app/generic_success.html'), name='success_page'),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

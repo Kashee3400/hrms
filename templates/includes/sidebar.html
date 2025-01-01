@@ -151,6 +151,13 @@
           <span class="menu-title">{% trans 'Attendance Report' %}</span>
         </a>
       </li>
+      {% url 'leave_transaction_create' as leave_transaction_create_url %}
+      <li class="nav-item {% if request.path == leave_transaction_create_url %} active {% endif %}">
+        <a class="nav-link" href="{{ leave_transaction_create_url }}">
+          <i class="mdi mdi-file-document menu-icon"></i>
+          <span class="menu-title">{% trans 'Leave Transaction' %}</span>
+        </a>
+      </li>
     {% endif %}
     <!-- Regularizations -->
     {% url 'regularization' as regularization_url %}

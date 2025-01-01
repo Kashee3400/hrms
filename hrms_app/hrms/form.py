@@ -1590,3 +1590,120 @@ class PopulateAttendanceForm(forms.Form):
             )
 
         return cleaned_data
+
+
+
+class LeaveTransactionForm(forms.Form):
+    leave_balance = forms.ChoiceField(
+        required=False,
+        label=_('Leave Balance'),
+        choices=[],  # To be dynamically populated in the form initialization
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        help_text=_('The leave balance associated with this transaction.'),
+    )
+    leave_type = forms.ChoiceField(
+        required=False,
+        label=_('Leave Type'),
+        choices=[],  # To be dynamically populated in the form initialization
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        help_text=_('The type of leave being requested (e.g., sick leave, vacation).'),
+    )
+    no_of_days_approved = forms.FloatField(
+        required=True,
+        label=_('Number of Days Approved'),
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        help_text=_('Number of leave days that have been approved.'),
+    )
+    transaction_type = forms.ChoiceField(
+        required=True,
+        label=_('Transaction Type'),
+        choices=[('add', _('Add')), ('subtract', _('Subtract'))],
+        widget=forms.Select(attrs={'class': 'form-control'}),
+        help_text=_('The type of transaction (add or subtract leaves).'),
+    )
+    remarks = forms.CharField(
+        required=False,
+        label=_('Remarks'),
+        widget=forms.Textarea(attrs={'class': 'form-control'}),
+        help_text=_('Any additional remarks regarding the leave transaction.'),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['leave_balance'].choices = self.get_leave_balance_choices()
+        self.fields['leave_type'].choices = self.get_leave_type_choices()
+
+    def get_leave_balance_choices(self):
+        # Replace with actual queryset to populate choices
+        leave_balances = LeaveBalanceOpenings.objects.filter(year=timezone.now().year)
+        return [('', _('Select Leave Balance'))] + [
+            (lb.pk, str(lb)) for lb in leave_balances
+        ]
+
+    def get_leave_type_choices(self):
+        # Replace with actual queryset to populate choices
+        leave_types = LeaveType.objects.all()
+        return [('', _('Select Leave Type'))] + [(lt.pk, lt.leave_type) for lt in leave_types]
+
+    def clean(self):
+        cleaned_data = super().clean()
+        leave_balance = cleaned_data.get('leave_balance')
+        leave_type = cleaned_data.get('leave_type')
+
+        # Ensure only one of leave_balance or leave_type is selected
+        if leave_balance and leave_type:
+            raise forms.ValidationError(
+                "You can select only one of 'Leave Balance' or 'Leave Type', not both."
+            )
+
+        if not leave_balance and not leave_type:
+            raise forms.ValidationError(
+                "You must select at least one of 'Leave Balance' or 'Leave Type'."
+            )
+
+        return cleaned_data
+
+    def process(self):
+        """
+        Handles form processing to create LeaveTransaction instances.
+        """
+        cleaned_data = self.cleaned_data
+        leave_balance_id = cleaned_data.get('leave_balance')
+        leave_type = cleaned_data.get('leave_type')
+        no_of_days_approved = cleaned_data.get('no_of_days_approved')
+        transaction_type = cleaned_data.get('transaction_type')
+        remarks = cleaned_data.get('remarks')
+
+        if leave_balance_id:
+            leave_balance = LeaveBalanceOpenings.objects.get(id=leave_balance_id)
+            transaction = LeaveTransaction(
+                leave_balance=leave_balance,
+                leave_type=leave_balance.leave_type,  # Assuming leave type is linked to leave balance
+                transaction_date=timezone.now(),
+                no_of_days_approved=no_of_days_approved,
+                transaction_type=transaction_type,
+                remarks=remarks,
+            )
+            transaction.save()
+            transaction.apply_transaction()
+
+        elif leave_type:
+            leave_balances = LeaveBalanceOpenings.objects.filter(
+                leave_type=leave_type,
+                year=2025
+                # year=timezone.now().year
+            )
+            for leave_balance in leave_balances:
+                transaction = LeaveTransaction(
+                    leave_balance=leave_balance,
+                    leave_type_id=leave_type,
+                    transaction_date=timezone.now(),
+                    no_of_days_approved=no_of_days_approved,
+                    transaction_type=transaction_type,
+                    remarks=remarks,
+                )
+                transaction.save()
+                transaction.apply_transaction()
+        else:
+            raise ValueError("Either leave_balance or leave_type must be provided.")
+

@@ -14,6 +14,7 @@ import uuid
 from django.core.validators import MinValueValidator
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db.models import Sum
 
 
 class Role(models.Model):
@@ -1643,8 +1644,8 @@ class LeaveBalanceOpenings(models.Model):
 
     def __str__(self):
         return (
-            f"Leave Balance for {self.user.first_name} {self.user.last_name} - "
-            f"{self.leave_type.leave_type_short_code} (Opening: {self.opening_balance}, Closing: {self.closing_balance})"
+            f"{self.user.get_full_name()} -{self.year} "
+            f"{self.leave_type.leave_type_short_code} (Balance: {self.remaining_leave_balances})"
         )
 
     @classmethod
@@ -1659,7 +1660,7 @@ class LeaveBalanceOpenings(models.Model):
                 leave_type=leave_type,
                 year=year,
                 opening_balance=0,
-                created_by=created_by,  # Set created_by field
+                created_by=created_by,
             )
             leave_balances.append(leave_balance)
         with transaction.atomic():
@@ -1669,14 +1670,7 @@ class LeaveBalanceOpenings(models.Model):
         self.closing_balance = self.opening_balance + days_approved
         self.save(update_fields=["closing_balance"])
 
-
 class LeaveTransaction(models.Model):
-    user = models.ForeignKey(
-        CustomUser,
-        on_delete=models.CASCADE,
-        verbose_name=_("User"),
-        help_text=_("The user for whom the leave transaction is recorded."),
-    )
     leave_balance = models.ForeignKey(
         LeaveBalanceOpenings,
         on_delete=models.CASCADE,
@@ -1688,22 +1682,32 @@ class LeaveTransaction(models.Model):
         on_delete=models.CASCADE,
         verbose_name=_("Leave Type"),
         help_text=_("The type of leave being requested (e.g., sick leave, vacation)."),
+        blank=True,null=True
     )
     transaction_date = models.DateField(
         default=timezone.now,
         verbose_name=_("Transaction Date"),
         help_text=_("The date when the leave transaction is recorded."),
     )
-    days_applied = models.FloatField(
+    no_of_days_applied = models.FloatField(
         validators=[MinValueValidator(0)],
-        verbose_name=_("Days Applied"),
+        verbose_name=_("Number of Days Applied"),
         help_text=_("Number of leave days applied for in this transaction."),
+        blank=True,null=True
     )
-    days_approved = models.FloatField(
+    no_of_days_approved = models.FloatField(
         validators=[MinValueValidator(0)],
         default=0,
-        verbose_name=_("Days Approved"),
+        verbose_name=_("Number of Days Approved"),
         help_text=_("Number of leave days that have been approved."),
+        blank=True,null=True
+    )
+    transaction_type = models.CharField(
+        max_length=10,
+        choices=[('add', 'Add'), ('subtract', 'Subtract')],
+        verbose_name=_("Transaction Type"),
+        help_text=_("The type of transaction (add or subtract leaves)."),
+        blank=True,null=True
     )
     remarks = models.TextField(
         blank=True,
@@ -1713,19 +1717,28 @@ class LeaveTransaction(models.Model):
     )
 
     def __str__(self):
-        return f"Leave Transaction for {self.user.username} - {self.leave_type.name} on {self.transaction_date}"
+        return f"Leave Transaction for {self.leave_balance.user.username} - {self.leave_type.leave_type} on {self.transaction_date}"
 
     class Meta:
         db_table = "tbl_leave_transaction"
         managed = True
         verbose_name = _("Leave Transaction")
         verbose_name_plural = _("Leave Transactions")
-        ordering = [
-            "-transaction_date"
-        ]  # Orders by transaction date in descending order
+        ordering = ["-transaction_date"]
 
-
-from django.db.models import Sum
+    def apply_transaction(self):
+        if self.transaction_type == 'add':
+            if self.leave_balance.no_of_leaves is None:
+                self.leave_balance.no_of_leaves = self.no_of_days_approved
+                self.leave_balance.opening_balance = self.no_of_days_approved
+            self.leave_balance.no_of_leaves += self.no_of_days_approved
+        elif self.transaction_type == 'subtract':
+            if self.leave_balance.no_of_leaves is None:
+                self.leave_balance.no_of_leaves = self.no_of_days_approved
+                self.leave_balance.opening_balance = self.no_of_days_approved
+            self.leave_balance.no_of_leaves -= self.no_of_days_approved
+            self.leave_balance.opening_balance -= self.no_of_days_approved
+        self.leave_balance.save()
 
 
 class CompensatoryOff(models.Model):
