@@ -1728,16 +1728,11 @@ class LeaveTransaction(models.Model):
 
     def apply_transaction(self):
         if self.transaction_type == 'add':
-            if self.leave_balance.no_of_leaves is None:
-                self.leave_balance.no_of_leaves = self.no_of_days_approved
-                self.leave_balance.opening_balance = self.no_of_days_approved
-            self.leave_balance.no_of_leaves += self.no_of_days_approved
+            if self.leave_balance.remaining_leave_balances is None:
+                self.leave_balance.remaining_leave_balances += self.no_of_days_approved
         elif self.transaction_type == 'subtract':
-            if self.leave_balance.no_of_leaves is None:
-                self.leave_balance.no_of_leaves = self.no_of_days_approved
-                self.leave_balance.opening_balance = self.no_of_days_approved
-            self.leave_balance.no_of_leaves -= self.no_of_days_approved
-            self.leave_balance.opening_balance -= self.no_of_days_approved
+            if self.leave_balance.remaining_leave_balances is None:
+                self.leave_balance.remaining_leave_balances -= self.no_of_days_approved
         self.leave_balance.save()
 
 

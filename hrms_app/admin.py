@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from hrms_app.hrms.form import *
-from hrms_app.hrms.resources import  CustomUserResource,HolidayResource,UserTourResource
+from hrms_app.hrms.resources import  CustomUserResource,HolidayResource,UserTourResource,LeaveTransactionResource
 from .models import *
 from django_ckeditor_5.widgets import CKEditor5Widget
 from django.utils.safestring import mark_safe
@@ -146,7 +146,6 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
         'updated_by')
     search_fields = ['user__username','user__first_name', 'user__last_name']
     list_filter = ('year','leave_type')
-    
     readonly_fields = ('created_at', 'updated_at', 'created_by', 'updated_by')
 
 
@@ -176,6 +175,33 @@ class LockStatusAdmin(admin.ModelAdmin):
     toggle_lock.short_description = "Toggle Lock Status"
     
 admin.site.register(LockStatus, LockStatusAdmin)
+
+
+@admin.register(LeaveTransaction)
+class LeaveTransactionAdmin(ImportExportModelAdmin, admin.ModelAdmin):
+    list_display = (
+        'leave_balance', 
+        'leave_type', 
+        'transaction_date', 
+        'no_of_days_applied', 
+        'no_of_days_approved', 
+        'transaction_type', 
+        'remarks',
+    )
+    list_filter = (
+        'transaction_type', 
+        'transaction_date', 
+        'leave_type',
+    )
+    search_fields = (
+        'leave_balance__user__username',
+        'leave_balance__user__first_name',
+        'leave_balance__user__last_name',
+        'leave_type__leave_type',
+        'remarks',
+    )
+    date_hierarchy = 'transaction_date'
+    resource_class = LeaveTransactionResource
 
 @admin.register(LeaveStatusPermission)
 class LeaveStatusPermissionAdmin(admin.ModelAdmin):

@@ -1690,8 +1690,7 @@ class LeaveTransactionForm(forms.Form):
         elif leave_type:
             leave_balances = LeaveBalanceOpenings.objects.filter(
                 leave_type=leave_type,
-                year=2025
-                # year=timezone.now().year
+                year=timezone.now().year
             )
             for leave_balance in leave_balances:
                 transaction = LeaveTransaction(
@@ -1707,3 +1706,84 @@ class LeaveTransactionForm(forms.Form):
         else:
             raise ValueError("Either leave_balance or leave_type must be provided.")
 
+
+class LeaveBalanceForm(forms.Form):
+    user = forms.ModelChoiceField(
+        queryset=User.objects.all(),
+        required=False,
+        label=_("User"),
+        help_text=_("Select a user to update their leave balance. Leave blank to update all users."),
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'placeholder': _("Select a user"),
+        })
+    )
+    leave_type = forms.ModelChoiceField(
+        queryset=LeaveType.objects.all(),
+        required=True,
+        label=_("Leave Type"),
+        help_text=_("The type of leave to update or create balances for."),
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'placeholder': _("Select a leave type"),
+        })
+    )
+    year = forms.IntegerField(
+        required=True,
+        label=_("Year"),
+        help_text=_("The year for which the leave balance is applicable."),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': _("Enter year"),
+        })
+    )
+    opening_balance = forms.FloatField(
+        required=False,
+        label=_("Opening Balance"),
+        help_text=_("Enter the opening balance for the leave."),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': _("Enter opening balance"),
+        })
+    )
+    closing_balance = forms.FloatField(
+        required=False,
+        label=_("Closing Balance"),
+        help_text=_("Enter the closing balance for the leave."),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': _("Enter closing balance"),
+        })
+    )
+    no_of_leaves = forms.FloatField(
+        required=False,
+        label=_("Number of Leaves"),
+        help_text=_("The total number of leaves allocated to the user for this leave type."),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': _("Enter number of leaves"),
+        })
+    )
+    remaining_leave_balances = forms.FloatField(
+        required=False,
+        label=_("Remaining Leave Balance"),
+        help_text=_("The remaining balance of leaves available to the user for this leave type."),
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': _("Enter remaining leave balance"),
+        })
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        opening_balance = cleaned_data.get("opening_balance")
+        closing_balance = cleaned_data.get("closing_balance")
+        no_of_leaves = cleaned_data.get("no_of_leaves")
+        remaining_leave_balances = cleaned_data.get("remaining_leave_balances")
+
+        # Ensure at least one balance field is provided
+        if not any([opening_balance, closing_balance, no_of_leaves, remaining_leave_balances]):
+            raise forms.ValidationError(
+                _("At least one balance field (Opening Balance, Closing Balance, Number of Leaves, or Remaining Leave Balance) must be provided.")
+            )
+        return cleaned_data

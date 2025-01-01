@@ -60,6 +60,7 @@ site.register_view('leave/<slug:slug>/', views.LeaveApplicationDetailView, name=
 site.register_view('leave/<slug:slug>/update', views.LeaveApplicationUpdateView, name='leave_application_update')
 site.register_view('delete/<str:model_name>/<int:pk>/', views.GenericDeleteView, name='generic_delete')
 site.register_view('leave-transaction/', views.LeaveTransactionCreateView, name='leave_transaction_create'),
+site.register_view('leave-balance-update/', views.LeaveBalanceUpdateView, name='leave_bal_up'),
 site.register_view('tour-tracker/', views.TourTrackerView, name='tour_tracker')
 site.register_view('apply-tour/', views.ApplyTourView, name='apply_tour')
 site.register_view('tour/<slug:slug>/', views.TourApplicationDetailView, name='tour_application_detail')

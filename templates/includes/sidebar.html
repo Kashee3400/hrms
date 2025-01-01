@@ -158,6 +158,13 @@
           <span class="menu-title">{% trans 'Leave Transaction' %}</span>
         </a>
       </li>
+      {% url 'leave_bal_up' as leave_bal_up_url %}
+      <li class="nav-item {% if request.path == leave_bal_up_url %} active {% endif %}">
+        <a class="nav-link" href="{{ leave_bal_up_url }}">
+          <i class="mdi mdi-file-document menu-icon"></i>
+          <span class="menu-title">{% trans 'Leave Balance' %}</span>
+        </a>
+      </li>
     {% endif %}
     <!-- Regularizations -->
     {% url 'regularization' as regularization_url %}

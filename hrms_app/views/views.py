@@ -1622,3 +1622,85 @@ class LeaveTransactionCreateView(FormView):
             "title": self.title
         })
         return context
+
+class LeaveBalanceUpdateView(View):
+    template_name = 'hrms_app/leave_bal_up.html'
+
+    def get(self, request, *args, **kwargs):
+        form = LeaveBalanceForm()
+        return render(request, self.template_name, {'form': form})
+
+    def post(self, request, *args, **kwargs):
+        form = LeaveBalanceForm(request.POST)
+        if form.is_valid():
+            user = form.cleaned_data.get("user")
+            leave_type = form.cleaned_data["leave_type"]
+            year = form.cleaned_data["year"]
+            opening_balance = form.cleaned_data.get("opening_balance")
+            closing_balance = form.cleaned_data.get("closing_balance")
+            no_of_leaves = form.cleaned_data.get("no_of_leaves")
+            remaining_leave_balances = form.cleaned_data.get("remaining_leave_balances")
+
+            try:
+                with transaction.atomic():
+                    if user:
+                        # Update only for the selected user
+                        leave_balances = LeaveBalanceOpenings.objects.filter(
+                            user=user,
+                            leave_type=leave_type,
+                            year=year
+                        )
+                    else:
+                        # Update for all users with the selected leave type
+                        leave_balances = LeaveBalanceOpenings.objects.filter(
+                            leave_type=leave_type,
+                            year=year
+                        )
+
+                    if leave_balances.exists():
+                        for balance in leave_balances:
+                            if opening_balance is not None:
+                                balance.opening_balance = opening_balance
+                            if closing_balance is not None:
+                                balance.closing_balance = closing_balance
+                            if no_of_leaves is not None:
+                                balance.no_of_leaves = no_of_leaves
+                            if remaining_leave_balances is not None:
+                                balance.remaining_leave_balances = remaining_leave_balances
+                            balance.save(update_fields=["opening_balance", "closing_balance", "no_of_leaves", "remaining_leave_balances"])
+
+                        messages.success(request, "Leave balances updated successfully.")
+                    else:
+                        # If no leave balances exist, create them
+                        messages.warning(request, "No existing leave balances found.")
+                        if user:
+                            LeaveBalanceOpenings.objects.create(
+                                user=user,
+                                leave_type=leave_type,
+                                year=year,
+                                opening_balance=opening_balance or 0,
+                                closing_balance=closing_balance or 0,
+                                no_of_leaves=no_of_leaves or 0,
+                                remaining_leave_balances=remaining_leave_balances or 0,
+                                created_by=request.user,
+                            )
+                        else:
+                            for user in CustomUser.objects.all():
+                                LeaveBalanceOpenings.objects.create(
+                                    user=user,
+                                    leave_type=leave_type,
+                                    year=year,
+                                    opening_balance=opening_balance or 0,
+                                    closing_balance=closing_balance or 0,
+                                    no_of_leaves=no_of_leaves or 0,
+                                    remaining_leave_balances=remaining_leave_balances or 0,
+                                    created_by=request.user,
+                                )
+                        messages.success(request, "New leave balances created successfully.")
+
+            except Exception as e:
+                messages.error(request, f"An error occurred: {e}")
+
+            return redirect('leave_bal_up')
+
+        return render(request, self.template_name, {'form': form})

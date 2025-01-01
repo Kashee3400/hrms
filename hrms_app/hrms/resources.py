@@ -1,5 +1,5 @@
 from import_export import resources,fields
-from hrms_app.models import CustomUser,Holiday,UserTour
+from hrms_app.models import CustomUser,Holiday,UserTour,LeaveTransaction
 
 class CustomUserResource(resources.ModelResource):
     class Meta:
@@ -32,3 +32,20 @@ class UserTourResource(resources.ModelResource):
             return f"{obj.applied_by.get_full_name()}"
         return "Unknown"  # Default value if no user is associated
 
+
+class LeaveTransactionResource(resources.ModelResource):
+    class Meta:
+        model = LeaveTransaction
+        fields = (
+            'id',
+            'leave_balance__user__username',
+            'leave_balance__user__first_name',
+            'leave_balance__user__last_name',
+            'leave_type__leave_type',
+            'transaction_date',
+            'no_of_days_applied',
+            'no_of_days_approved',
+            'transaction_type',
+            'remarks',
+        )
+        export_order = fields

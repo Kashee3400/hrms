@@ -15,8 +15,6 @@ def initialize_leave_balance(sender, instance, created, **kwargs):
         current_year = timezone.now().year
         leave_types =LeaveType.objects.all()
         LeaveBalanceOpenings.initialize_leave_balances(instance,leave_types, current_year, created_by=instance)
-        # shift_timing = ShiftTiming.objects.filter(role=instance.role).first()
-        # EmployeeShift.objects.create(employee=instance,shift_timing=shift_timing)
 
 
 
@@ -44,22 +42,6 @@ def set_user_fields(sender, instance, **kwargs):
             instance.updated_by = user
 
 
-# @receiver(post_save, sender=LeaveBalanceOpenings)
-# def create_leave_transaction(sender, instance, created, **kwargs):
-#     if created:
-#         # Handle newly created leave balance
-#         pass
-#     else:
-#         # Handle updated leave balance
-#         if instance.closing_balance != instance.opening_balance:
-#             # Create a new LeaveTransaction instance
-#             LeaveTransaction.objects.create(
-#                 leave_balance=instance,
-#                 leave_type=instance.leave_type,
-#                 transaction_date=timezone.now(),
-#                 no_of_days_approved=instance.opening_balance,
-#             )
-
 @receiver(post_save, sender=LeaveApplication)
 def create_or_update_leave_log(sender, instance, created, **kwargs):
         if created:
@@ -82,7 +64,10 @@ def create_or_update_leave_log(sender, instance, created, **kwargs):
         current_site = Site.objects.get_current()
         protocol = 'http'  # or 'https' if applicable
         domain = current_site.domain
-        send_leave_application_notifications.delay(instance.id, protocol, domain)
+        try:
+            send_leave_application_notifications.delay(instance.id, protocol, domain)
+        except:
+            pass
 
 @receiver(post_save, sender=UserTour)
 def create_or_update_user_tour(sender, instance, created, **kwargs):
@@ -106,7 +91,10 @@ def create_or_update_user_tour(sender, instance, created, **kwargs):
         current_site = Site.objects.get_current()
         protocol = 'http'  # or 'https' if applicable
         domain = current_site.domain
-        send_tour_notifications.delay(instance.id, protocol, domain)
+        try:
+            send_tour_notifications.delay(instance.id, protocol, domain)
+        except:
+            pass
 
 @receiver(pre_save, sender=UserTour)
 def set_user_tour_slug(sender, instance, **kwargs):
@@ -114,8 +102,6 @@ def set_user_tour_slug(sender, instance, **kwargs):
         slug_base = slugify(f"{instance.applied_by.get_full_name()}-{instance.from_destination}-{instance.to_destination}")
         slug = slug_base
         num = 1
-
-        # Ensure unique slug
         while UserTour.objects.filter(slug=slug).exists():
             slug = f"{slug_base}-{num}"
             num += 1
@@ -130,7 +116,10 @@ def create_or_update_regularization(sender, instance, created, **kwargs):
     current_site = Site.objects.get_current()
     protocol = 'http'  # or 'http' if applicable
     domain = current_site.domain
-    send_tour_notifications.delay(instance.id, protocol, domain)
+    try:
+        send_tour_notifications.delay(instance.id, protocol, domain)
+    except:
+        pass
     
 
 @receiver(post_save, sender=LeaveApplication)
