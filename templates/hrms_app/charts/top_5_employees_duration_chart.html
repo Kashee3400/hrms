@@ -6,7 +6,7 @@
 
 <script>
     // Call the API using fetch to get the data dynamically
-    fetch('/api/v1/attendance-aggregation?year=2025&month=1')
+    fetch('/api/v1/attendance-aggregation/?year=2025&month=1')
         .then(response => response.json())
         .then(data => {
             const top5EmployeesData = data.top_5_employees.map(employee => ({
