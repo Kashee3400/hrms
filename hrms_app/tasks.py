@@ -225,7 +225,7 @@ def send_greeting_email(obj, occasion_type):
         date_to_check = obj.birthday
         occasion_name = WishingCard.BirthdayCard
     elif occasion_type == 'marriage_anniversary':
-        date_to_check = obj.ann_date
+        date_to_check = obj.marriage_ann
         occasion_name = WishingCard.MarriageAnniversaryCard
     elif occasion_type == 'job_anniversary':
         date_to_check = obj.doj

@@ -5,6 +5,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 from hrms_app.utility.leave_utils import format_date
 from django.utils.http import urlencode
+
 # Third-party imports
 from django.http import HttpResponseForbidden, HttpResponseRedirect, JsonResponse
 from django.contrib import messages
@@ -18,7 +19,7 @@ from django.views.generic import (
     ListView,
 )
 from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect,render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.apps import apps
 from django_filters.views import FilterView
@@ -46,24 +47,79 @@ from hrms_app.table_classes import (
 )
 from django.contrib.auth import get_user_model
 from django.views.decorators.csrf import csrf_exempt
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+
 def custom_permission_denied(request, exception=None):
-    error_message = str(exception) if exception else "You do not have permission to access this page."
-    return render(request, '403.html', {'error_message': error_message})
+    error_message = (
+        str(exception)
+        if exception
+        else "You do not have permission to access this page."
+    )
+    return render(request, "403.html", {"error_message": error_message})
+
 
 class HomePageView(LoginRequiredMixin, TemplateView):
     template_name = "admin/index.html"
     title = _("Dashboard")
-    
+
     def dispatch(self, request, *args, **kwargs):
         # Check if the user is a superuser
         if not request.user.is_superuser:
-            return HttpResponseForbidden("You do not have permission to access this page.")
+            return HttpResponseForbidden(
+                "You do not have permission to access this page."
+            )
         return super().dispatch(request, *args, **kwargs)
 
+    def get_employee_wishing(self):
+        today = now().date()
+        employees = PersonalDetails.objects.filter(
+            models.Q(birthday__month=today.month, birthday__day=today.day)
+            | models.Q(marriage_ann__month=today.month, marriage_ann__day=today.day)
+            | models.Q(doj__month=today.month, doj__day=today.day)
+        )
+
+        light_colors = [
+            "bg-light-blue",
+            "bg-light-pink",
+            "bg-light-yellow",
+            "bg-light-green",
+            "bg-light-coral",
+            "bg-light-cyan",
+            "bg-light-lavender",
+        ]
+
+        for employee in employees:
+            events = []
+            if (
+                employee.birthday
+                and employee.birthday.month == today.month
+                and employee.birthday.day == today.day
+            ):
+                events.append("🎉 Happy Birthday! 🎉")
+            if (
+                employee.marriage_ann
+                and employee.marriage_ann.month == today.month
+                and employee.marriage_ann.day == today.day
+            ):
+                events.append("💍 Happy Marriage Anniversary! 💍")
+            if (
+                employee.doj
+                and employee.doj.month == today.month
+                and employee.doj.day == today.day
+            ):
+                events.append("🎊 Happy Job Anniversary! 🎊")
+            employee.events = events
+
+            # Assign a random light color to each employee
+            employee.bg_color = random.choice(light_colors)
+
+        return employees
+
     def get_context_data(self, **kwargs):
+        """Add custom context data for the dashboard."""
         context = super().get_context_data(**kwargs)
         context["current_date"] = datetime.now()
 
@@ -76,17 +132,20 @@ class HomePageView(LoginRequiredMixin, TemplateView):
         ]
         context["urls"] = urls
         context["form"] = PopulateAttendanceForm()
-        context.update({
-            "title": self.title
-        })
+        context.update(
+            {
+                "title": self.title,
+                "employees": self.get_employee_wishing(),
+            }
+        )
         return context
 
     def get(self, request, *args, **kwargs):
-        # Add your GET request handling logic here
+        """Handle GET requests."""
         return super().get(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        # Add your POST request handling logic here
+        """Handle POST requests."""
         return super().post(request, *args, **kwargs)
 
 
@@ -356,7 +415,9 @@ class ApplyOrUpdateLeaveView(
 
         # Fetch leave balance for the specified leave type
         leave_balance = LeaveBalanceOpenings.objects.filter(
-            user=self.request.user, leave_type_id=leave_type_id,year=timezone.now().year
+            user=self.request.user,
+            leave_type_id=leave_type_id,
+            year=timezone.now().year,
         ).first()
 
         # Add data to the context
@@ -499,13 +560,17 @@ class LeaveApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, Update
         action_by = self.request.user
         self.update_leave_balance(leave_application)
         LeaveLog.create_log(leave_application, action_by, leave_application.status)
-        messages.success(self.request, _(f"Leave application {leave_application.status} successfully"))
+        messages.success(
+            self.request,
+            _(f"Leave application {leave_application.status} successfully"),
+        )
         return response
 
     def get_success_url(self):
         return reverse_lazy(
             "leave_application_detail", kwargs={"slug": self.object.slug}
         )
+
 
 class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = LeaveApplication
@@ -514,6 +579,13 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
     permission_denied_message = _("You do not have permission to access this page.")
     permission_required = "hrms_app.view_leaveapplication"
     title = _("Leave Application Detail")
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        if not self.test_func():
+            raise PermissionDenied(self.permission_denied_message)
+        return super().dispatch(request, *args, **kwargs)
 
     def test_func(self):
         return self.request.user.has_perm(self.permission_required)
@@ -531,22 +603,24 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
             or user.is_superuser
             or user.is_staff
             or leave_application.appliedBy.reports_to == user
-            or user.personal_detail.designation.department.department == 'admin'
+            or user.personal_detail.designation.department.department == "admin"
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         leave_application = self.get_object()
         print(self.get_leave_type_balance(leave_application))
-        context.update({
-            "is_manager": self.is_manager(leave_application),
-            "status_form": self.get_status_form(),
-            "leave_balance": self.get_leave_type_balance(leave_application),
-            "delete_url": self.get_delete_url(),
-            "edit_url": self.get_edit_url(),
-            "urls": self.get_breadcrumb_urls(leave_application),
-            "title": self.title,
-        })
+        context.update(
+            {
+                "is_manager": self.is_manager(leave_application),
+                "status_form": self.get_status_form(),
+                "leave_balance": self.get_leave_type_balance(leave_application),
+                "delete_url": self.get_delete_url(),
+                "edit_url": self.get_edit_url(),
+                "urls": self.get_breadcrumb_urls(leave_application),
+                "title": self.title,
+            }
+        )
         return context
 
     def is_manager(self, leave_application):
@@ -555,11 +629,18 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
     def get_status_form(self):
         return LeaveStatusUpdateForm(user=self.request.user, instance=self.object)
 
-    def get_leave_type_balance(self,leave_application):
-        return LeaveBalanceOpenings.objects.filter(user=leave_application.appliedBy,year=leave_application.startDate.date().year,leave_type=leave_application.leave_type).first()
+    def get_leave_type_balance(self, leave_application):
+        return LeaveBalanceOpenings.objects.filter(
+            user=leave_application.appliedBy,
+            year=leave_application.startDate.date().year,
+            leave_type=leave_application.leave_type,
+        ).first()
 
     def get_delete_url(self):
-        return reverse("generic_delete", kwargs={"model_name": self.model.__name__, "pk": self.object.pk})
+        return reverse(
+            "generic_delete",
+            kwargs={"model_name": self.model.__name__, "pk": self.object.pk},
+        )
 
     def get_edit_url(self):
         return reverse("update_leave", kwargs={"slug": self.object.slug})
@@ -568,8 +649,15 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
         return [
             ("dashboard", {"label": "Dashboard"}),
             ("leave_tracker", {"label": "Leave Tracker"}),
-            ("leave_application_detail", {"label": f"{leave_application.applicationNo}", "slug": leave_application.slug}),
+            (
+                "leave_application_detail",
+                {
+                    "label": f"{leave_application.applicationNo}",
+                    "slug": leave_application.slug,
+                },
+            ),
         ]
+
 
 class LeaveApplicationListView(View, LeaveListViewMixin):
     START_LEAVE_TYPE_CHOICES = {
@@ -651,6 +739,33 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     title = _("Attendance Log")
     permission_required = "hrms_app.change_attendancelog"
 
+    def dispatch(self, request, *args, **kwargs):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+
+        # Perform the permission check
+        if not self.test_func():
+            raise PermissionDenied(_("You do not have permission to access this page."))
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def test_func(self):
+        # Determine the required permission dynamically based on the HTTP method
+        if self.request.method in ["GET"]:
+            permission_required = (
+                f"{self.model._meta.app_label}.view_{self.model._meta.model_name}"
+            )
+        elif self.request.method in ["POST", "PUT", "PATCH"]:
+            permission_required = (
+                f"{self.model._meta.app_label}.change_{self.model._meta.model_name}"
+            )
+        else:
+            # Default to the permission specified in the class
+            permission_required = self.permission_required
+
+        return self.request.user.has_perm(permission_required)
+
     def form_valid(self, form):
         form.instance.is_submitted = True
         self.object = form.save()
@@ -666,9 +781,6 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
-
-    def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
 
     def get_object(self, queryset=None):
         attendance_log = super().get_object(queryset)
@@ -807,6 +919,7 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
         minutes = total_minutes % 60
         time_difference = f"{int(hours):02}:{int(minutes):02}"
         log.duration = time_difference
+        log.regularized = True
         log.save()
         log.approve(action_by=self.request.user, reason=reason)
         return _("Attendance log approved and updated successfully.")
@@ -815,13 +928,10 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
         action = request.POST.get("action")
         log_id = kwargs.get("slug")
         log = get_object_or_404(AttendanceLog, slug=log_id)
-
         form = AttendanceLogActionForm(request.POST)
-
         if form.is_valid():
             static_data = self.fetch_static_data()
             reason = form.cleaned_data["reason"]
-
             action_handlers = {
                 "approve": lambda: self.handle_attendance_update(
                     log, form.cleaned_data, static_data
@@ -848,9 +958,11 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
         messages.error(request, _("Invalid action or form data."))
         return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": log.slug}))
 
+
 import json
 from django.forms.models import model_to_dict
 from django.core.serializers.json import DjangoJSONEncoder
+
 
 def make_json_serializable(data):
     """Ensure data is JSON serializable."""
@@ -1214,8 +1326,19 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
     slug_field = "slug"
     slug_url_kwarg = "slug"
 
+    def dispatch(self, request, *args, **kwargs):
+        # Check if the user is authenticated
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+
+        # Perform the permission check
+        if not self.test_func():
+            raise PermissionDenied(_("You do not have permission to access this page."))
+
+        return super().dispatch(request, *args, **kwargs)
+
     def test_func(self):
-        # Determine the required permission dynamically based on the action
+        # Determine the required permission dynamically based on the HTTP method
         if self.request.method in ["GET"]:
             permission_required = (
                 f"{self.model._meta.app_label}.view_{self.model._meta.model_name}"
@@ -1225,7 +1348,8 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
                 f"{self.model._meta.app_label}.change_{self.model._meta.model_name}"
             )
         else:
-            permission_required = self.permission_required
+            # Default to a custom permission, if needed
+            permission_required = getattr(self, "permission_required", None)
 
         return self.request.user.has_perm(permission_required)
 
@@ -1273,7 +1397,7 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         context = super().get_context_data(**kwargs)
         tour_application = self.get_object()
         current_url = self.request.get_full_path()
-        
+
         urls = [
             ("dashboard", {"label": "Dashboard"}),
             ("tour_tracker", {"label": "Tour Tracker"}),
@@ -1587,14 +1711,15 @@ class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
         context["urls"] = urls
         return context
 
+
 class LeaveTransactionCreateView(FormView):
     form_class = LeaveTransactionForm
-    template_name = 'hrms_app/leave_transaction.html'
+    template_name = "hrms_app/leave_transaction.html"
     title = _("Leave Transaction")
-    
+
     def get_success_url(self):
         # Redirect back to the same form for creating a new transaction
-        return reverse_lazy('leave_transaction_create')
+        return reverse_lazy("leave_transaction_create")
 
     def form_valid(self, form):
         try:
@@ -1608,7 +1733,10 @@ class LeaveTransactionCreateView(FormView):
 
     def form_invalid(self, form):
         # Add an error message and render the form again
-        messages.error(self.request, "There was an error with your submission. Please check the form and try again.")
+        messages.error(
+            self.request,
+            "There was an error with your submission. Please check the form and try again.",
+        )
         return super().form_invalid(form)
 
     def get_context_data(self, **kwargs):
@@ -1617,18 +1745,16 @@ class LeaveTransactionCreateView(FormView):
             ("dashboard", {"label": "Dashboard"}),
             ("leave_transaction_create", {"label": "Leave Transaction"}),
         ]
-        context.update({
-            "urls": urls,
-            "title": self.title
-        })
+        context.update({"urls": urls, "title": self.title})
         return context
 
+
 class LeaveBalanceUpdateView(View):
-    template_name = 'hrms_app/leave_bal_up.html'
+    template_name = "hrms_app/leave_bal_up.html"
 
     def get(self, request, *args, **kwargs):
         form = LeaveBalanceForm()
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {"form": form})
 
     def post(self, request, *args, **kwargs):
         form = LeaveBalanceForm(request.POST)
@@ -1646,15 +1772,12 @@ class LeaveBalanceUpdateView(View):
                     if user:
                         # Update only for the selected user
                         leave_balances = LeaveBalanceOpenings.objects.filter(
-                            user=user,
-                            leave_type=leave_type,
-                            year=year
+                            user=user, leave_type=leave_type, year=year
                         )
                     else:
                         # Update for all users with the selected leave type
                         leave_balances = LeaveBalanceOpenings.objects.filter(
-                            leave_type=leave_type,
-                            year=year
+                            leave_type=leave_type, year=year
                         )
 
                     if leave_balances.exists():
@@ -1666,10 +1789,21 @@ class LeaveBalanceUpdateView(View):
                             if no_of_leaves is not None:
                                 balance.no_of_leaves = no_of_leaves
                             if remaining_leave_balances is not None:
-                                balance.remaining_leave_balances = remaining_leave_balances
-                            balance.save(update_fields=["opening_balance", "closing_balance", "no_of_leaves", "remaining_leave_balances"])
+                                balance.remaining_leave_balances = (
+                                    remaining_leave_balances
+                                )
+                            balance.save(
+                                update_fields=[
+                                    "opening_balance",
+                                    "closing_balance",
+                                    "no_of_leaves",
+                                    "remaining_leave_balances",
+                                ]
+                            )
 
-                        messages.success(request, "Leave balances updated successfully.")
+                        messages.success(
+                            request, "Leave balances updated successfully."
+                        )
                     else:
                         # If no leave balances exist, create them
                         messages.warning(request, "No existing leave balances found.")
@@ -1693,14 +1827,19 @@ class LeaveBalanceUpdateView(View):
                                     opening_balance=opening_balance or 0,
                                     closing_balance=closing_balance or 0,
                                     no_of_leaves=no_of_leaves or 0,
-                                    remaining_leave_balances=remaining_leave_balances or 0,
+                                    remaining_leave_balances=remaining_leave_balances
+                                    or 0,
                                     created_by=request.user,
                                 )
-                        messages.success(request, "New leave balances created successfully.")
+                        messages.success(
+                            request, "New leave balances created successfully."
+                        )
 
             except Exception as e:
                 messages.error(request, f"An error occurred: {e}")
 
-            return redirect('leave_bal_up')
+            return redirect("leave_bal_up")
 
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {"form": form})
+
+

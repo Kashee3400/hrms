@@ -1,3 +1,4 @@
+{% load i18n %}
 <li class="nav-item dropdown">
   
   <a class="nav-link count-indicator" id="countDropdown" href="#" data-bs-toggle="dropdown" aria-expanded="false">
@@ -6,7 +7,7 @@
   </a>
   <div class="dropdown-menu dropdown-menu-right navbar-dropdown preview-list pb-0" aria-labelledby="countDropdown">
     <a class="dropdown-item py-3">
-      <p class="mb-0 font-weight-medium float-left">You have {{ pending_leaves.count }} pending leave requests</p>
+      <p class="mb-0 font-weight-medium float-left">{% trans "You have pending approvals" %}</p>
       <span class="badge badge-pill badge-primary float-right">View all</span>
     </a>
     {% if pending_leaves %}

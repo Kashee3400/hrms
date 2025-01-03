@@ -124,3 +124,15 @@ CELERY_TIMEZONE = "Asia/Kolkata"
 LOGO_URL = "hrms_app/img/logo.png"
 LOGO_MINI_URL = "hrms_app/img/logo.png"
 
+
+PANDAS_RENDERERS = [
+    'rest_pandas.renderers.PandasJSONRenderer',    # JSON output
+    'rest_pandas.renderers.PandasCSVRenderer',     # CSV output
+    'rest_pandas.renderers.PandasExcelRenderer',   # Excel output (.xlsx)
+    'rest_pandas.renderers.PandasOldExcelRenderer',   # Excel output (.xls)
+    'rest_pandas.renderers.PandasPNGRenderer',     # PNG charts
+    'rest_pandas.renderers.PandasSVGRenderer',     # SVG charts
+    'rest_pandas.renderers.PandasHTMLRenderer',    # HTML tables
+    'rest_pandas.renderers.PandasTextRenderer',    # Plain text output
+]
+# from rest_pandas.renderers import ,,,,PandasFileRenderer,,PandasImageRenderer,,,,

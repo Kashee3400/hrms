@@ -223,8 +223,6 @@ class PersonalDetailAdmin(admin.ModelAdmin):
         'religion',
         'marital_status',
         'birthday',
-        'ctc',
-        'ann_date',
         'doj',
         'dol',
     )
@@ -251,6 +249,7 @@ class PersonalDetailAdmin(admin.ModelAdmin):
     fieldsets = (
         ('Personal Information', {
             'fields': (
+                'salutation', 
                 'employee_code', 
                 'user', 
                 'avatar', 
@@ -270,9 +269,11 @@ class PersonalDetailAdmin(admin.ModelAdmin):
         ('Job Details', {
             'fields': (
                 'designation', 
-                'ctc', 
-                'ann_date', 
+                'marriage_ann',
                 'doj', 
+                'dor',
+                'dot',
+                'dof',
                 'dol',
             ),
         }),

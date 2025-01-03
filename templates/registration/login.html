@@ -7,6 +7,42 @@
   </div>
   <h4>Hello! let's get started</h4>
   <h6 class="fw-light">Sign in to continue.</h6>
+  <div class="row">
+    <div class="col-12">
+      {% block messages %}
+        {% if messages %}
+          <div class="messages">
+            {% for message in messages %}
+              <div class="alert {% if message.tags == 'success' %}
+                  alert-success
+
+                {% elif message.tags == 'info' %}
+                  
+                  alert-info
+
+                {% elif message.tags == 'warning' %}
+                  
+                  alert-warning
+
+                {% elif message.tags == 'error' %}
+                  
+                  alert-danger
+
+                {% else %}
+                  
+                  alert-secondary
+
+                {% endif %} alert-dismissible fade show"
+                role="alert">
+                {{ message|capfirst }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endblock %}
+    </div>
+  </div>
   <form class="pt-3" method="post">
     {% csrf_token %}
 

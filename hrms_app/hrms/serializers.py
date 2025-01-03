@@ -42,7 +42,7 @@ class AttendanceLogActionSerializer(serializers.ModelSerializer):
         model = AttendanceLogAction
         fields = "__all__"
 
-        
+
 class AttendanceLogSerializer(serializers.ModelSerializer):
     actions = AttendanceLogActionSerializer(many=True,read_only = True)
     appliedByName = serializers.StringRelatedField(source="applied_by", read_only=True)
@@ -580,3 +580,11 @@ class UserTourSerializer(serializers.ModelSerializer):
         representation = super().to_representation(instance)
         representation['isManager'] = self.context.get('isManager', False)
         return representation
+
+class LogASerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AttendanceLog
+        fields = ['applied_by', 'start_date', 'end_date','duration']
+        pandas_index = ['start_date']
+        pandas_scatter_coord = ['duration']
+        pandas_scatter_header = ['applied_by']

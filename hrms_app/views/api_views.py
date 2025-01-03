@@ -1266,3 +1266,197 @@ class ExecutePopulateAttendanceView(APIView):
                 {"error": f"Failed to sync data: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+class Top5EmployeesDurationAPIView(APIView):
+    """
+    API for aggregating attendance log data, providing top 5 employees based on
+    the highest total duration of attendance.
+    """
+    
+    def filter_queryset(self, queryset):
+        """
+        Filter data based on `applied_by`, `year`, and `month` query parameters.
+        """
+        applied_by = self.request.query_params.get('applied_by')
+        year = self.request.query_params.get('year')
+        month = self.request.query_params.get('month')
+
+        if not year:
+            raise ValidationError({"error": "Year is required."})
+
+        try:
+            year = int(year)
+            if month:
+                month = int(month)
+        except ValueError:
+            raise ValidationError({"error": "Invalid year or month format."})
+
+        if applied_by:
+            queryset = queryset.filter(applied_by__username=applied_by)
+        
+        queryset = queryset.filter(start_date__year=year)
+        if month:
+            queryset = queryset.filter(start_date__month=month)
+
+        return queryset
+
+    def calculate_working_duration(self, year, month=None):
+        """
+        Calculate the total working duration for the month/year, excluding Sundays and holidays.
+        Each working day is 8 hours.
+        
+        - If month is provided, calculate working hours for that month till the current date.
+        - If only year is provided, calculate working hours for all months in that year.
+        """
+        # Get today's date
+        today = timezone.now().date()
+
+        # If month is not provided, calculate for the whole year
+        if month:
+            # Ensure we are calculating up to today's date if it's in the given month
+            if today.month == month and today.year == year:
+                last_day = today
+            else:
+                # Get the last day of the month
+                last_day = timezone.datetime(year, month, 1).replace(hour=0, minute=0, second=0)
+                last_day = last_day.replace(
+                    month=month % 12 + 1 if month != 12 else 1
+                ) - timedelta(days=1)  # last day of the current month
+        else:
+            # If no month is passed, calculate for the entire year
+            last_day = timezone.datetime(year, 12, 31).date()
+
+        # Get all holidays for the specified year/month
+        holidays = Holiday.objects.filter(start_date__year=year)
+
+        # Calculate the total number of working days
+        total_days_in_period = []
+        current_date = timezone.datetime(year, 1, 1).date()
+
+        # Loop through all days in the period (either for the whole year or till the last day of the month)
+        while current_date <= last_day:
+            total_days_in_period.append(current_date)
+            current_date += timedelta(days=1)
+
+        # Count weekdays (exclude Sundays and holidays)
+        working_days = [
+            day for day in total_days_in_period
+            if day.weekday() != 6  # Exclude Sundays (Sunday is 6)
+            and not holidays.filter(start_date=day).exists()  # Exclude holidays
+        ]
+        
+        # Calculate total working hours
+        total_working_hours = len(working_days) * 8
+        return total_working_hours-8
+    
+    def get(self, request, *args, **kwargs):
+        """
+        Handle GET requests to provide top 5 employees with the highest total duration
+        and total working duration for the specified month/year.
+        """
+        # Filter the queryset based on the provided query parameters
+        queryset = AttendanceLog.objects.all()
+        queryset = self.filter_queryset(queryset)
+
+        # Aggregate by employee and calculate the total duration
+        top_5_employees = (
+            queryset
+            .values('applied_by__username')
+            .annotate(total_duration=Sum('duration'))
+            .order_by('-total_duration')[:5]
+        )
+
+        # Prepare response data
+        result = []
+        for employee in top_5_employees:
+            employee_name = f"{employee['applied_by__username']}"
+            total_duration_hours = employee['total_duration'].total_seconds() / 3600  # Convert to hours
+            # Format the total_duration_hours to 2 decimal places
+            result.append({
+                "employee": employee_name,
+                "total_duration_hours": round(total_duration_hours, 2)
+            })
+
+        # Get total working duration (excluding Sundays and holidays)
+        total_working_duration = self.calculate_working_duration(year=int(request.query_params['year']), month=int(request.query_params.get('month', 1)))
+
+        # Include the total working duration in the response
+        response_data = {
+            "top_5_employees": result,
+            "total_working_duration_hours": total_working_duration
+        }
+
+        # Return the aggregated data in JSON format
+        return Response(response_data, status=status.HTTP_200_OK)
+
+
+from django.http import JsonResponse
+from django.views import View
+from django.db.models import Sum
+from datetime import timedelta
+
+class Top5EmployeesView(View):
+    def get(self, request, year):
+        # Get holidays for the specified year
+        holidays = Holiday.objects.filter(start_date__year=year)
+
+        # Initialize a dictionary to store the total working hours per employee per month
+        top_5_data = {month: [] for month in range(1, 13)}  # For each month, store top 5 employees
+
+        for month in range(1, 13):
+            # Filter AttendanceLog for each month, considering holidays and weekends
+            monthly_data = (
+                AttendanceLog.objects
+                .filter(start_date__year=year, start_date__month=month)
+                .exclude(start_date__week_day=7)  # Exclude Sundays
+                .exclude(start_date__in=holidays.values('start_date'))  # Exclude holidays
+                .values('applied_by__username')  # Use username as identifier
+                .annotate(total_duration=Sum('duration'))
+                .order_by('-total_duration')[:5]  # Get top 5 employees for the current month
+            )
+
+            # Store the data for the top 5 employees for the current month
+            for record in monthly_data:
+                employee_id = record['applied_by__username']
+                total_duration_hours = record['total_duration'].total_seconds() / 3600  # Convert to hours
+
+                # Only include employees with non-zero total duration
+                if total_duration_hours > 0:
+                    top_5_data[month].append({
+                        'employee_id': employee_id,
+                        'total_duration_hours': round(total_duration_hours, 2)
+                    })
+
+        # Prepare data for the response
+        data = {
+            'labels': ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],  # Months
+            'datasets': []
+        }
+
+        employees = {}  # Keep track of employees and their data across all months
+
+        # Now structure the data for the response
+        for month, employees_data in top_5_data.items():
+            for employee in employees_data:
+                employee_id = employee['employee_id']
+                total_duration_hours = employee['total_duration_hours']
+
+                if employee_id not in employees:
+                    employees[employee_id] = {
+                        'label': employee_id,  # Use employee's username as label
+                        'monthly_duration': []  # Only store months with non-zero duration
+                    }
+
+                # Add the current month and its working hours
+                employees[employee_id]['monthly_duration'].append(total_duration_hours)
+
+        # Now structure the data for the response
+        for employee in employees.values():
+            data['datasets'].append({
+                'label': employee['label'],
+                'data': employee['monthly_duration'],
+                'borderColor': '#1F3BB3',  # Use a consistent color for all employees
+                'fill': False
+            })
+
+        return JsonResponse(data)

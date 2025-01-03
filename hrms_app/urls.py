@@ -1,7 +1,5 @@
 from django.contrib import admin
-from django.urls import path, include
-from hrms_app.hrms.sites import site
-from django.conf.urls.static import static
+from django.urls import path, include,re_path
 from hrms_app.views.api_views import *
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -34,6 +32,7 @@ urlpatterns = [
     path('notifications/', UserMonthlyNotificationsListView.as_view(), name='user_notifications'),
     path('notifications/<int:id>/update-read-status/', UpdateNotificationStatusView.as_view(), name='update-notification-status'),
     path("execute-populate-attendance/", ExecutePopulateAttendanceView.as_view(), name="execute_populate_attendance"),
-    
-]
+    path('attendance-aggregation/', Top5EmployeesDurationAPIView.as_view(), name='attendance-aggregation'),
+    path('get_top_5_employees/<int:year>/', Top5EmployeesView.as_view(), name='get_top_5_employees'),
 
+]

@@ -4,6 +4,10 @@ from django.utils.safestring import mark_safe
 from django.conf import settings
 from hrms_app.utility.leave_utils import get_employee_requested_leave,get_employee_requested_tour,get_regularization_requests
 register = template.Library()
+from hrms_app.models import PersonalDetails
+from django.utils.timezone import now
+from django.db import models
+import random
 
 @register.simple_tag
 def render_breadcrumb(title, urls):
@@ -249,3 +253,65 @@ def is_active(request_path, urls):
 @register.filter
 def in_list(value, arg):
     return value in arg.split(',')
+
+
+
+@register.inclusion_tag('hrms_app/charts/top_5_employees_duration_chart.html')
+def render_top_5_employees_by_duration():
+    return {'top_performer':"Top Performer"}
+
+@register.inclusion_tag('includes/sync_attendance.html')
+def load_attendance_form(form):
+    return {'form':form}
+
+
+@register.simple_tag
+def get_employee_highlights():
+    """
+    This tag retrieves employees who have a birthday, marriage anniversary,
+    or job anniversary today, along with random background colors for the carousel.
+    """
+    # Get employee highlights using the existing method
+    today = now().date()
+    employees = PersonalDetails.objects.filter(
+        models.Q(birthday__month=today.month, birthday__day=today.day)
+        | models.Q(marriage_ann__month=today.month, marriage_ann__day=today.day)
+        | models.Q(doj__month=today.month, doj__day=today.day)
+    )
+
+    light_colors = [
+        "bg-light-blue",
+        "bg-light-pink",
+        "bg-light-yellow",
+        "bg-light-green",
+        "bg-light-coral",
+        "bg-light-cyan",
+        "bg-light-lavender",
+    ]
+
+    for employee in employees:
+        events = []
+        if (
+            employee.birthday
+            and employee.birthday.month == today.month
+            and employee.birthday.day == today.day
+        ):
+            events.append("🎉 Happy Birthday! 🎉")
+        if (
+            employee.marriage_ann
+            and employee.marriage_ann.month == today.month
+            and employee.marriage_ann.day == today.day
+        ):
+            events.append("💍 Happy Marriage Anniversary! 💍")
+        if (
+            employee.doj
+            and employee.doj.month == today.month
+            and employee.doj.day == today.day
+        ):
+            events.append("🎊 Happy Job Anniversary! 🎊")
+        employee.events = events
+
+        # Assign a random light color to each employee
+        employee.bg_color = random.choice(light_colors)
+
+    return employees

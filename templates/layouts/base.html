@@ -36,15 +36,14 @@
           {% include 'includes/sidebar.html' %}
         {% endblock %}
 
-        <div class="main-panel vh-100 overflow-auto">
-          <div class="content-wrapper">
+        <div class="main-panel vh-100 overflow-auto border-top">
+          <div class="content-wrapper px-4 py-1">
             <div class="col-12">
               {% block messages %}
                 {% if messages %}
                   <div class="messages">
                     {% for message in messages %}
                       <div class="alert {% if message.tags == 'success' %}
-                          
                           alert-success
 
                         {% elif message.tags == 'info' %}
@@ -83,10 +82,10 @@
                 {% endblock %}
               </div>
             </div>
-          </div>
           {% include 'includes/footer.html' %}
-        </div>
 
+          </div>
+        </div>
         {% block settings_panel %}
           {% include 'includes/settings-panel.html' %}
         {% endblock %}

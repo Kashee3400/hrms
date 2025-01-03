@@ -7,7 +7,7 @@
   </div>
 
   <ul class="nav flex-column">
-    {% if request.user.is_superuser %}
+    {% if request.user.is_superuser or request.user.is_staff %}
     {% url 'dashboard' as index_url %}
       <li class="nav-item {% if request.path == index_url %} active {% endif %}">
         <a class="nav-link" href="{{index_url}}">
@@ -36,39 +36,11 @@
               <a class="nav-link"
                 data-bs-toggle="collapse"
                 href="#submenu-{{ app.app_label }}"
-                aria-expanded="{% if app.app_label in request.path %}
-                  
-                  
-                
-                
-                true
-
-
-
-                {% else %}
-                  
-                  
-                
-                false
-
-
-
-                {% endif %}"
+                aria-expanded="{% if app.app_label in request.path %}true{% else %}false{% endif %}"
                 aria-controls="submenu-{{ app.app_label }}">
                 <i class="menu-icon mdi {% if app.icon %}
                     {{ app.icon }}
-                  {% else %}
-                    
-                    
-                  
-                  
-                  mdi-octagon
-
-
-
-
-                  {% endif %}">
-
+                  {% else %}mdi-octagon{% endif %}">
                 </i>
                 <span class="menu-title">{{ app.label|slice:10 }}{% if app.label|length > 10 %}..{% endif %}</span>
                 <i class="menu-arrow"></i>

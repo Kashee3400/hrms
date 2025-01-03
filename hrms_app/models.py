@@ -670,20 +670,7 @@ class PersonalDetails(models.Model):
         verbose_name=_("Marriage Anniversary"),
         help_text=_("Enter the employee's marriage anniversary (optional)."),
     )
-    ctc = models.DecimalField(
-        null=True,
-        blank=True,
-        max_digits=10,
-        decimal_places=2,
-        verbose_name=_("CTC"),
-        help_text=_("Enter the employee's Cost to Company (CTC) (optional)."),
-    )
-    ann_date = models.DateField(
-        null=True,
-        blank=True,
-        verbose_name=_("Job Anniversary"),
-        help_text=_("Enter the employee's job anniversary (optional)."),
-    )
+
     doj = models.DateField(
         verbose_name=_("Date of Joining"),
         help_text=_("Enter the employee's date of joining."),
@@ -714,6 +701,7 @@ class PersonalDetails(models.Model):
         verbose_name=_("Date of Final Settlement"),
         help_text=_("Enter the employee's final settlement date (if applicable)."),
     )
+
     updated_at = models.DateTimeField(
         auto_now=True,
         verbose_name=_("Updated At"),
@@ -2605,9 +2593,9 @@ class AttendanceLog(models.Model):
         verbose_name=_("Is Submitted"),
         help_text=_("Indicate if the regularization has been submitted."),
     )
-    is_late_coming = models.BooleanField(
+    regularized = models.BooleanField(
         default=False,
-        verbose_name=_("Is Late Coming"),
+        verbose_name=_("Attendance Regularized"),
         help_text=_("Indicate if this entry is for late coming regularization."),
     )
     is_early_going = models.BooleanField(
@@ -2630,7 +2618,7 @@ class AttendanceLog(models.Model):
         super(AttendanceLog, self).save(*args, **kwargs)
 
     def __str__(self):
-        return self.title
+        return f"{self.title}"
 
     def approve(self, action_by, reason=None):
         self.save(

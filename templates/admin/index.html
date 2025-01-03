@@ -6,83 +6,74 @@
 {% endblock %}
 {% block extrastyle %}
   <link rel="stylesheet" href="{% static 'js/select.dataTables.min.css' %}" />
+  <style>
+    .bg-light-blue {
+      background-color: #d9f2ff; /* Light blue */
+    }
+    
+    .bg-light-pink {
+      background-color: #ffe6e9; /* Light pink */
+    }
+    
+    .bg-light-yellow {
+      background-color: #fff8d9; /* Light yellow */
+    }
+    
+    .bg-light-green {
+      background-color: #e4ffdb; /* Light green */
+    }
+    
+    .bg-light-coral {
+      background-color: #ffd6cc; /* Light coral */
+    }
+    
+    .bg-light-cyan {
+      background-color: #d9ffff; /* Light cyan */
+    }
+    
+    .bg-light-lavender {
+      background-color: #f4eaff; /* Light lavender */
+    }
+    .event-text {
+      display: inline-block;
+      animation: fadeInUp 1s ease-in-out;
+    }
+    
+    .event-item {
+      opacity: 0;
+      animation: appear 1s ease-in-out forwards;
+      animation-delay: calc(var(--order, 0) * 0.5s); /* Staggered delay for each event */
+    }
+    
+    @keyframes appear {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+  </style>
 {% endblock %}
 
 {% block content %}
   <div class="home-tab">
-    <div class="d-sm-flex align-items-center justify-content-between border-bottom">
-      <ul class="nav nav-tabs" role="tablist">
-        <li class="nav-item">
-          <a class="nav-link active ps-0" id="home-tab" data-bs-toggle="tab" href="#overview" role="tab" aria-controls="overview" aria-selected="true">Overview</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" id="profile-tab" data-bs-toggle="tab" href="#audiences" role="tab" aria-selected="false">Audiences</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" id="contact-tab" data-bs-toggle="tab" href="#demographics" role="tab" aria-selected="false">Demographics</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link border-0" id="more-tab" data-bs-toggle="tab" href="#more" role="tab" aria-selected="false">More</a>
-        </li>
-      </ul>
-      <div>
-        <div class="btn-wrapper">
-          <a href="#" class="btn btn-otline-dark align-items-center"><i class="icon-share"></i> Share</a>
-          <a href="#" class="btn btn-otline-dark"><i class="icon-printer"></i> Print</a>
-          <a href="#" class="btn btn-primary text-white me-0"><i class="icon-download"></i> Export</a>
-        </div>
-      </div>
-    </div>
     <div class="tab-content tab-content-basic">
       <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview">
-        <div class="row">
-          <div class="col-sm-12">
-            <div class="statistics-details d-flex align-items-center justify-content-between">
-              <div>
-                <p class="statistics-title">Bounce Rate</p>
-                <h3 class="rate-percentage">32.53%</h3>
-                <p class="text-danger d-flex">
-                  <i class="mdi mdi-menu-down"></i><span>-0.5%</span>
-                </p>
-              </div>
-              <div>
-                <p class="statistics-title">Page Views</p>
-                <h3 class="rate-percentage">7,682</h3>
-                <p class="text-success d-flex">
-                  <i class="mdi mdi-menu-up"></i><span>+0.1%</span>
-                </p>
-              </div>
-              <div>
-                <p class="statistics-title">New Sessions</p>
-                <h3 class="rate-percentage">68.8</h3>
-                <p class="text-danger d-flex">
-                  <i class="mdi mdi-menu-down"></i><span>68.8</span>
-                </p>
-              </div>
-              <div class="d-none d-md-block">
-                <p class="statistics-title">Avg. Time on Site</p>
-                <h3 class="rate-percentage">2m:35s</h3>
-                <p class="text-success d-flex">
-                  <i class="mdi mdi-menu-down"></i><span>+0.8%</span>
-                </p>
-              </div>
-              <div class="d-none d-md-block">
-                <p class="statistics-title">New Sessions</p>
-                <h3 class="rate-percentage">68.8</h3>
-                <p class="text-danger d-flex">
-                  <i class="mdi mdi-menu-down"></i><span>68.8</span>
-                </p>
-              </div>
-              <div class="d-none d-md-block">
-                <p class="statistics-title">Avg. Time on Site</p>
-                <h3 class="rate-percentage">2m:35s</h3>
-                <p class="text-success d-flex">
-                  <i class="mdi mdi-menu-down"></i><span>+0.8%</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
         <div class="row">
           <div class="col-lg-8 d-flex flex-column">
             <div class="row flex-grow">
@@ -104,28 +95,17 @@
               </div>
             </div>
           </div>
+          {% if employees %}
           <div class="col-lg-4 d-flex flex-column">
             <div class="row flex-grow">
-              <div class="col-md-6 col-lg-12 grid-margin stretch-card">
-                <div class="card bg-white card-rounded">
-                  <div class="card-body pb-0">
-                    <h4 class="card-title card-title-dash text-dark mb-4">{% trans 'Populate User Specific attendance' %}</h4>
-                    <div class="row">
-                      <form method="post">
-                        {% csrf_token %}
-                        <div class="col-sm-12">{{ form.as_p }}</div>
-                        <div class="col-sm-8">
-                          <div class="status-summary-chart-wrapper pb-4">
-                            <button type="button" id="executeCommandButton" class="btn btn-sm btn-primary text-white">{% trans "Sync Attendance" %}</button>
-                          </div>
-                        </div>
-                      </form>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {% include 'includes/employee_highlights.html' %}
             </div>
           </div>
+          {% else %}
+          <div class="col-lg-4 d-flex flex-column">
+            {% load_attendance_form form %}
+          </div>
+          {% endif %}
         </div>
         <div class="row">
           <div class="col-lg-8 d-flex flex-column">
@@ -135,11 +115,11 @@
                   <div class="card-body">
                     <div class="d-sm-flex justify-content-between align-items-start">
                       <div>
-                        <h4 class="card-title card-title-dash">Pending Requests</h4>
-                        <p class="card-subtitle card-subtitle-dash">You have 50+ new requests</p>
+                        <h4 class="card-title card-title-dash">{% trans "Registered Employees" %}</h4>
+                        <p class="card-subtitle card-subtitle-dash">You have {{users.count}} registered employees</p>
                       </div>
                       <div>
-                        <a class="btn btn-primary btn-lg text-white mb-0 me-0" href="{% url 'create_user' %}"><i class="mdi mdi-account-plus"></i>Add new member</a>
+                        <a class="btn btn-primary btn-lg text-white mb-0 me-0" href="{% url 'create_user' %}"><i class="mdi mdi-account-plus"></i>{% trans "Add new employee" %}</a>
                       </div>
                     </div>
                     <div class="dt-responsive table-responsive mt-1">
@@ -196,84 +176,58 @@
               </div>
             </div>
             <div class="row flex-grow">
-              <div class="col-md-6 col-lg-6 grid-margin stretch-card">
+              <div class="col-12 grid-margin stretch-card">
                 <div class="card card-rounded">
                   <div class="card-body">
-                    <div class="d-flex align-items-center justify-content-between mb-3">
-                      <h4 class="card-title card-title-dash">Activities</h4>
-                      <p class="mb-0">20 finished, 5 remaining</p>
-                    </div>
-                    <ul class="bullet-line-list">
-                      <li>
-                        <div class="d-flex justify-content-between">
-                          <div>
-                            <span class="text-light-green">Ben Tossell</span> assign you a task
-                          </div>
-                          <p>Just now</p>
-                        </div>
-                      </li>
-                      <li>
-                        <div class="d-flex justify-content-between">
-                          <div>
-                            <span class="text-light-green">Oliver Noah</span> assign you a task
-                          </div>
-                          <p>1h</p>
-                        </div>
-                      </li>
-                      <li>
-                        <div class="d-flex justify-content-between">
-                          <div>
-                            <span class="text-light-green">Jack William</span> assign you a task
-                          </div>
-                          <p>1h</p>
-                        </div>
-                      </li>
-                      <li>
-                        <div class="d-flex justify-content-between">
-                          <div>
-                            <span class="text-light-green">Leo Lucas</span> assign you a task
-                          </div>
-                          <p>1h</p>
-                        </div>
-                      </li>
-                      <li>
-                        <div class="d-flex justify-content-between">
-                          <div>
-                            <span class="text-light-green">Thomas Henry</span> assign you a task
-                          </div>
-                          <p>1h</p>
-                        </div>
-                      </li>
-                      <li>
-                        <div class="d-flex justify-content-between">
-                          <div>
-                            <span class="text-light-green">Ben Tossell</span> assign you a task
-                          </div>
-                          <p>1h</p>
-                        </div>
-                      </li>
-                      <li>
-                        <div class="d-flex justify-content-between">
-                          <div>
-                            <span class="text-light-green">Ben Tossell</span> assign you a task
-                          </div>
-                          <p>1h</p>
-                        </div>
-                      </li>
-                    </ul>
-                    <div class="list align-items-center pt-3">
-                      <div class="wrapper w-100">
-                        <p class="mb-0">
-                          <a href="#" class="fw-bold text-primary">Show all <i class="mdi mdi-arrow-right ms-2"></i></a>
-                        </p>
-                      </div>
-                    </div>
+                    {% if users|length > 0 %}
+                      <table class="table table-bordered">
+                        <thead>
+                          <tr>
+                            <th>#</th>
+                            <th>Employee Name</th>
+                            <th>Event(s)</th>
+                            <th>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {% for user in users %}
+                            {% with user.personal_detail as detail %}
+                              {% if detail.birthday or detail.marriage_ann or detail.doj %}
+                              {% if detail.birthday.month == current_date.month or detail.marriage_ann.month == current_date.month or detail.doj.month == current_date.month %}
+                                  <tr>
+                                    <td>{{ forloop.counter }}</td>
+                                    <td>{{ user.get_full_name }}</td>
+                                    <td>
+                                      {% if detail.birthday and detail.birthday.month == current_date.month %}
+                                        🎉 Birthday<br>
+                                      {% endif %}
+                                      {% if detail.marriage_ann and detail.marriage_ann.month == current_date.month %}
+                                        💍 Marriage Anniversary<br>
+                                      {% endif %}
+                                      {% if detail.doj and detail.doj.month == current_date.month %}
+                                        🎊 Job Anniversary<br>
+                                      {% endif %}
+                                    </td>
+                                    <td>
+                                      <button href="" class="btn btn-primary">{% trans "Wish" %}</button>
+                                    </td>
+                                  </tr>
+                              {% endif %}
+                              {% endif %}
+                            {% endwith %}
+                          {% endfor %}
+                        </tbody>
+                      </table>
+                    {% else %}
+                      <p>No events to display for this month.</p>
+                    {% endif %}
                   </div>
                 </div>
               </div>
             </div>
           </div>
           <div class="col-lg-4 d-flex flex-column">
+            {% if todo_list %}
             <div class="row flex-grow">
               <div class="col-12 grid-margin stretch-card">
                 <div class="card card-rounded">
@@ -334,6 +288,7 @@
                 </div>
               </div>
             </div>
+            {% endif %}
             <div class="row flex-grow">
               <div class="col-12 grid-margin stretch-card">
                 <div class="card card-rounded">
@@ -357,7 +312,7 @@
                       <div class="col-lg-12">
                         <div class="d-flex justify-content-between align-items-center mb-3">
                           <div>
-                            <h4 class="card-title card-title-dash">Leave Report</h4>
+                            <h4 class="card-title card-title-dash">{% trans "Top Performer" %}</h4>
                           </div>
                           <div>
                             <div class="dropdown">
@@ -370,7 +325,7 @@
                           </div>
                         </div>
                         <div class="mt-3">
-                          <canvas id="leaveReport"></canvas>
+                          {% render_top_5_employees_by_duration %}
                         </div>
                       </div>
                     </div>
@@ -378,75 +333,9 @@
                 </div>
               </div>
             </div>
-            <div class="row flex-grow">
-              <div class="col-12 grid-margin stretch-card">
-                <div class="card card-rounded">
-                  <div class="card-body">
-                    <div class="row">
-                      <div class="col-lg-12">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                          <div>
-                            <h4 class="card-title card-title-dash">Top Performer</h4>
-                          </div>
-                        </div>
-                        <div class="mt-3">
-                          <div class="wrapper d-flex align-items-center justify-content-between py-2 border-bottom">
-                            <div class="d-flex">
-                              <img class="img-sm rounded-10" src="{% static 'images/faces/face1.jpg' %}" alt="profile" />
-                              <div class="wrapper ms-3">
-                                <p class="ms-1 mb-1 fw-bold">Brandon Washington</p>
-                                <small class="text-muted mb-0">162543</small>
-                              </div>
-                            </div>
-                            <div class="text-muted text-small">1h ago</div>
-                          </div>
-                          <div class="wrapper d-flex align-items-center justify-content-between py-2 border-bottom">
-                            <div class="d-flex">
-                              <img class="img-sm rounded-10" src="{% static 'images/faces/face2.jpg' %}" alt="profile" />
-                              <div class="wrapper ms-3">
-                                <p class="ms-1 mb-1 fw-bold">Wayne Murphy</p>
-                                <small class="text-muted mb-0">162543</small>
-                              </div>
-                            </div>
-                            <div class="text-muted text-small">1h ago</div>
-                          </div>
-                          <div class="wrapper d-flex align-items-center justify-content-between py-2 border-bottom">
-                            <div class="d-flex">
-                              <img class="img-sm rounded-10" src="{% static 'images/faces/face3.jpg' %}" alt="profile" />
-                              <div class="wrapper ms-3">
-                                <p class="ms-1 mb-1 fw-bold">Katherine Butler</p>
-                                <small class="text-muted mb-0">162543</small>
-                              </div>
-                            </div>
-                            <div class="text-muted text-small">1h ago</div>
-                          </div>
-                          <div class="wrapper d-flex align-items-center justify-content-between py-2 border-bottom">
-                            <div class="d-flex">
-                              <img class="img-sm rounded-10" src="{% static 'images/faces/face4.jpg' %}" alt="profile" />
-                              <div class="wrapper ms-3">
-                                <p class="ms-1 mb-1 fw-bold">Matthew Bailey</p>
-                                <small class="text-muted mb-0">162543</small>
-                              </div>
-                            </div>
-                            <div class="text-muted text-small">1h ago</div>
-                          </div>
-                          <div class="wrapper d-flex align-items-center justify-content-between pt-2">
-                            <div class="d-flex">
-                              <img class="img-sm rounded-10" src="{% static 'images/faces/face5.jpg' %}" alt="profile" />
-                              <div class="wrapper ms-3">
-                                <p class="ms-1 mb-1 fw-bold">Rafell John</p>
-                                <small class="text-muted mb-0">Alaska, USA</small>
-                              </div>
-                            </div>
-                            <div class="text-muted text-small">1h ago</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {% if employees %}
+            {% load_attendance_form form %}
+            {% endif %}
           </div>
         </div>
       </div>
