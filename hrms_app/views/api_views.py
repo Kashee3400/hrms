@@ -1288,6 +1288,8 @@ class Top5EmployeesDurationAPIView(APIView):
         try:
             year = int(year)
             if year < 1900 or year > timezone.now().year + 1:
+                logging.error(f"Invalid 'year'. Year must be between 1900 and the current year.")
+                
                 raise ValidationError({"error": "Invalid 'year'. Year must be between 1900 and the current year."})
         except ValueError:
             raise ValidationError({"error": "The 'year' parameter must be a valid integer."})
@@ -1336,6 +1338,7 @@ class Top5EmployeesDurationAPIView(APIView):
             return len(working_days) * 8  # 8 hours per working day
 
         except Exception as e:
+            logging.error(f"{str(e)}")
             raise ValidationError({"error": f"Failed to calculate working duration: {str(e)}"})
 
     def get(self, request, *args, **kwargs):
@@ -1381,8 +1384,10 @@ class Top5EmployeesDurationAPIView(APIView):
             return Response(response_data, status=status.HTTP_200_OK)
 
         except ValidationError as ve:
+            logging.error(f" BAD request{str(ve)}")
             return Response({"error": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
+            logging.error(f"An unexpected error occurred: {str(e)}")
             return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 from django.http import JsonResponse
@@ -1453,5 +1458,4 @@ class Top5EmployeesView(View):
                 'borderColor': '#1F3BB3',  # Use a consistent color for all employees
                 'fill': False
             })
-
         return JsonResponse(data)
