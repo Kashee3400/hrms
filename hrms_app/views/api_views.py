@@ -1272,7 +1272,7 @@ class Top5EmployeesDurationAPIView(APIView):
     API for aggregating attendance log data, providing top 5 employees based on
     the highest total duration of attendance.
     """
-    
+
     def filter_queryset(self, queryset):
         """
         Filter data based on `applied_by`, `year`, and `month` query parameters.
@@ -1281,16 +1281,26 @@ class Top5EmployeesDurationAPIView(APIView):
         year = self.request.query_params.get('year')
         month = self.request.query_params.get('month')
 
+        # Validate `year` and `month` parameters
         if not year:
-            raise ValidationError({"error": "Year is required."})
-
+            raise ValidationError({"error": "The 'year' parameter is required."})
+        
         try:
             year = int(year)
-            if month:
-                month = int(month)
+            if year < 1900 or year > timezone.now().year + 1:
+                raise ValidationError({"error": "Invalid 'year'. Year must be between 1900 and the current year."})
         except ValueError:
-            raise ValidationError({"error": "Invalid year or month format."})
+            raise ValidationError({"error": "The 'year' parameter must be a valid integer."})
 
+        if month:
+            try:
+                month = int(month)
+                if month < 1 or month > 12:
+                    raise ValidationError({"error": "The 'month' parameter must be between 1 and 12."})
+            except ValueError:
+                raise ValidationError({"error": "The 'month' parameter must be a valid integer."})
+
+        # Apply filters to the queryset
         if applied_by:
             queryset = queryset.filter(applied_by__username=applied_by)
         
@@ -1303,92 +1313,77 @@ class Top5EmployeesDurationAPIView(APIView):
     def calculate_working_duration(self, year, month=None):
         """
         Calculate the total working duration for the month/year, excluding Sundays and holidays.
-        Each working day is 8 hours.
-        
-        - If month is provided, calculate working hours for that month till the current date.
-        - If only year is provided, calculate working hours for all months in that year.
         """
-        # Get today's date
-        today = timezone.now().date()
-
-        # If month is not provided, calculate for the whole year
-        if month:
-            # Ensure we are calculating up to today's date if it's in the given month
-            if today.month == month and today.year == year:
-                last_day = today
+        try:
+            # Define the period
+            today = timezone.now().date()
+            if month:
+                first_day = timezone.datetime(year, month, 1).date()
+                last_day = today if today.year == year and today.month == month else first_day.replace(month=month + 1) - timedelta(days=1)
             else:
-                # Get the last day of the month
-                last_day = timezone.datetime(year, month, 1).replace(hour=0, minute=0, second=0)
-                last_day = last_day.replace(
-                    month=month % 12 + 1 if month != 12 else 1
-                ) - timedelta(days=1)  # last day of the current month
-        else:
-            # If no month is passed, calculate for the entire year
-            last_day = timezone.datetime(year, 12, 31).date()
+                first_day = timezone.datetime(year, 1, 1).date()
+                last_day = timezone.datetime(year, 12, 31).date()
 
-        # Get all holidays for the specified year/month
-        holidays = Holiday.objects.filter(start_date__year=year)
+            # Get holidays
+            holidays = Holiday.objects.filter(start_date__range=[first_day, last_day])
+            
+            # Calculate working days
+            working_days = [
+                day for day in (first_day + timedelta(n) for n in range((last_day - first_day).days + 1))
+                if day.weekday() != 6 and not holidays.filter(start_date=day).exists()
+            ]
 
-        # Calculate the total number of working days
-        total_days_in_period = []
-        current_date = timezone.datetime(year, 1, 1).date()
+            return len(working_days) * 8  # 8 hours per working day
 
-        # Loop through all days in the period (either for the whole year or till the last day of the month)
-        while current_date <= last_day:
-            total_days_in_period.append(current_date)
-            current_date += timedelta(days=1)
+        except Exception as e:
+            raise ValidationError({"error": f"Failed to calculate working duration: {str(e)}"})
 
-        # Count weekdays (exclude Sundays and holidays)
-        working_days = [
-            day for day in total_days_in_period
-            if day.weekday() != 6  # Exclude Sundays (Sunday is 6)
-            and not holidays.filter(start_date=day).exists()  # Exclude holidays
-        ]
-        
-        # Calculate total working hours
-        total_working_hours = len(working_days) * 8
-        return total_working_hours-8
-    
     def get(self, request, *args, **kwargs):
         """
         Handle GET requests to provide top 5 employees with the highest total duration
         and total working duration for the specified month/year.
         """
-        # Filter the queryset based on the provided query parameters
-        queryset = AttendanceLog.objects.all()
-        queryset = self.filter_queryset(queryset)
+        try:
+            # Filter and validate queryset
+            queryset = AttendanceLog.objects.all()
+            queryset = self.filter_queryset(queryset)
 
-        # Aggregate by employee and calculate the total duration
-        top_5_employees = (
-            queryset
-            .values('applied_by__username')
-            .annotate(total_duration=Sum('duration'))
-            .order_by('-total_duration')[:5]
-        )
+            # Aggregate top 5 employees
+            top_5_employees = (
+                queryset
+                .values('applied_by__username')
+                .annotate(total_duration=Sum('duration'))
+                .order_by('-total_duration')[:5]
+            )
 
-        # Prepare response data
-        result = []
-        for employee in top_5_employees:
-            employee_name = f"{employee['applied_by__username']}"
-            total_duration_hours = employee['total_duration'].total_seconds() / 3600  # Convert to hours
-            # Format the total_duration_hours to 2 decimal places
-            result.append({
-                "employee": employee_name,
-                "total_duration_hours": round(total_duration_hours, 2)
-            })
+            if not top_5_employees:
+                return Response({"message": "No attendance data found for the given period."}, status=status.HTTP_200_OK)
 
-        # Get total working duration (excluding Sundays and holidays)
-        total_working_duration = self.calculate_working_duration(year=int(request.query_params['year']), month=int(request.query_params.get('month', 1)))
+            # Prepare response data
+            result = []
+            for employee in top_5_employees:
+                total_duration_hours = employee['total_duration'].total_seconds() / 3600  # Convert seconds to hours
+                result.append({
+                    "employee": employee['applied_by__username'],
+                    "total_duration_hours": round(total_duration_hours, 2)
+                })
 
-        # Include the total working duration in the response
-        response_data = {
-            "top_5_employees": result,
-            "total_working_duration_hours": total_working_duration
-        }
+            # Calculate total working duration
+            total_working_duration = self.calculate_working_duration(
+                year=int(request.query_params['year']),
+                month=int(request.query_params.get('month', 0))
+            )
 
-        # Return the aggregated data in JSON format
-        return Response(response_data, status=status.HTTP_200_OK)
+            response_data = {
+                "top_5_employees": result,
+                "total_working_duration_hours": total_working_duration
+            }
+            return Response(response_data, status=status.HTTP_200_OK)
 
+        except ValidationError as ve:
+            return Response({"error": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": f"An unexpected error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 from django.http import JsonResponse
 from django.views import View
