@@ -32,27 +32,23 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
         end_date_object,
     ):
         attendance_data = defaultdict(lambda: defaultdict(list))
+        sundays = {
+            start_date_object + timedelta(days=i)
+            for i in range((end_date_object - start_date_object).days + 1)
+            if (start_date_object + timedelta(days=i)).weekday() == 6
+        }
 
         # Optimized Holiday Handling
         holiday_days = {
-            holiday.start_date.day: {
+            holiday.start_date : {
                 "status": holiday.short_code,
                 "color": holiday.color_hex,
             }
             for holiday in holidays
         }
 
-        # # Optimize Attendance Log Mapping
-        # for log in attendance_logs:
-        #     attendance_data[log.applied_by.id][log.start_date.day].append(
-        #         {
-        #             "status": log.att_status_short_code,
-        #             "color": log.color_hex or "#000000",
-        #         }
-        #     )
-        # Optimize Attendance Log Mapping
         for log in attendance_logs:
-            attendance_data[log.applied_by.id][log.start_date.day].append(
+            attendance_data[log.applied_by.id][localtime(log.start_date).date()].append(
                 {
                     "status": log.att_status_short_code,
                     "color": log.color_hex or "#000000",
@@ -63,72 +59,69 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
         for log in tour_logs:
             daily_durations = calculate_daily_tour_durations(log.start_date, log.start_time, log.end_date, log.end_time)
             for date, short_code, duration in daily_durations:
-                attendance_data[log.applied_by.id][date.day] = {
+                attendance_data[log.applied_by.id][date] = {
                         "status": short_code,
                         "color": "#06c1c4",
                     }
-            holiday_days.pop(date.day, None)
+            holiday_days.pop(date, None)
 
         # Add remaining holidays to attendance data
         for employee_id in attendance_data.keys():
             for day, holiday_info in holiday_days.items():
                 attendance_data[employee_id][day].append(holiday_info)
-
+        
         # Optimize Leave Log Mapping
         for log in leave_logs:
             start_date = localtime(log.startDate)
             end_date = localtime(log.endDate)
             for day in range((end_date - start_date).days + 1):
                 current_date = start_date + timedelta(days=day)
-                day_of_month = current_date.day
+                day_of_month = current_date
                 leave_status = log.leave_type.leave_type_short_code
+                
                 if leave_status == "CL":
+                    # Handle "CL" leave type
                     if day_of_month in holiday_days:
-                        attendance_data[log.appliedBy.id][day_of_month].append(
+                        attendance_data[log.appliedBy.id][day_of_month.date()].append(
                             {
                                 "status": "",
-                                "color": holiday_days[day_of_month]["color"],
+                                "color": holiday_days[day_of_month.date()]["color"],
                             }
                         )
                     elif current_date.weekday() == 6:
-                        attendance_data[log.appliedBy.id][day_of_month].append(
+                        attendance_data[log.appliedBy.id][day_of_month.date()].append(
                             {
                                 "status": "OFF",
                                 "color": "#CCCCCC",
                             }
                         )
                     else:
-                        attendance_data[log.appliedBy.id][day_of_month].append(
+                        attendance_data[log.appliedBy.id][day_of_month.date()].append(
                             {
                                 "status": leave_status,
                                 "color": log.leave_type.color_hex or "#FF0000",
                             }
                         )
                 else:
-                    if day_of_month in attendance_data[log.appliedBy.id]:
-                        # Check if any entry has the status 'FH'
-                        for entry in attendance_data[log.appliedBy.id][day_of_month]:
-                            if entry.get("status") == "FH":
-                                del attendance_data[log.appliedBy.id][day_of_month]
-                                break
-                    attendance_data[log.appliedBy.id][day_of_month].append(
+                    # Handle other leave types
+                    date_entries = attendance_data[log.appliedBy.id].get(day_of_month.date(), [])
+                    
+                    # Check if "FL" exists and remove all entries if found
+                    if any(entry.get("status") == "FL" for entry in date_entries):
+                        attendance_data[log.appliedBy.id][day_of_month.date()] = []
+                    
+                    # Append the new leave status
+                    attendance_data[log.appliedBy.id][day_of_month.date()].append(
                         {
                             "status": leave_status,
                             "color": log.leave_type.color_hex or "#FF0000",
                         }
                     )
 
-        # Efficient Sunday Handling
-        sundays = {
-            day
-            for day in range(start_date_object.day, end_date_object.day + 1)
-            if (start_date_object + timedelta(days=day - 1)).weekday() == 6
-        }
-
         for employee_id in attendance_data.keys():
             for sunday in sundays:
-                if not attendance_data[employee_id][sunday]:
-                    attendance_data[employee_id][sunday].append(
+                if not attendance_data[employee_id][sunday.date()]:
+                    attendance_data[employee_id][sunday.date()].append(
                         {
                             "status": "OFF",
                             "color": "#CCCCCC",  # Default color for "OFF"
@@ -210,27 +203,25 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
 
     def _get_holiday_logs(self, start_date, end_date):
         return Holiday.objects.filter(
-            start_date__gte=start_date, end_date__lte=end_date
+            start_date__range=[start_date, end_date]
         )
 
     def _get_attendance_logs(self, employees, start_date, end_date):
         return AttendanceLog.objects.filter(
-            applied_by__in=employees, start_date__gte=start_date, end_date__lte=end_date
+            applied_by__in=employees, start_date__date__range=[start_date,end_date]
         )
 
     def _get_leave_logs(self, employees, start_date, end_date):
         return LeaveApplication.objects.filter(
             appliedBy__in=employees,
-            startDate__gte=start_date,
-            endDate__lte=end_date,
+            endDate__date__range=[start_date,end_date],
             status=settings.APPROVED,
         )
 
     def _get_tour_logs(self, employees, start_date, end_date):
         return UserTour.objects.filter(
             applied_by__in=employees,
-            start_date__gte=start_date,
-            end_date__lte=end_date,
+            start_date__range=[start_date,end_date],
             status=settings.APPROVED,
         )
 

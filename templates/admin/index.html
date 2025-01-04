@@ -184,9 +184,11 @@
                         <thead>
                           <tr>
                             <th>#</th>
-                            <th>Employee Name</th>
-                            <th>Event(s)</th>
-                            <th>Action</th>
+                            <th>{% trans "Employee Code" %}</th>
+                            <th>{% trans "Employee Name" %}</th>
+                            <th>{% trans "Event(s)" %}</th>
+                            <th>{% trans "Date" %}</th>
+                            <th>{% trans "Action" %}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -196,6 +198,7 @@
                               {% if detail.birthday.month == current_date.month or detail.marriage_ann.month == current_date.month or detail.doj.month == current_date.month %}
                                   <tr>
                                     <td>{{ forloop.counter }}</td>
+                                    <td>{{ user.username }}</td>
                                     <td>{{ user.get_full_name }}</td>
                                     <td>
                                       {% if detail.birthday and detail.birthday.month == current_date.month %}
@@ -209,7 +212,18 @@
                                       {% endif %}
                                     </td>
                                     <td>
-                                      <button href="" class="btn btn-primary">{% trans "Wish" %}</button>
+                                      {% if detail.birthday and detail.birthday.month == current_date.month %}
+                                        {{detail.birthday}}
+                                      {% endif %}
+                                      {% if detail.marriage_ann and detail.marriage_ann.month == current_date.month %}
+                                      {{detail.marriage_ann}}
+                                      {% endif %}
+                                      {% if detail.doj and detail.doj.month == current_date.month %}
+                                      {{detail.doj}}
+                                      {% endif %}
+                                    </td>
+                                    <td>
+                                      <button class="btn btn-primary text-white">{% trans "Send Wishing E-mail" %}</button>
                                     </td>
                                   </tr>
                               {% endif %}
@@ -219,7 +233,7 @@
                         </tbody>
                       </table>
                     {% else %}
-                      <p>No events to display for this month.</p>
+                      <p>{% trans "No events to display for this month." %}</p>
                     {% endif %}
                   </div>
                 </div>
@@ -316,10 +330,10 @@
                           </div>
                           <div>
                             <div class="dropdown">
-                              <button class="btn btn-secondary dropdown-toggle toggle-dark btn-lg mb-0 me-0" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Month Wise</button>
+                              <button class="btn btn-secondary dropdown-toggle toggle-dark btn-lg mb-0 me-0" type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">{% trans "Month Wise" %}</button>
                               <div class="dropdown-menu" aria-labelledby="dropdownMenuButton3">
-                                <h6 class="dropdown-header">week Wise</h6>
-                                <a class="dropdown-item" href="#">Year Wise</a>
+                                <h6 class="dropdown-header">{% trans "Month wise" %}</h6>
+                                {% comment %} <a class="dropdown-item" href="#">Year Wise</a> {% endcomment %}
                               </div>
                             </div>
                           </div>

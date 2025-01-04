@@ -542,17 +542,17 @@ class LeaveApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, Update
         return get_object_or_404(LeaveApplication, slug=self.kwargs.get("slug"))
 
     def update_leave_balance(self, leave_application):
-        leave_balance = LeaveBalanceOpenings.objects.get(
+        leave_balance = LeaveBalanceOpenings.objects.filter(
             user=leave_application.appliedBy,
             leave_type=leave_application.leave_type,
-            year=leave_application.startDate.year,
-        )
-        if leave_application.status == settings.APPROVED:
-            leave_balance.remaining_leave_balances -= leave_application.usedLeave
-        elif leave_application.status == settings.CANCELLED:
-            leave_balance.remaining_leave_balances += leave_application.usedLeave
-
-        leave_balance.save()
+            year=localtime(leave_application.startDate).year,
+        ).first()
+        if leave_balance:
+            if leave_application.status == settings.APPROVED:
+                leave_balance.remaining_leave_balances -= leave_application.usedLeave
+            elif leave_application.status == settings.CANCELLED:
+                leave_balance.remaining_leave_balances += leave_application.usedLeave
+            leave_balance.save()
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -609,7 +609,6 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         leave_application = self.get_object()
-        print(self.get_leave_type_balance(leave_application))
         context.update(
             {
                 "is_manager": self.is_manager(leave_application),
@@ -632,7 +631,7 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
     def get_leave_type_balance(self, leave_application):
         return LeaveBalanceOpenings.objects.filter(
             user=leave_application.appliedBy,
-            year=leave_application.startDate.date().year,
+            year=localtime(leave_application.startDate).date().year,
             leave_type=leave_application.leave_type,
         ).first()
 
@@ -767,14 +766,25 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return self.request.user.has_perm(permission_required)
 
     def form_valid(self, form):
-        form.instance.is_submitted = True
-        self.object = form.save()
-        self.object.add_action(
-            action="Submitted regularization",
-            performed_by=self.request.user,
-            comment=form.instance.reason,
-        )
-        messages.success(self.request, _("Regularization Updated Successfully"))
+        count = AttendanceLog.objects.filter(
+            applied_by=self.request.user,
+            start_date__date__month=self.object.start_date.date().month,
+        ).filter(
+            Q(regularized=True) | Q(is_submitted=True)
+        ).count()
+        if count >= 3:
+            messages.error(
+                self.request, _("Your already have applied regularization 3 times.")
+            )
+        else:
+            form.instance.is_submitted = True
+            self.object = form.save()
+            self.object.add_action(
+                action="Submitted regularization",
+                performed_by=self.request.user,
+                comment=form.instance.reason,
+            )
+            messages.success(self.request, _("Regularization Updated Successfully"))
         return HttpResponseRedirect(
             reverse("event_detail", kwargs={"slug": self.object.slug})
         )
@@ -873,9 +883,7 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
             log.end_date = log.to_date
         elif log.reg_status == settings.LATE_COMING:
             log.start_date = log.from_date
-
         log.save()
-
         from hrms_app.hrms.managers import AttendanceStatusHandler
 
         status_handler = AttendanceStatusHandler(
@@ -900,7 +908,6 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
             user_expected_logout_time.time(),
             user_expected_logout_time,
         )
-
         (
             log.att_status,
             log.color_hex,
@@ -1038,13 +1045,13 @@ class EventListView(View):
             [
                 {
                     "id": leave.slug,
-                    "title": leave.leave_type.leave_type,
-                    "start": timezone.localtime(
+                    "title": f"{leave.leave_type.leave_type} {leave.status}",
+                    "start": localtime(
                         leave.startDate
-                    ).isoformat(),  # Convert to local time
-                    "end": timezone.localtime(
+                    ),
+                    "end": localtime(
                         leave.endDate
-                    ).isoformat(),  # Convert to local time
+                    ),
                     "color": leave.leave_type.color_hex,
                     "url": reverse_lazy(
                         "leave_application_detail", kwargs={"slug": leave.slug}
@@ -1358,11 +1365,14 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         user = self.request.user
         if (
             tour_application.applied_by == user
+            or user.is_superuser
+            or user.is_staff
+            or user.personal_detail.designation.department.department == "admin"
             or tour_application.applied_by.reports_to == user
         ):
             return tour_application
         raise PermissionDenied(
-            "Only Employee and Manager can view His/Her tour details."
+            "Only Employee, Manager and Admin can view His/Her tour details."
         )
 
     def get_form_kwargs(self):
@@ -1841,5 +1851,3 @@ class LeaveBalanceUpdateView(View):
             return redirect("leave_bal_up")
 
         return render(request, self.template_name, {"form": form})
-
-

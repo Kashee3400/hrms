@@ -295,7 +295,7 @@ class LeaveApplicationAdmin(admin.ModelAdmin):
     list_display = ['appliedBy', 'leave_type', 'applicationNo', 'applyingDate'
         , 'startDate', 'endDate', 'usedLeave', 'balanceLeave', 'status'
         , 'startDayChoice', 'endDayChoice', 'updatedAt']
-
+    list_filter = ("startDate","status","leave_type")
     search_fields = ['leave_type__leave_type', 'appliedBy__first_name', 'appliedBy__last_name']
 
 

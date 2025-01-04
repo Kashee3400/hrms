@@ -2,7 +2,7 @@
 {% load static hrms_tag humanize i18n %}
 
 {% block title %}
-  {% trans 'Employee' %}| {{ title }}
+  {% trans 'Employees' %} | {{ title }}
 {% endblock %}
 
 {% block extrastyle %}
@@ -39,7 +39,7 @@
         <thead class="table-primary">
           <tr>
             <th>Employee Code</th> <th>Employee Name</th> {% for day in days_in_month %}
-              <th>{{ day.day }}</th>
+            <th>{{ day|date:"d-m" }}</th>
             {% endfor %}
           </tr>
         </thead> <tbody>
@@ -49,9 +49,9 @@
                 {% format_emp_code employee.personal_detail.employee_code %}
               </td>
               <td>{{ employee.get_full_name }}</td>
-              {% for day in days_in_month %}
+              {% for mdate in days_in_month %}
                 <td>
-                  {% get_item attendance_data employee.id day.day as statuses %}
+                  {% get_item attendance_data employee.id mdate as statuses %}
                   {% for status in statuses %}
                     <span style="color: {{ status.color }};">{{ status.status }}</span>
                     {% if not forloop.last %} {% endif %}

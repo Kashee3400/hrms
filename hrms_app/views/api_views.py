@@ -1334,8 +1334,7 @@ class Top5EmployeesDurationAPIView(APIView):
                 day for day in (first_day + timedelta(n) for n in range((last_day - first_day).days + 1))
                 if day.weekday() != 6 and not holidays.filter(start_date=day).exists()
             ]
-
-            return len(working_days) * 8  # 8 hours per working day
+            return (len(working_days) * 8)-8
 
         except Exception as e:
             logging.error(f"{str(e)}")

@@ -12,6 +12,7 @@ from decouple import config
 import os
 import subprocess
 import logging
+from django.utils.timezone import now, localtime
 
 
 USER = get_user_model()
@@ -52,8 +53,8 @@ def send_leave_application_notifications(application_id, protocol, domain):
         f"Dear {user.first_name},\n\n"
         f"Your leave application ({leave_application.applicationNo}) has been {leave_application.status}.\n\n"
         f"Leave Details:\n"
-        f"- Start Date: {leave_application.startDate.date()}\n"
-        f"- End Date: {leave_application.endDate.date()}\n"
+        f"- Start Date: {localtime(leave_application.startDate).date()}\n"
+        f"- End Date: {localtime(leave_application).endDate.date()}\n"
         f"- Leave Type: {leave_application.leave_type.leave_type}\n"
         f"Thank you,\n"
         f"Your HR Team"
@@ -66,8 +67,8 @@ def send_leave_application_notifications(application_id, protocol, domain):
         f"Dear {manager.first_name} {manager.last_name},\n\n"
         f"A leave application ({leave_application.applicationNo}) by {user.get_full_name()} has been {leave_application.status}.\n\n"
         f"Leave Details:\n"
-        f"- Start Date: {leave_application.startDate.date()}\n"
-        f"- End Date: {leave_application.endDate.date()}\n"
+        f"- Start Date: {localtime(leave_application.startDate).date()}\n"
+        f"- End Date: {localtime(leave_application.startDate).date()}\n"
         f"- Leave Type: {leave_application.leave_type.leave_type}\n"
         f"You can review the application at the following link:"
     )
@@ -80,7 +81,8 @@ def send_leave_application_notifications(application_id, protocol, domain):
 
 @shared_task
 def send_leave_application_email(subject, message, recipient_list):
-    send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
+    print(f"Mail sent")
+    # send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
 
 @shared_task
