@@ -81,8 +81,8 @@ def send_leave_application_notifications(application_id, protocol, domain):
 
 @shared_task
 def send_leave_application_email(subject, message, recipient_list):
-    print(f"Mail sent")
-    # send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
+    # print(f"Mail sent")
+    send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
 
 @shared_task
