@@ -54,7 +54,7 @@ def send_leave_application_notifications(application_id, protocol, domain):
         f"Your leave application ({leave_application.applicationNo}) has been {leave_application.status}.\n\n"
         f"Leave Details:\n"
         f"- Start Date: {localtime(leave_application.startDate).date()}\n"
-        f"- End Date: {localtime(leave_application).endDate.date()}\n"
+        f"- End Date: {localtime(leave_application.endDate).date()}\n"
         f"- Leave Type: {leave_application.leave_type.leave_type}\n"
         f"Thank you,\n"
         f"Your HR Team"
