@@ -6,17 +6,14 @@ class Command(BaseCommand):
     help = 'Populate DayChoiceAdjustment table with initial data'
 
     def handle(self, *args, **kwargs):
-        # Define the initial data for DayChoiceAdjustment
         initial_data = [
-            {'start_day_choice': settings.FULL_DAY, 'end_day_choice': settings.FULL_DAY, 'adjustment_value': 0},
-            {'start_day_choice': settings.FIRST_HALF, 'end_day_choice': settings.FULL_DAY, 'adjustment_value': -0.5},
-            {'start_day_choice': settings.SECOND_HALF, 'end_day_choice': settings.FULL_DAY, 'adjustment_value': -1.0},
+            {'start_day_choice': settings.FULL_DAY, 'end_day_choice': settings.FULL_DAY, 'adjustment_value': 0},  # FULL day Scenario
+            {'start_day_choice': settings.FIRST_HALF, 'end_day_choice': settings.FULL_DAY, 'adjustment_value': 0},  # FULL day for start
+            {'start_day_choice': settings.FULL_DAY, 'end_day_choice': settings.SECOND_HALF, 'adjustment_value': 0},  # FULL day Scenario
+            {'start_day_choice': settings.SECOND_HALF, 'end_day_choice': settings.FULL_DAY, 'adjustment_value': -0.5}, 
             {'start_day_choice': settings.FULL_DAY, 'end_day_choice': settings.FIRST_HALF, 'adjustment_value': -0.5},
-            {'start_day_choice': settings.FULL_DAY, 'end_day_choice': settings.SECOND_HALF, 'adjustment_value': 0},
-            {'start_day_choice': settings.FIRST_HALF, 'end_day_choice': settings.FIRST_HALF, 'adjustment_value': -1.0},
-            {'start_day_choice': settings.SECOND_HALF, 'end_day_choice': settings.SECOND_HALF, 'adjustment_value': -1.0},
-            {'start_day_choice': settings.FIRST_HALF, 'end_day_choice': settings.SECOND_HALF, 'adjustment_value': -0.5},
-            {'start_day_choice': settings.SECOND_HALF, 'end_day_choice': settings.FIRST_HALF, 'adjustment_value': -1.5},
+            {'start_day_choice': settings.SECOND_HALF, 'end_day_choice': settings.FIRST_HALF, 'adjustment_value': -1.0},
+
         ]
 
         # Check for existing entries and avoid duplicates

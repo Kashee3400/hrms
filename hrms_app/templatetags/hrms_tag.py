@@ -364,3 +364,11 @@ def get_employee_highlights():
 @register.filter
 def add_days(date, days):
     return date + timedelta(days=days)
+
+
+
+
+@register.filter
+def localtime_filter(value):
+    from django.utils.timezone import localtime
+    return localtime(value)

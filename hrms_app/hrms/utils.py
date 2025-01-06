@@ -119,7 +119,7 @@ def call_soap_api(device_instance, from_date, to_date):
 
 
 def is_weekend(date):
-    return date.weekday() >= 6  # 5 = Saturday, 6 = Sunday
+    return date.weekday() == 6
 
 
 def is_holiday(date):
@@ -127,6 +127,7 @@ def is_holiday(date):
 
 
 def get_non_working_days(start, end):
+    print(f"Getting non working days between: {start} & {end}")
     non_working_days = 0
     for n in range((end - start).days + 1):
         day = start + timedelta(n)
