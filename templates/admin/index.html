@@ -179,6 +179,7 @@
               <div class="col-12 grid-margin stretch-card">
                 <div class="card card-rounded">
                   <div class="card-body">
+                    <div class="dt-responsive table-responsive mt-1">
                     {% if users|length > 0 %}
                       <table class="table table-bordered">
                         <thead>
@@ -235,6 +236,7 @@
                     {% else %}
                       <p>{% trans "No events to display for this month." %}</p>
                     {% endif %}
+                    </div>
                   </div>
                 </div>
               </div>
