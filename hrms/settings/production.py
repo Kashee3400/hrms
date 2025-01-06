@@ -33,3 +33,22 @@ LOGGING = {
 }
 
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
+
+from celery.schedules import crontab
+
+CELERY_BEAT_SCHEDULE = {
+    'send_wishing_email': {
+        'task': 'hrms_app.tasks.send_regularization_email',
+        'schedule': crontab(minute=0, hour=9),  # Every day at 8:00 AM
+    },
+    'populate_attendance_log': {
+        'task': 'hrms_app.tasks.populate_attendance_log',
+        'schedule': crontab(minute=59, hour=22),
+    },
+    'send_reminder_email': {
+        'task': 'hrms_app.tasks.send_reminder_email',
+        'schedule': crontab(minute=0, hour=10),    },
+    'backup_database': {
+        'task': 'hrms_app.tasks.backup_database',
+        'schedule': crontab(minute=0, hour=3),    },
+}
