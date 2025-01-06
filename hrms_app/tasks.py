@@ -272,7 +272,7 @@ def send_greeting_emails():
     for obj in emp_objs:
         if obj.birthday and obj.birthday.day == today.day and obj.birthday.month == today.month:
             send_greeting_email(obj, 'birthday')
-        if obj.ann_date and obj.ann_date.day == today.day and obj.ann_date.month == today.month:
+        if obj.marriage_ann and obj.marriage_ann.day == today.day and obj.marriage_ann.month == today.month:
             send_greeting_email(obj, 'marriage_anniversary')
         if obj.doj and obj.doj.day == today.day and obj.doj.month == today.month:
             send_greeting_email(obj, 'job_anniversary')
