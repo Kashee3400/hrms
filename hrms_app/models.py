@@ -2284,8 +2284,6 @@ class UserTour(models.Model):
                 hours = int(total_seconds // 3600)
                 minutes = int((total_seconds % 3600) // 60)
                 seconds = int(total_seconds % 60)
-
-                # Store the duration as a time object
                 self.total = time(hour=hours % 24, minute=minutes, second=seconds)
             else:
                 self.total = None  # No duration if end_datetime isn't defined

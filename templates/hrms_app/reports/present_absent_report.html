@@ -74,8 +74,10 @@
         searching: true,
         ordering: false,
         dom: 'Bfrtip',
-        buttons: ['copy', 'csv', 'excel']
-      })
-    })
+        buttons: ['copy', 'csv', 'excel'],
+        pageLength: 25,
+        lengthMenu: [10, 25, 50, 100] // Dropdown options for page sizes
+      });
+    });
   </script>
 {% endblock %}

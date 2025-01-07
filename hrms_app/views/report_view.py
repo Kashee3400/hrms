@@ -32,103 +32,100 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
         end_date_object,
     ):
         attendance_data = defaultdict(lambda: defaultdict(list))
+        total_days = (end_date_object - start_date_object).days + 1
         sundays = {
             start_date_object + timedelta(days=i)
-            for i in range((end_date_object - start_date_object).days + 1)
+            for i in range(total_days)
             if (start_date_object + timedelta(days=i)).weekday() == 6
         }
 
-        # Optimized Holiday Handling
+        # Map holidays by date
         holiday_days = {
-            holiday.start_date : {
+            holiday.start_date: {
                 "status": holiday.short_code,
                 "color": holiday.color_hex,
             }
             for holiday in holidays
         }
 
+        # Process attendance logs
         for log in attendance_logs:
-            attendance_data[log.applied_by.id][localtime(log.start_date).date()].append(
+            employee_id = log.applied_by.id
+            log_date = localtime(log.start_date).date()
+            attendance_data[employee_id][log_date].append(
                 {
                     "status": log.att_status_short_code,
                     "color": log.color_hex or "#000000",
                 }
             )
 
-        # Optimize Tour Log Mapping
+        # Process tour logs
         for log in tour_logs:
-            daily_durations = calculate_daily_tour_durations(log.start_date, log.start_time, log.end_date, log.end_time)
-            for date, short_code, duration in daily_durations:
-                attendance_data[log.applied_by.id][date] = {
-                        "status": short_code,
-                        "color": "#06c1c4",
-                    }
-            holiday_days.pop(date, None)
+            daily_durations = calculate_daily_tour_durations(
+                log.start_date, log.start_time, log.end_date, log.end_time
+            )
+            for date, short_code, _ in daily_durations:
+                employee_id = log.applied_by.id
+                attendance_data[employee_id][date] = [{
+                    "status": short_code,
+                    "color": "#06c1c4",
+                }]
+                holiday_days.pop(date, None)
 
-        # Add remaining holidays to attendance data
-        for employee_id in attendance_data.keys():
-            for day, holiday_info in holiday_days.items():
-                attendance_data[employee_id][day].append(holiday_info)
-        
-        # Optimize Leave Log Mapping
+        # Add holidays to attendance data
+        for employee_id, employee_data in attendance_data.items():
+            for holiday_date, holiday_info in holiday_days.items():
+                employee_data[holiday_date].append(holiday_info)
+
+        # Process leave logs
         for log in leave_logs:
-            start_date = localtime(log.startDate)
-            end_date = localtime(log.endDate)
-            for day in range((end_date - start_date).days + 1):
-                current_date = start_date + timedelta(days=day)
-                day_of_month = current_date
-                leave_status = log.leave_type.leave_type_short_code
-                
-                if leave_status == "CL":
-                    # Handle "CL" leave type
-                    if day_of_month in holiday_days:
-                        attendance_data[log.appliedBy.id][day_of_month.date()].append(
-                            {
-                                "status": "",
-                                "color": holiday_days[day_of_month.date()]["color"],
-                            }
-                        )
-                    elif current_date.weekday() == 6:
-                        attendance_data[log.appliedBy.id][day_of_month.date()].append(
-                            {
-                                "status": "OFF",
-                                "color": "#CCCCCC",
-                            }
-                        )
-                    else:
-                        attendance_data[log.appliedBy.id][day_of_month.date()].append(
-                            {
-                                "status": leave_status,
-                                "color": log.leave_type.color_hex or "#FF0000",
-                            }
-                        )
-                else:
-                    # Handle other leave types
-                    date_entries = attendance_data[log.appliedBy.id].get(day_of_month.date(), [])
-                    
-                    # Check if "FL" exists and remove all entries if found
-                    if any(entry.get("status") == "FL" for entry in date_entries):
-                        attendance_data[log.appliedBy.id][day_of_month.date()] = []
-                    
-                    # Append the new leave status
-                    attendance_data[log.appliedBy.id][day_of_month.date()].append(
-                        {
-                            "status": leave_status,
-                            "color": log.leave_type.color_hex or "#FF0000",
-                        }
-                    )
+            employee_id = log.leave_application.appliedBy.id
+            log_date = log.date
+            leave_type = log.leave_application.leave_type
+            leave_status = leave_type.leave_type_short_code
+            half_status = leave_type.half_day_short_code
 
+            # Handle "CL" leave type
+            if leave_status == "CL":
+                if log_date in holiday_days:
+                    attendance_data[employee_id][log_date].append({
+                        "status": "",
+                        "color": holiday_days[log_date]["color"],
+                    })
+                elif log_date.weekday() == 6:  # Sunday
+                    attendance_data[employee_id][log_date].append({
+                        "status": "OFF",
+                        "color": "#CCCCCC",
+                    })
+                else:
+                    attendance_data[employee_id][log_date].append({
+                        "status": leave_status if log.is_full_day else half_status,
+                        "color": leave_type.color_hex or "#FF0000",
+                    })
+            else:
+                # Handle other leave types
+                date_entries = attendance_data[employee_id].get(log_date, [])
+
+                # Remove all entries if "FL" exists
+                if any(entry.get("status") == "FL" for entry in date_entries):
+                    attendance_data[employee_id][log_date] = []
+
+                attendance_data[employee_id][log_date].append({
+                    "status": leave_status if log.is_full_day else half_status,
+                    "color": leave_type.color_hex or "#FF0000",
+                })
+
+        # Add "OFF" status for Sundays without any entries
         for employee_id in attendance_data.keys():
             for sunday in sundays:
                 if not attendance_data[employee_id][sunday.date()]:
-                    attendance_data[employee_id][sunday.date()].append(
-                        {
-                            "status": "OFF",
-                            "color": "#CCCCCC",  # Default color for "OFF"
-                        }
-                    )
+                    attendance_data[employee_id][sunday.date()].append({
+                        "status": "OFF",
+                        "color": "#CCCCCC",  # Default color for "OFF"
+                    })
 
         return attendance_data
+
 
     def _get_days_in_month(self, start_date, end_date):
         return [
@@ -202,26 +199,30 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
         return converted_from_datetime, converted_to_datetime
 
     def _get_holiday_logs(self, start_date, end_date):
-        return Holiday.objects.filter(
-            start_date__range=[start_date, end_date]
-        )
+        return Holiday.objects.filter(start_date__range=[start_date, end_date])
 
     def _get_attendance_logs(self, employees, start_date, end_date):
         return AttendanceLog.objects.filter(
-            applied_by__in=employees, start_date__date__range=[start_date,end_date]
+            applied_by__in=employees, start_date__date__range=[start_date, end_date]
         )
 
+    # def _get_leave_logs(self, employees, start_date, end_date):
+    #     return LeaveApplication.objects.filter(
+    #         appliedBy__in=employees,
+    #         endDate__date__range=[start_date,end_date],
+    #         status=settings.APPROVED,
+    #     )
     def _get_leave_logs(self, employees, start_date, end_date):
-        return LeaveApplication.objects.filter(
-            appliedBy__in=employees,
-            endDate__date__range=[start_date,end_date],
-            status=settings.APPROVED,
+        return LeaveDay.objects.filter(
+            leave_application__appliedBy__in=employees,
+            date__range=[start_date, end_date],
+            leave_application__status=settings.APPROVED,
         )
 
     def _get_tour_logs(self, employees, start_date, end_date):
         return UserTour.objects.filter(
             applied_by__in=employees,
-            start_date__range=[start_date,end_date],
+            start_date__range=[start_date, end_date],
             status=settings.APPROVED,
         )
 
@@ -440,12 +441,17 @@ def process_leaves(leaves, monthly_presence_data):
                 "total_duration": None,
             }
             current_date += timedelta(days=1)
+
+
 from datetime import datetime, timedelta
+
 
 def process_tours(all_tours, monthly_presence_data):
     for tour in all_tours:
-        daily_durations = calculate_daily_tour_durations(tour.start_date, tour.start_time, tour.end_date, tour.end_time)
-        
+        daily_durations = calculate_daily_tour_durations(
+            tour.start_date, tour.start_time, tour.end_date, tour.end_time
+        )
+
         emp_code = tour.applied_by.personal_detail.employee_code
         for date, short_code, duration in daily_durations:
             monthly_presence_data[emp_code][date.strftime("%Y-%m-%d")]["tour"] = {
@@ -455,35 +461,36 @@ def process_tours(all_tours, monthly_presence_data):
                 "total_duration": str(duration),
             }
 
+
 def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
     # Combine date and time into datetime objects
     start_datetime = datetime.combine(start_date, start_time or datetime.min.time())
     end_datetime = datetime.combine(end_date, end_time or datetime.min.time())
-    
     # Initialize the current datetime to the start datetime
     current_datetime = start_datetime
     daily_durations = []
-
     while current_datetime.date() <= end_datetime.date():
         # Calculate the end of the current day
+        attendance_log = AttendanceLog.objects.filter(start_date__date=current_datetime.date()).first()
+        log_duration = 0
+        if attendance_log.duration.hour < 4:
+            log_duration = attendance_log.duration.hour
         end_of_day = datetime.combine(current_datetime.date(), datetime.max.time())
-        
         # Determine the actual end time for the current day
         actual_end_time = min(end_of_day, end_datetime)
-        
         # Calculate the duration for the current day
         duration = actual_end_time - current_datetime
         duration_hours = duration.total_seconds() / 3600
-        
         # Determine the short code based on duration
+        duration_hours +=log_duration
         short_code = "T" if duration_hours >= 8 else "TH"
-        
         # Append the result for the current day
         daily_durations.append((current_datetime.date(), short_code, duration))
-        
         # Move to the next day
-        current_datetime = datetime.combine(current_datetime.date() + timedelta(days=1), datetime.min.time())
-    
+        current_datetime = datetime.combine(
+            current_datetime.date() + timedelta(days=1), datetime.min.time()
+        )
+
     return daily_durations
 
 

@@ -135,4 +135,3 @@ PANDAS_RENDERERS = [
     'rest_pandas.renderers.PandasHTMLRenderer',    # HTML tables
     'rest_pandas.renderers.PandasTextRenderer',    # Plain text output
 ]
-# from rest_pandas.renderers import ,,,,PandasFileRenderer,,PandasImageRenderer,,,,

@@ -13,6 +13,9 @@ import os
 import subprocess
 import logging
 from django.utils.timezone import now, localtime
+from decouple import config
+
+DEBUG = config('DEBUG', default=False, cast=bool)
 
 
 USER = get_user_model()
@@ -82,7 +85,8 @@ def send_leave_application_notifications(application_id, protocol, domain):
 @shared_task
 def send_leave_application_email(subject, message, recipient_list):
     # print(f"Mail sent")
-    send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
+    if not DEBUG:
+        send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
 
 @shared_task
@@ -137,8 +141,9 @@ def send_tour_notifications(tour_id, protocol, domain):
 
 @shared_task
 def send_tour_application_email(subject, message, recipient_list):
-    send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
-    logging.info("Tour application status email sent")
+    if not DEBUG:
+        send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
+        logging.info("Tour application status email sent")
     
 
 
@@ -193,8 +198,9 @@ def send_regularization_notification(regularization_id, protocol, domain):
 
 @shared_task
 def send_regularization_email(subject, message, recipient_list):
-    send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
-    logging.info("Regularization Status sent")
+    if not DEBUG:
+        send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
+        logging.info("Regularization Status sent")
 
 @shared_task
 def populate_attendance_log():
