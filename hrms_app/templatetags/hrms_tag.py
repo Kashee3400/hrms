@@ -143,6 +143,10 @@ def get_leave_balances(user):
             appliedBy__in=user.employees.all(), status=settings.PENDING
         )
 
+        user_pending_leaves = LeaveApplication.objects.filter(
+            appliedBy=user, status=settings.PENDING
+        )
+
         leave_balances_list = []
         for lb in leave_balances:
             # Calculate on hold used leave
@@ -168,7 +172,7 @@ def get_leave_balances(user):
             if ml_balance:
                 on_hold_leave = sum(
                     leave.usedLeave
-                    for leave in pending_leaves
+                    for leave in user_pending_leaves
                     if leave.leave_type == ml_balance.leave_type
                 )
                 leave_balances_list.append(
@@ -240,6 +244,34 @@ def format_emp_code(emp_code):
 from datetime import timedelta
 
 
+# @register.simple_tag
+# def get_item(attendance_data, employee_id, date):
+#     """
+#     Get the attendance details (status and color) for a specific day from the provided attendance data,
+#     considering the statuses of the previous and next days.
+#     """
+#     from datetime import timedelta
+
+#     # Fetch attendance for the current, previous, and next dates
+#     employee_attendance = attendance_data.get(employee_id, {})
+#     current_entries = employee_attendance.get(date.date(), [])
+#     prev_date = date.date() - timedelta(days=1)
+#     next_date = date.date() + timedelta(days=1)
+#     prev_entries = employee_attendance.get(prev_date, [])
+#     next_entries = employee_attendance.get(next_date, [])
+
+#     # Get the last status entry or default to "A" if not present
+#     prev_status = prev_entries[-1]["status"] if prev_entries else "A"
+#     next_status = next_entries[-1]["status"] if next_entries else "A"
+#     current_status = current_entries[-1]["status"] if current_entries else "A"
+
+#     # Logic: If previous and next statuses are "A", and current status is "OFF" or "FL", mark current as "A"
+#     if prev_status == "A" and next_status == "A" and current_status in ["OFF", "FL"]:
+#         return [{"status": "A", "color": "#FF0000"}]
+#     else:
+#         # Return the current status or default to "A"
+#         return current_entries if current_entries else [{"status": "A", "color": "#FF0000"}]
+
 @register.simple_tag
 def get_item(attendance_data, employee_id, date):
     """
@@ -256,10 +288,22 @@ def get_item(attendance_data, employee_id, date):
     prev_entries = employee_attendance.get(prev_date, [])
     next_entries = employee_attendance.get(next_date, [])
 
-    # Get the last status entry or default to "A" if not present
-    prev_status = prev_entries[-1]["status"] if prev_entries else "A"
-    next_status = next_entries[-1]["status"] if next_entries else "A"
-    current_status = current_entries[-1]["status"] if current_entries else "A"
+    # Ensure we handle `next_entries` as a list or compatible iterable
+    if isinstance(next_entries, list) and next_entries:
+        next_status = next_entries[-1].get("status", "A")
+    else:
+        next_status = "A"
+
+    # Ensure we handle `prev_entries` and `current_entries` similarly
+    if isinstance(prev_entries, list) and prev_entries:
+        prev_status = prev_entries[-1].get("status", "A")
+    else:
+        prev_status = "A"
+
+    if isinstance(current_entries, list) and current_entries:
+        current_status = current_entries[-1].get("status", "A")
+    else:
+        current_status = "A"
 
     # Logic: If previous and next statuses are "A", and current status is "OFF" or "FL", mark current as "A"
     if prev_status == "A" and next_status == "A" and current_status in ["OFF", "FL"]:

@@ -194,7 +194,7 @@ def send_regularization_notification(regularization_id, protocol, domain):
 @shared_task
 def send_regularization_email(subject, message, recipient_list):
     send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
-    logging.info("Tour Application Status sent")
+    logging.info("Regularization Status sent")
 
 @shared_task
 def populate_attendance_log():

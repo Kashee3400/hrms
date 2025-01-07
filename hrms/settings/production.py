@@ -38,8 +38,8 @@ from celery.schedules import crontab
 
 CELERY_BEAT_SCHEDULE = {
     'send_wishing_email': {
-        'task': 'hrms_app.tasks.send_regularization_email',
-        'schedule': crontab(minute=0, hour=9),  # Every day at 8:00 AM
+        'task': 'hrms_app.tasks.send_greeting_emails',
+        'schedule': crontab(minute=0, hour=9),  # Every day at 9:00 AM
     },
     'populate_attendance_log': {
         'task': 'hrms_app.tasks.populate_attendance_log',

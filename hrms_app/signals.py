@@ -1,5 +1,5 @@
 # myapp/signals.py
-from .tasks import send_leave_application_notifications,send_tour_notifications
+from .tasks import send_leave_application_notifications,send_tour_notifications,send_regularization_notification
 from django.contrib.sites.models import Site
 from .models import LeaveApplication, UserTour, Notification,LeaveBalanceOpenings,CustomUser
 from django.contrib.contenttypes.models import ContentType
@@ -52,7 +52,7 @@ def create_or_update_leave_log(sender, instance, created, **kwargs):
         Notification.objects.create(
             sender=instance.appliedBy,
             receiver=instance.appliedBy.reports_to,  # assuming the user who applied is the receiver
-            message=f"Leave application '{instance.applicationNo}' has been created.",
+            message=f"Leave application '{instance.applicationNo}' has been {instance.status}.",
             notification_type=settings.LEAVE_STATUS,  # use the constant defined in your Notification model
             related_object_id=instance.id,
             related_content_type=ContentType.objects.get_for_model(LeaveApplication),
@@ -79,7 +79,7 @@ def create_or_update_user_tour(sender, instance, created, **kwargs):
         Notification.objects.create(
             sender=instance.applied_by,
             receiver=instance.applied_by.reports_to,
-            message=f"Tour '{instance.slug}' has been created.",
+            message=f"Tour '{instance.slug}' has been {instance.status}.",
             notification_type=settings.TOUR_STATUS,
             related_object_id=instance.id,
             related_content_type=ContentType.objects.get_for_model(UserTour),
@@ -117,7 +117,7 @@ def create_or_update_regularization(sender, instance, created, **kwargs):
     protocol = 'http'  # or 'http' if applicable
     domain = current_site.domain
     try:
-        send_tour_notifications.delay(instance.id, protocol, domain)
+        send_regularization_notification.delay(instance.id, protocol, domain)
     except:
         pass
     
