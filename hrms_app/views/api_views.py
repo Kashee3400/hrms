@@ -608,6 +608,10 @@ class LeaveTypeViewSet(viewsets.ModelViewSet):
 
 from rest_framework.decorators import action
 
+from rest_framework.pagination import PageNumberPagination
+
+class HolidaysPagination(PageNumberPagination):
+    page_size = 20  # Set the default page size to 20
 
 class HolidayViewSet(viewsets.ModelViewSet):
     queryset = Holiday.objects.all()
@@ -615,6 +619,7 @@ class HolidayViewSet(viewsets.ModelViewSet):
     permission_classes = [AllowAny]
     filter_backends = [filters.OrderingFilter]  # Add other filter backends if needed
     ordering_fields = ["start_date", "end_date"]  # Fields that can be used for ordering
+    pagination_class = HolidaysPagination
 
     def get_queryset(self):
         """
