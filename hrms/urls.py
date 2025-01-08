@@ -4,7 +4,7 @@ from hrms_app.hrms.sites import site
 from django.conf.urls.static import static
 from hrms_app.views.views import *
 # urls.py
-from hrms_app.wishes import birthday as hbd
+# from hrms_app.wishes import birthday as hbd
 
 from django.conf.urls import handler403
 
@@ -27,7 +27,7 @@ urlpatterns = [
     path("api/v1/", include('hrms_app.urls')),
     re_path(r'^webpush/', include('webpush.urls')),
     path('<str:title>/success/', TemplateView.as_view(template_name='hrms_app/generic_success.html'), name='success_page'),
-    path('hbd-index', hbd.index, name='index'),
+    # path('hbd-index', hbd.index, name='index'),
     # path('wish/', hbd.wish, name='wish'),
     # path('stop_sound/', hbd.stop_sound, name='stop_sound'),
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
