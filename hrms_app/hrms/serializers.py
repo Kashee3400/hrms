@@ -368,14 +368,14 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
     # Use PrimaryKeyRelatedField for creation and LeaveTypeSerializer for retrieval
     leave_type = serializers.PrimaryKeyRelatedField(queryset=LeaveType.objects.all(), write_only=True)
     leave_type_detail = LeaveTypeSerializer(read_only=True, source="leave_type")
-    
     appliedByName = serializers.StringRelatedField(source="appliedBy", read_only=True)
-
+    avatar = serializers.SerializerMethodField()
     class Meta:
         model = LeaveApplication
         fields = [
             "id",
             "applicationNo",
+            "avatar",
             "leave_type",
             "leave_type_detail",
             "leave_type_url",
@@ -405,7 +405,13 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
             'updatedAt', 
             'logs'
         ]
-
+    def get_avatar(self, obj):
+        # Navigate through the relationship to fetch the avatar
+        personal_detail = obj.appliedBy.personal_detail,
+        if personal_detail:
+            return personal_detail.avatar  # Assuming avatar is a URL or a path
+        return None  # Return None if no avatar exists
+    
     def validate(self, data):
         """Validate leave application data."""
         request_method = self.context['request'].method
