@@ -407,9 +407,12 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
         ]
     def get_avatar(self, obj):
         # Navigate through the relationship to fetch the avatar
-        personal_detail = obj.appliedBy.personal_detail,
-        if personal_detail:
-            return personal_detail.avatar  # Assuming avatar is a URL or a path
+        personal_detail = getattr(obj.appliedBy, "personal_detail", None)
+        if personal_detail and personal_detail.avatar:
+            request = self.context.get("request")  # Use the request object for full URL
+            if request:
+                return request.build_absolute_uri(personal_detail.avatar.url)
+            return personal_detail.avatar.url  # Return relative URL if request is not available
         return None  # Return None if no avatar exists
     
     def validate(self, data):
