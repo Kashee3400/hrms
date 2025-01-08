@@ -20,6 +20,7 @@ INSTALLED_APPS = [
     "colorfield",
     "timezone_field",
     'django_tables2',
+    'webpush',
     'django_extensions',
     "django_ckeditor_5",
     "django_celery_beat",
@@ -59,7 +60,6 @@ ROOT_URLCONF = "hrms.urls"
 LOGIN_URL = "/login/"
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/login/"
-
 
 TEMPLATES = [
     {
@@ -135,3 +135,13 @@ PANDAS_RENDERERS = [
     'rest_pandas.renderers.PandasHTMLRenderer',    # HTML tables
     'rest_pandas.renderers.PandasTextRenderer',    # Plain text output
 ]
+
+VAPID_PUBLIC_KEY = config("VAPID_PUBLIC_KEY")
+VAPID_PRIVATE_KEY = config("VAPID_PRIVATE_KEY")
+VAPID_ADMIN_EMAIL = config("VAPID_ADMIN_EMAIL")
+
+WEBPUSH_SETTINGS = {
+    "VAPID_PUBLIC_KEY": VAPID_PUBLIC_KEY,
+    "VAPID_PRIVATE_KEY":VAPID_PRIVATE_KEY,
+    "VAPID_ADMIN_EMAIL": VAPID_ADMIN_EMAIL
+}

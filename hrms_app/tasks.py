@@ -14,10 +14,9 @@ import subprocess
 import logging
 from django.utils.timezone import now, localtime
 from decouple import config
+from webpush import send_user_notification
 
 DEBUG = config('DEBUG', default=False, cast=bool)
-
-
 USER = get_user_model()
 
 logging.basicConfig(
@@ -85,8 +84,16 @@ def send_leave_application_notifications(application_id, protocol, domain):
 @shared_task
 def send_leave_application_email(subject, message, recipient_list):
     # print(f"Mail sent")
+
     if not DEBUG:
         send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
+
+
+def push_notification(user,head,body,url):
+    payload = {"head": head, "body": body, 
+        "icon": "http://hr.kasheemilk.com:7777/static/hrms_app/img/logo.png", "url": url}
+    send_user_notification(user=user, payload=payload, ttl=1000)
+
 
 
 @shared_task

@@ -432,3 +432,10 @@ class LeaveDayAdmin(admin.ModelAdmin):
     date_hierarchy = "date"
     ordering = ("-date",)
 
+@admin.register(WishingCard)
+class WishingCardAdmin(admin.ModelAdmin):
+    list_display = ('type', 'created_at', 'image')  # Fields displayed in the admin list view
+    list_filter = ('type', 'created_at')  # Add filters for type and creation date
+    search_fields = ('type',)  # Enable search by type
+    date_hierarchy = 'created_at'  # Date hierarchy for navigation by creation date
+    ordering = ('-created_at',)  # Default ordering by creation date (descending)

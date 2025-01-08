@@ -50,7 +50,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
-
+from hrms_app.tasks import push_notification
 
 def custom_permission_denied(request, exception=None):
     error_message = (
@@ -122,7 +122,7 @@ class HomePageView(LoginRequiredMixin, TemplateView):
         """Add custom context data for the dashboard."""
         context = super().get_context_data(**kwargs)
         context["current_date"] = datetime.now()
-
+        push_notification(user=self.request.user,head="Hello There",body="Testing the webpush notification",url="http://hr.kasheemilk.com:7777/dashboard")
         # Fetch all users to pass in the context
         users = User.objects.all()  # Adjust this if you want to filter the users
         context["users"] = users

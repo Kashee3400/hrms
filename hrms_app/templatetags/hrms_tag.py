@@ -138,11 +138,6 @@ def get_leave_balances(user):
         )
         leave_balances_dict = {lb.leave_type: lb for lb in leave_balances}
 
-        # Fetch pending leave applications
-        pending_leaves = LeaveApplication.objects.filter(
-            appliedBy__in=user.employees.all(), status=settings.PENDING
-        )
-
         user_pending_leaves = LeaveApplication.objects.filter(
             appliedBy=user, status=settings.PENDING
         )
@@ -152,7 +147,7 @@ def get_leave_balances(user):
             # Calculate on hold used leave
             on_hold_leave = sum(
                 leave.usedLeave
-                for leave in pending_leaves
+                for leave in user_pending_leaves
                 if leave.leave_type == lb.leave_type
             )
             leave_balances_list.append(
@@ -198,38 +193,6 @@ def get_leave_balances(user):
 
 from hrms_app.models import AttendanceLog
 
-
-@register.simple_tag
-def get_attendance_for_day(employee, date, attendance_logs_cache=None):
-    """
-    Optimized template tag to fetch the attendance status for a given employee on a specific date.
-    """
-    # If the attendance_logs_cache is passed, use it to avoid multiple queries
-    if attendance_logs_cache is None:
-        attendance_logs_cache = {}
-
-    # Check if the attendance log for the given employee and date exists in the cache
-    cache_key = (employee.id, date.date())
-    if cache_key in attendance_logs_cache:
-        return attendance_logs_cache[cache_key]
-
-    # Otherwise, query the database for the specific log with only the necessary field (att_status_short_code)
-    attendance_log = (
-        AttendanceLog.objects.filter(applied_by=employee, start_date__date=date.date())
-        .values("att_status_short_code")
-        .first()
-    )
-
-    # Cache the result
-    if attendance_log:
-        status = attendance_log["att_status_short_code"]
-    else:
-        status = "NA"
-
-    attendance_logs_cache[cache_key] = status
-    return status
-
-
 @register.simple_tag
 def format_emp_code(emp_code):
     length = len(emp_code)
@@ -243,34 +206,6 @@ def format_emp_code(emp_code):
 
 from datetime import timedelta
 
-
-# @register.simple_tag
-# def get_item(attendance_data, employee_id, date):
-#     """
-#     Get the attendance details (status and color) for a specific day from the provided attendance data,
-#     considering the statuses of the previous and next days.
-#     """
-#     from datetime import timedelta
-
-#     # Fetch attendance for the current, previous, and next dates
-#     employee_attendance = attendance_data.get(employee_id, {})
-#     current_entries = employee_attendance.get(date.date(), [])
-#     prev_date = date.date() - timedelta(days=1)
-#     next_date = date.date() + timedelta(days=1)
-#     prev_entries = employee_attendance.get(prev_date, [])
-#     next_entries = employee_attendance.get(next_date, [])
-
-#     # Get the last status entry or default to "A" if not present
-#     prev_status = prev_entries[-1]["status"] if prev_entries else "A"
-#     next_status = next_entries[-1]["status"] if next_entries else "A"
-#     current_status = current_entries[-1]["status"] if current_entries else "A"
-
-#     # Logic: If previous and next statuses are "A", and current status is "OFF" or "FL", mark current as "A"
-#     if prev_status == "A" and next_status == "A" and current_status in ["OFF", "FL"]:
-#         return [{"status": "A", "color": "#FF0000"}]
-#     else:
-#         # Return the current status or default to "A"
-#         return current_entries if current_entries else [{"status": "A", "color": "#FF0000"}]
 
 @register.simple_tag
 def get_item(attendance_data, employee_id, date):

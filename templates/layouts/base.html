@@ -1,4 +1,4 @@
-{% load i18n static %}
+{% load i18n static webpush_notifications %}
 <!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 {% get_current_language_bidi as LANGUAGE_BIDI %}
@@ -23,6 +23,7 @@
     {% block blockbots %}
       <meta name="robots" content="NONE,NOARCHIVE" />
     {% endblock %}
+    {% webpush_header %}
   </head>
 
   <body data-admin-utc-offset="{% now 'Z' %}">
@@ -36,7 +37,7 @@
         {% endblock %}
 
         <div class="main-panel vh-100 overflow-auto border-top">
-          <div class="content-wrapper px-4 py-1">
+          <div class="content-wrapper px-4 py-1 mb-5">
             <div class="col-12">
               {% block messages %}
                 {% if messages %}
@@ -81,8 +82,8 @@
                 {% endblock %}
               </div>
             </div>
-          {% include 'includes/footer.html' %}
-
+            {% webpush_button with_class="btn btn-outline-info" %}
+            {% include 'includes/footer.html' %}
           </div>
         </div>
         {% block settings_panel %}
