@@ -489,17 +489,27 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
 class UserTourSerializer(serializers.ModelSerializer):
     logs = TourLogSerializer(many=True, read_only=True)
     appliedByName = serializers.StringRelatedField(source="applied_by", read_only=True)
-
+    avatar = serializers.SerializerMethodField()
     class Meta:
         model = UserTour
         fields = [
-            'id', 'applied_by', 'appliedByName', 'from_destination', 'to_destination',
-            'start_date', 'start_time', 'end_date', 'end_time', 'updatedAt',
-            'createdAt', 'remarks', 'status', 'extended_end_date', 'extended_end_time',
+            'id','avatar', 'applied_by', 'appliedByName', 'from_destination', 'to_destination',
+            'start_date', 'start_time', 'end_date', 'end_time', 'updated_at',
+            'created_at', 'remarks', 'status', 'extended_end_date', 'extended_end_time',
             'bills_submitted', 'slug', 'approval_type', 'logs'
         ]
-        read_only_fields = ['id', 'slug', 'createdAt', 'updatedAt', 'logs', 'applied_by']
+        read_only_fields = ['id', 'slug', 'created_at', 'updated_at', 'logs', 'applied_by']
 
+    def get_avatar(self, obj):
+        # Navigate through the relationship to fetch the avatar
+        personal_detail = getattr(obj.applied_by, "personal_detail", None)
+        if personal_detail and personal_detail.avatar:
+            request = self.context.get("request")  # Use the request object for full URL
+            if request:
+                return request.build_absolute_uri(personal_detail.avatar.url)
+            return personal_detail.avatar.url  # Return relative URL if request is not available
+        return None  # Return None if no avatar exists
+    
     def validate(self, attrs):
         approval_type = attrs.get('approval_type')
         start_date_str = attrs.get('start_date')

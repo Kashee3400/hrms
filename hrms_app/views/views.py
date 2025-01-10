@@ -572,6 +572,8 @@ class LeaveApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, Update
         )
 
 
+from django.core.exceptions import ObjectDoesNotExist
+
 class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = LeaveApplication
     template_name = "hrms_app/leave_application_detail.html"
@@ -591,10 +593,14 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
         return self.request.user.has_perm(self.permission_required)
 
     def get_object(self, queryset=None):
-        leave_application = super().get_object(queryset)
-        if self.has_permission_to_view(leave_application):
-            return leave_application
-        raise PermissionDenied(self.permission_denied_message)
+        try:
+            leave_application = super().get_object(queryset)
+            if self.has_permission_to_view(leave_application):
+                return leave_application
+            raise PermissionDenied(self.permission_denied_message)
+        except ObjectDoesNotExist:
+            messages.error(self.request, _("Leave application does not exist, perhaps it was deleted."))
+            return redirect('calendar')  # Replace 'dashboard' with the name of your dashboard URL
 
     def has_permission_to_view(self, leave_application):
         user = self.request.user

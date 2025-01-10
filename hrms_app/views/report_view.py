@@ -206,12 +206,6 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             applied_by__in=employees, start_date__date__range=[start_date, end_date]
         )
 
-    # def _get_leave_logs(self, employees, start_date, end_date):
-    #     return LeaveApplication.objects.filter(
-    #         appliedBy__in=employees,
-    #         endDate__date__range=[start_date,end_date],
-    #         status=settings.APPROVED,
-    #     )
     def _get_leave_logs(self, employees, start_date, end_date):
         return LeaveDay.objects.filter(
             leave_application__appliedBy__in=employees,
@@ -473,7 +467,7 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
         # Calculate the end of the current day
         attendance_log = AttendanceLog.objects.filter(start_date__date=current_datetime.date()).first()
         log_duration = 0
-        if attendance_log.duration.hour < 4:
+        if attendance_log and attendance_log.duration.hour < 4:
             log_duration = attendance_log.duration.hour
         end_of_day = datetime.combine(current_datetime.date(), datetime.max.time())
         # Determine the actual end time for the current day

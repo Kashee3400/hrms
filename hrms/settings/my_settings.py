@@ -15,6 +15,7 @@ SALUTATION_CHOICES = [
     ("Mrs.", "Mrs."),
     ("Dr.", "Dr."),
     ("Prof.", "Prof."),
+    ("Er.", "Er."),
 ]
 
 

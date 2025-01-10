@@ -229,7 +229,6 @@ def send_reminder_email():
     email.send()
     logging.info(f"reminder mail sent at {timezone.now()}")
 
-    
 
 def send_greeting_email(obj, occasion_type):
     today = datetime.now().date()

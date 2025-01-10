@@ -480,7 +480,7 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Restricts the returned leave applications based on the user type."""
         user = self.request.user
-        queryset = LeaveApplication.objects.all()
+        queryset = LeaveApplication.objects.none()  # Default to an empty queryset
 
         # Determine the type of request
         request_type = self.request.query_params.get("type")
@@ -488,14 +488,14 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
         # Set the isManager flag based on the request type
         self.request.is_manager = request_type == "requested"
 
-        if (
-            request_type == "requested"
-            and hasattr(user, "employees")
-            and user.employees.exists()
-        ):
-            queryset = queryset.filter(appliedBy__in=user.employees.all())
-        else:
-            queryset = queryset.filter(appliedBy=user)
+        if request_type == "requested" and hasattr(user, "employees") and user.employees.exists():
+            queryset = LeaveApplication.objects.filter(appliedBy__in=user.employees.all())
+        elif request_type == "own":
+            queryset = LeaveApplication.objects.filter(appliedBy=user)
+
+        # If no valid request_type is specified, return an empty queryset
+        if queryset is None:
+            return LeaveApplication.objects.none()
 
         from_date = self.request.query_params.get("from_date")
         to_date = self.request.query_params.get("to_date")
@@ -519,7 +519,6 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(status=status_filter)
 
         return queryset.distinct()
-
 
 class UserLeaveOpeningsViewSet(viewsets.ModelViewSet):
     """
@@ -769,84 +768,70 @@ class HolidayViewSet(viewsets.ModelViewSet):
 ########   User Notification modules
 ########   By Divyanshu
 ###########################################################################
-
+from django.db.models import Q
+from django.utils.dateparse import parse_datetime
 
 class UserMonthlyNotificationsListView(ListAPIView):
     """
-    API view to fetch notifications for the authenticated user within the last month,
-    grouped by time periods like 'Today', 'This Week', and 'This Month'.
+    API view to fetch notifications for the authenticated user within a date range,
+    optionally filtered and paginated.
     """
-
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = PageNumberPagination  # Enables pagination
 
     def get_queryset(self):
         """
-        Get notifications for the authenticated user that are within the past month.
+        Get notifications for the authenticated user.
         """
         user = self.request.user
-
-        # Calculate the date one month ago from today
-        one_month_ago = timezone.now() - timedelta(days=30)
-
-        # Filter notifications for the past month and order them by timestamp
         return Notification.objects.filter(
-            receiver=user, timestamp__gte=one_month_ago
+            Q(receiver=user) | Q(sender=user)
         ).order_by("-timestamp")
 
     def list(self, request, *args, **kwargs):
         """
-        Override the list method to return grouped notifications for the past month.
+        Override the list method to allow filtering and provide paginated data.
         """
         queryset = self.get_queryset()
-        grouped_notifications = self.group_notifications_by_time_period(queryset)
 
-        # Structure the response using `create_response` function
-        response_data = {"grouped_notifications": grouped_notifications}
+        # Extract date range parameters from the query params
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
 
-        return create_response(
-            status="success",
-            message="Notifications from the past month fetched successfully.",
-            data=response_data,
-            status_code=status.HTTP_200_OK,
+        # Apply filtering based on start_date and end_date if provided
+        if start_date:
+            start_date_parsed = parse_datetime(start_date)
+            if start_date_parsed:
+                queryset = queryset.filter(timestamp__gte=start_date_parsed)
+
+        if end_date:
+            end_date_parsed = parse_datetime(end_date)
+            if end_date_parsed:
+                queryset = queryset.filter(timestamp__lte=end_date_parsed)
+
+        # Paginate the queryset
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serialized_data = self.get_serializer(page, many=True).data
+            return self.get_paginated_response(serialized_data)
+
+        # If pagination is not applied, serialize and return the entire data
+        serialized_data = self.get_serializer(queryset, many=True).data
+        return Response(
+            {
+                "status": "success",
+                "message": "Notifications fetched successfully.",
+                "data": serialized_data,
+            },
+            status=HTTP_200_OK,
         )
-
-    def group_notifications_by_time_period(self, notifications):
-        """
-        Group notifications based on the time period for the past month.
-        """
-        grouped_data = defaultdict(list)
-        current_time = timezone.now()
-
-        # Categorize notifications into time periods for the past month
-        for notification in notifications:
-            delta = (current_time - notification.timestamp).days
-
-            # Group by 'Today'
-            if delta == 0:
-                grouped_data["Today"].append(NotificationSerializer(notification).data)
-            # Group by 'This Week'
-            elif delta < 7:
-                grouped_data["This Week"].append(
-                    NotificationSerializer(notification).data
-                )
-            # Group by 'This Month'
-            else:
-                grouped_data["This Month"].append(
-                    NotificationSerializer(notification).data
-                )
-
-        # Sort the dictionary for consistency (optional)
-        sorted_grouped_data = dict(sorted(grouped_data.items()))
-        return sorted_grouped_data
-
 
 class UpdateNotificationStatusView(UpdateAPIView):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
     permission_classes = [IsAuthenticated]
     lookup_field = "id"
-
     def update(self, request, *args, **kwargs):
         try:
             # Get the notification object based on the provided ID
@@ -996,8 +981,10 @@ class UserTourViewSet(viewsets.ModelViewSet):
             and user.employees.exists()
         ):
             queryset = queryset.filter(applied_by__in=user.employees.all())
-        else:
+        elif request_type == "own":
             queryset = queryset.filter(applied_by=user)
+        else:
+            queryset= UserTour.objects.none()
 
         from_date = self.request.query_params.get("from_date")
         to_date = self.request.query_params.get("to_date")

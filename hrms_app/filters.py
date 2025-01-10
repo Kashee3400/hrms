@@ -10,3 +10,17 @@ class UserTourFilter(django_filters.FilterSet):
         model = UserTour
         fields = ['applied_by']
 
+
+from django_filters import rest_framework as filters
+from .models import Notification
+
+class NotificationFilter(filters.FilterSet):
+    """
+    FilterSet for Notification model to filter by timestamp.
+    """
+    from_date = filters.IsoDateTimeFilter(field_name="timestamp", lookup_expr="gte")
+    to_date = filters.IsoDateTimeFilter(field_name="timestamp", lookup_expr="lte")
+
+    class Meta:
+        model = Notification
+        fields = ["from_date", "to_date"]
