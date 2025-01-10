@@ -66,10 +66,10 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             )
             for date, short_code, _ in daily_durations:
                 employee_id = log.applied_by.id
-                attendance_data[employee_id][date] = [{
+                attendance_data[employee_id][date].append({
                     "status": short_code,
                     "color": "#06c1c4",
-                }]
+                })
                 holiday_days.pop(date, None)
 
         # Add holidays to attendance data
