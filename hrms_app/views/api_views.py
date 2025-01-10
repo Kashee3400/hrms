@@ -383,6 +383,7 @@ class LeaveApplicationViewSet(viewsets.ModelViewSet):
     queryset = LeaveApplication.objects.all()
     serializer_class = LeaveApplicationSerializer
     permission_classes = [IsAuthenticated]
+    lookup_field = 'id'
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -791,7 +792,8 @@ class UserMonthlyNotificationsListView(ListAPIView):
 
     def list(self, request, *args, **kwargs):
         """
-        Override the list method to allow filtering and provide paginated data.
+        Override the list method to allow filtering and provide paginated data,
+        including the unread notification count.
         """
         queryset = self.get_queryset()
 
@@ -810,11 +812,21 @@ class UserMonthlyNotificationsListView(ListAPIView):
             if end_date_parsed:
                 queryset = queryset.filter(timestamp__lte=end_date_parsed)
 
+        # Calculate unread notification count
+        unread_count = queryset.filter(is_read=False).count()
+
         # Paginate the queryset
         page = self.paginate_queryset(queryset)
         if page is not None:
             serialized_data = self.get_serializer(page, many=True).data
-            return self.get_paginated_response(serialized_data)
+            return self.get_paginated_response(
+                {
+                    "status": "success",
+                    "message": "Notifications fetched successfully.",
+                    "unread_count": unread_count,  # Add unread notification count
+                    "data": serialized_data,
+                }
+            )
 
         # If pagination is not applied, serialize and return the entire data
         serialized_data = self.get_serializer(queryset, many=True).data
@@ -822,9 +834,10 @@ class UserMonthlyNotificationsListView(ListAPIView):
             {
                 "status": "success",
                 "message": "Notifications fetched successfully.",
+                "unread_count": unread_count,  # Add unread notification count
                 "data": serialized_data,
             },
-            status=HTTP_200_OK,
+            status=status.HTTP_200_OK,
         )
 
 class UpdateNotificationStatusView(UpdateAPIView):
@@ -890,7 +903,7 @@ class UpdateNotificationStatusView(UpdateAPIView):
 class UserTourViewSet(viewsets.ModelViewSet):
     serializer_class = UserTourSerializer
     permission_classes = [AllowAny]
-    lookup_field = "slug"
+    lookup_field = "id"
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -911,9 +924,9 @@ class UserTourViewSet(viewsets.ModelViewSet):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-    def retrieve(self, request, slug=None, *args, **kwargs):
+    def retrieve(self, request, id=None, *args, **kwargs):
         try:
-            tour = self.get_object()
+            tour = UserTour.objects.get(id=id)
             serializer = self.get_serializer(tour)
             return create_response(
                 status="success",
@@ -929,10 +942,10 @@ class UserTourViewSet(viewsets.ModelViewSet):
                 status_code=status.HTTP_404_NOT_FOUND,
             )
 
-    def update(self, request, slug=None, *args, **kwargs):
+    def update(self, request, id=None, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         try:
-            tour = self.get_object()
+            tour = UserTour.objects.get(id=id)
             serializer = self.get_serializer(tour, data=request.data, partial=partial)
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
@@ -950,13 +963,13 @@ class UserTourViewSet(viewsets.ModelViewSet):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-    def partial_update(self, request, slug=None, *args, **kwargs):
+    def partial_update(self, request, id=None, *args, **kwargs):
         kwargs["partial"] = True
-        return self.update(request, slug, *args, **kwargs)
+        return self.update(request, id, *args, **kwargs)
 
-    def destroy(self, request, slug=None, *args, **kwargs):
+    def destroy(self, request, id=None, *args, **kwargs):
         try:
-            tour = self.get_object()
+            tour = UserTour.objects.get(id=id)
             self.perform_destroy(tour)
             return create_response(
                 status="success",
@@ -1012,7 +1025,6 @@ class UserTourViewSet(viewsets.ModelViewSet):
                 page, many=True, context={"request": request, "isManager": is_manager}
             )
             return self.get_paginated_response(serializer.data)
-
         serializer = self.get_serializer(queryset, many=True)
         return create_response(
             status="success",
@@ -1022,8 +1034,8 @@ class UserTourViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["post"])
-    def approved(self, request, slug=None):
-        tour = get_object_or_404(UserTour, slug=slug)
+    def approved(self, request, id=None):
+        tour = get_object_or_404(UserTour, id=id)
         action_by = request.user
         tour.approve(action_by)
 
@@ -1038,8 +1050,8 @@ class UserTourViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["post"])
-    def rejected(self, request, slug=None):
-        tour = get_object_or_404(UserTour, slug=slug)
+    def rejected(self, request, id=None):
+        tour = get_object_or_404(UserTour, id=id)
         action_by = self.request.user
         reason = request.data.get("reason", None)
         tour.reject(action_by, reason)
@@ -1055,8 +1067,8 @@ class UserTourViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["post"])
-    def cancelled(self, request, slug=None):
-        tour = get_object_or_404(UserTour, slug=slug)
+    def cancelled(self, request, id=None):
+        tour = get_object_or_404(UserTour, id=id)
         action_by = self.request.user
         reason = request.data.get("reason", None)
         tour.cancel(action_by, reason)
@@ -1072,8 +1084,8 @@ class UserTourViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["post"])
-    def pending_cancellation(self, request, slug=None):
-        tour = get_object_or_404(UserTour, slug=slug)
+    def pending_cancellation(self, request, id=None):
+        tour = get_object_or_404(UserTour, id=id)
         action_by = self.request.user
         reason = request.data.get("reason", None)
         tour.pending_cancel(action_by, reason)
@@ -1089,8 +1101,8 @@ class UserTourViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["post"])
-    def completed(self, request, slug=None):
-        tour = get_object_or_404(UserTour, slug=slug)
+    def completed(self, request, id=None):
+        tour = get_object_or_404(UserTour, id=id)
         action_by = self.request.user
         reason = request.data.get("reason", None)
         tour.complete(action_by, reason)
@@ -1106,8 +1118,8 @@ class UserTourViewSet(viewsets.ModelViewSet):
         )
 
     @action(detail=True, methods=["post"])
-    def extended(self, request, slug=None):
-        tour = get_object_or_404(UserTour, slug=slug)
+    def extended(self, request, id=None):
+        tour = get_object_or_404(UserTour, id=id)
         action_by = self.request.user
         new_end_date = request.data.get("new_end_date")
         new_end_time = request.data.get("new_end_time")
