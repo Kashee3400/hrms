@@ -333,12 +333,13 @@ def get_monthly_presence_html_table(
         emp_code = user.personal_detail.employee_code
         if emp_code in monthly_presence_data:
             row_data = {
-                "status": f'<tr><td class="sticky-col" rowspan="6">KMPCL-{format_emp_code(emp_code)}</td><td class="sticky-col" rowspan="6">{user.get_full_name()}</td><td>Status</td>',
+                "status": f'<tr><td class="sticky-col" rowspan="7">KMPCL-{format_emp_code(emp_code)}</td><td class="sticky-col" rowspan="7">{user.get_full_name()}</td><td>Status</td>',
                 "in_time": "<tr><td>In Time</td>",
                 "out_time": "<tr><td>Out Time</td>",
                 "total_duration": "<tr><td>Duration</td>",
                 "leave": "<tr><td>Leave</td>",
                 "tour": "<tr><td>Tour</td>",
+                "reg": "<tr><td>Reg</td>",
             }
 
             for day_date in date_range:
@@ -368,6 +369,7 @@ def get_cell_data(user, day_date, day_str, monthly_presence_data, emp_code):
         "total_duration": "",
         "leave": "",
         "tour": "",
+        "reg":""
     }
     if (
         (user.personal_detail.dot and day_date < user.personal_detail.dot)
@@ -396,6 +398,7 @@ def get_cell_data(user, day_date, day_str, monthly_presence_data, emp_code):
                     "status", status_entry.get("leave", {}).get("status", "")
                 ),
                 "tour": status_entry.get("tour", {}).get("tour", ""),
+                "reg": status_entry.get("present", {}).get("reg", ""),
             }
         )
         if status_entry.get("sunday", {}).get("status"):
@@ -472,6 +475,7 @@ def process_logs(logs, monthly_presence_data):
             "in_time": localtime(log.start_date).strftime("%I:%M %p"),
             "out_time": localtime(log.end_date).strftime("%I:%M %p"),
             "total_duration": log.duration,
+            "reg": "R" if log.regularized else "",
         }
 
 
