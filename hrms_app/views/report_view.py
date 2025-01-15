@@ -221,28 +221,86 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
         )
 
 
+# class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
+#     template_name = "hrms_app/reports/present_absent_detailed_report.html"
+#     permission_denied_message = _("U are not authorized to access the page")
+#     title = _("Attendance Detailed Report")
+
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         form = AttendanceReportFilterForm(self.request.GET)
+#         if form.is_valid():
+#             location = self.request.GET.get("location")
+#             from_date = self.request.GET.get("from_date")
+#             to_date = self.request.GET.get("to_date")
+#             active = self.request.GET.get("active")
+#             active = True if active == "on" else False
+#             table_data = get_monthly_presence_html_table(
+#                 converted_from_datetime=from_date,
+#                 converted_to_datetime=to_date,
+#                 is_active=active,
+#                 location=location,
+#             )
+#             context.update({"html_table": table_data, "form": form})
+#         context.update({"title": self.title, "form": form})
+#         return context
+
+from django.http import HttpResponse
+import pandas as pd
+
 class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/present_absent_detailed_report.html"
-    permission_denied_message = _("U are not authorized to access the page")
+    permission_denied_message = _("You are not authorized to access this page.")
     title = _("Attendance Detailed Report")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         form = AttendanceReportFilterForm(self.request.GET)
+
         if form.is_valid():
             location = self.request.GET.get("location")
             from_date = self.request.GET.get("from_date")
             to_date = self.request.GET.get("to_date")
             active = self.request.GET.get("active")
             active = True if active == "on" else False
+
             table_data = get_monthly_presence_html_table(
                 converted_from_datetime=from_date,
                 converted_to_datetime=to_date,
                 is_active=active,
                 location=location,
             )
-            context.update({"html_table": table_data, "form": form})
-        context.update({"title": self.title, "form": form})
+
+            # Check if export is requested
+            if self.request.GET.get("export") == "true":
+                # Convert HTML table to DataFrame
+                df = pd.read_html(table_data)[0]  # Assuming only one table in HTML content
+                filename = f'monthly_presence_data_from_{from_date}_to_{to_date}.xlsx'
+
+                # Create an Excel writer object
+                excel_writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+                df.to_excel(excel_writer, index=False, sheet_name='Sheet1')
+                excel_writer.close()
+
+                # Prepare the response with the Excel file
+                with open(filename, 'rb') as excel_file:
+                    response = HttpResponse(
+                        excel_file.read(),
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    )
+                    response['Content-Disposition'] = f'attachment; filename={filename}'
+                    return response
+
+            # Update context with table data for rendering
+            context.update({
+                "html_table": table_data,
+                "form": form,
+            })
+
+        context.update({
+            "title": self.title,
+            "form": form,
+        })
         return context
 
 
@@ -563,3 +621,38 @@ def format_emp_code(emp_code):
         return f"0{emp_code}"
     else:
         return emp_code
+
+
+import pandas as pd
+from django.http import HttpResponse
+
+def exportDetailedMonthlyPresenceView(request):
+    location = request.GET.get("location")
+    from_date = request.GET.get("from_date")
+    to_date = request.GET.get("to_date")
+    active = request.GET.get("active")
+    active = True if active == "on" else False
+    # Generate the table and export to Excel as before
+    table_data = get_monthly_presence_html_table(converted_from_datetime=from_date,
+                                                converted_to_datetime=to_date,
+                                                location=location,is_active=active)
+    # Convert HTML table to DataFrame
+    df = pd.read_html(table_data)[0]  # Assuming only one table in HTML content
+    filename = f'monthly_presence_data_from_{from_date}_to_{to_date}.xlsx'
+    # Create an Excel writer object
+    excel_writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+    # Convert DataFrame to Excel
+    df.to_excel(excel_writer, index=False, sheet_name='Sheet1')
+    # Close the Excel writer object
+    excel_writer.close()
+    # Prepare the response with the Excel file
+    with open(filename, 'rb') as excel_file:
+        response = HttpResponse(
+            excel_file.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+
+    # Set the file name in the response headers
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+
+    return response

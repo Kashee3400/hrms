@@ -2,7 +2,7 @@
 {% load static hrms_tag humanize i18n %}
 
 {% block title %}
-  {% trans 'Employee' %} | {{ title }}
+  {% trans 'Employee' %}| {{ title }}
 {% endblock %}
 
 {% block extrastyle %}
@@ -65,17 +65,17 @@
         <div class="col-md-3 col-12 mb-2">{{ form.from_date.label_tag }} {{ form.from_date }}</div>
         <!-- To Date Filter -->
         <div class="col-md-3 col-12 mb-2">{{ form.to_date.label_tag }} {{ form.to_date }}</div>
-        <!-- Search Field -->
+        <!-- Active Filter -->
         <div class="col-md-3 col-12 mb-2">{{ form.active.label_tag }} {{ form.active }}</div>
-        <!-- Buttons: Filter, Clear Filter, Apply Tour -->
+        <!-- Buttons: Filter, Clear Filter, Export -->
         <div class="col-md-3 col-12 mb-2">
           <button type="submit" class="btn btn-sm btn-primary"><span class="mif-filter"></span> Filter</button>
           <a class="btn btn-sm btn-secondary" href="{% url 'calendar' %}">Clear Filter</a>
+          <button type="submit" name="export" value="true" class="btn btn-sm btn-success"><span class="mif-file-excel"></span> Export to Excel</button>
         </div>
       </div>
     </form>
   </div>
-
   <div class="bg-white my-2 p-2">
     <div class="dt-responsive table-responsive">{{ html_table|safe }}</div>
   </div>
