@@ -66,10 +66,12 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             )
             for date, short_code, _ in daily_durations:
                 employee_id = log.applied_by.id
-                attendance_data[employee_id][date].append({
-                    "status": short_code,
-                    "color": "#06c1c4",
-                })
+                attendance_data[employee_id][date].append(
+                    {
+                        "status": short_code,
+                        "color": "#06c1c4",
+                    }
+                )
                 holiday_days.pop(date, None)
 
         # Add holidays to attendance data
@@ -88,20 +90,26 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             # Handle "CL" leave type
             if leave_status == "CL":
                 if log_date in holiday_days:
-                    attendance_data[employee_id][log_date].append({
-                        "status": "",
-                        "color": holiday_days[log_date]["color"],
-                    })
+                    attendance_data[employee_id][log_date].append(
+                        {
+                            "status": "",
+                            "color": holiday_days[log_date]["color"],
+                        }
+                    )
                 elif log_date.weekday() == 6:  # Sunday
-                    attendance_data[employee_id][log_date].append({
-                        "status": "OFF",
-                        "color": "#CCCCCC",
-                    })
+                    attendance_data[employee_id][log_date].append(
+                        {
+                            "status": "OFF",
+                            "color": "#CCCCCC",
+                        }
+                    )
                 else:
-                    attendance_data[employee_id][log_date].append({
-                        "status": leave_status if log.is_full_day else half_status,
-                        "color": leave_type.color_hex or "#FF0000",
-                    })
+                    attendance_data[employee_id][log_date].append(
+                        {
+                            "status": leave_status if log.is_full_day else half_status,
+                            "color": leave_type.color_hex or "#FF0000",
+                        }
+                    )
             else:
                 # Handle other leave types
                 date_entries = attendance_data[employee_id].get(log_date, [])
@@ -110,22 +118,25 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
                 if any(entry.get("status") == "FL" for entry in date_entries):
                     attendance_data[employee_id][log_date] = []
 
-                attendance_data[employee_id][log_date].append({
-                    "status": leave_status if log.is_full_day else half_status,
-                    "color": leave_type.color_hex or "#FF0000",
-                })
+                attendance_data[employee_id][log_date].append(
+                    {
+                        "status": leave_status if log.is_full_day else half_status,
+                        "color": leave_type.color_hex or "#FF0000",
+                    }
+                )
 
         # Add "OFF" status for Sundays without any entries
         for employee_id in attendance_data.keys():
             for sunday in sundays:
                 if not attendance_data[employee_id][sunday.date()]:
-                    attendance_data[employee_id][sunday.date()].append({
-                        "status": "OFF",
-                        "color": "#CCCCCC",  # Default color for "OFF"
-                    })
+                    attendance_data[employee_id][sunday.date()].append(
+                        {
+                            "status": "OFF",
+                            "color": "#CCCCCC",  # Default color for "OFF"
+                        }
+                    )
 
         return attendance_data
-
 
     def _get_days_in_month(self, start_date, end_date):
         return [
@@ -220,31 +231,6 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             status=settings.APPROVED,
         )
 
-
-# class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
-#     template_name = "hrms_app/reports/present_absent_detailed_report.html"
-#     permission_denied_message = _("U are not authorized to access the page")
-#     title = _("Attendance Detailed Report")
-
-#     def get_context_data(self, **kwargs):
-#         context = super().get_context_data(**kwargs)
-#         form = AttendanceReportFilterForm(self.request.GET)
-#         if form.is_valid():
-#             location = self.request.GET.get("location")
-#             from_date = self.request.GET.get("from_date")
-#             to_date = self.request.GET.get("to_date")
-#             active = self.request.GET.get("active")
-#             active = True if active == "on" else False
-#             table_data = get_monthly_presence_html_table(
-#                 converted_from_datetime=from_date,
-#                 converted_to_datetime=to_date,
-#                 is_active=active,
-#                 location=location,
-#             )
-#             context.update({"html_table": table_data, "form": form})
-#         context.update({"title": self.title, "form": form})
-#         return context
-
 from django.http import HttpResponse
 import pandas as pd
 
@@ -271,37 +257,60 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
                 location=location,
             )
 
-            # Check if export is requested
-            if self.request.GET.get("export") == "true":
+            # Update context with table data for rendering
+            context.update(
+                {
+                    "html_table": table_data,
+                    "form": form,
+                }
+            )
+
+        context.update(
+            {
+                "title": self.title,
+                "form": form,
+            }
+        )
+        return context
+
+    def get(self, request, *args, **kwargs):
+        # Check if export is requested
+        if request.GET.get("export") == "true":
+            form = AttendanceReportFilterForm(request.GET)
+            if form.is_valid():
+                location = request.GET.get("location")
+                from_date = request.GET.get("from_date")
+                to_date = request.GET.get("to_date")
+                active = request.GET.get("active")
+                active = True if active == "on" else False
+
+                table_data = get_monthly_presence_html_table(
+                    converted_from_datetime=from_date,
+                    converted_to_datetime=to_date,
+                    is_active=active,
+                    location=location,
+                )
+
                 # Convert HTML table to DataFrame
                 df = pd.read_html(table_data)[0]  # Assuming only one table in HTML content
-                filename = f'monthly_presence_data_from_{from_date}_to_{to_date}.xlsx'
+                filename = f"monthly_presence_data_from_{from_date}_to_{to_date}.xlsx"
 
                 # Create an Excel writer object
-                excel_writer = pd.ExcelWriter(filename, engine='xlsxwriter')
-                df.to_excel(excel_writer, index=False, sheet_name='Sheet1')
+                excel_writer = pd.ExcelWriter(filename, engine="xlsxwriter")
+                df.to_excel(excel_writer, index=False, sheet_name="Sheet1")
                 excel_writer.close()
 
                 # Prepare the response with the Excel file
-                with open(filename, 'rb') as excel_file:
+                with open(filename, "rb") as excel_file:
                     response = HttpResponse(
                         excel_file.read(),
-                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     )
-                    response['Content-Disposition'] = f'attachment; filename={filename}'
+                    response["Content-Disposition"] = f"attachment; filename={filename}"
                     return response
 
-            # Update context with table data for rendering
-            context.update({
-                "html_table": table_data,
-                "form": form,
-            })
-
-        context.update({
-            "title": self.title,
-            "form": form,
-        })
-        return context
+        # If no export, render the template as usual
+        return super().get(request, *args, **kwargs)
 
 
 def get_monthly_presence_html_table(
@@ -369,7 +378,7 @@ def get_cell_data(user, day_date, day_str, monthly_presence_data, emp_code):
         "total_duration": "",
         "leave": "",
         "tour": "",
-        "reg":""
+        "reg": "",
     }
     if (
         (user.personal_detail.dot and day_date < user.personal_detail.dot)
@@ -395,14 +404,14 @@ def get_cell_data(user, day_date, day_str, monthly_presence_data, emp_code):
                     "total_duration", ""
                 ),
                 "leave": status_entry.get("holiday", {}).get(
-                    "status", status_entry.get("leave", {}).get("status", "")
+                    "status", status_entry.get("leave", {}).get("leave", "")
                 ),
                 "tour": status_entry.get("tour", {}).get("tour", ""),
                 "reg": status_entry.get("present", {}).get("reg", ""),
             }
         )
         if status_entry.get("sunday", {}).get("status"):
-            cell_data["status"] = status_entry["sunday"]["status"]
+            cell_data["leave"] = status_entry["sunday"]["status"]
     return cell_data
 
 
@@ -429,11 +438,15 @@ def generate_monthly_presence_data_detailed(
     if location:
         employees = employees.filter(device_location_id=location).order_by("first_name")
 
-    leaves = LeaveApplication.objects.filter(
-        appliedBy__in=employees.values_list("id", flat=True),
-        status=settings.APPROVED,
-        startDate__range=[converted_from_datetime, converted_to_datetime],
-    ).select_related("appliedBy__personal_detail")
+
+    leaves = LeaveDay.objects.filter(
+        leave_application__appliedBy__in=employees.values_list("id", flat=True),
+        leave_application__status=settings.APPROVED,
+        leave_application__startDate__range=[
+            converted_from_datetime,
+            converted_to_datetime,
+        ],
+    ).select_related("leave_application__appliedBy__personal_detail")
 
     logs = AttendanceLog.objects.filter(
         applied_by__in=employees,
@@ -449,10 +462,6 @@ def generate_monthly_presence_data_detailed(
     holidays = get_payroll_date_holidays(converted_from_datetime, converted_to_datetime)
     converted_from_datetime = datetime.strptime(converted_from_datetime, "%Y-%m-%d")
     converted_to_datetime = datetime.strptime(converted_to_datetime, "%Y-%m-%d")
-
-    process_logs(logs, monthly_presence_data)
-    process_leaves(leaves, monthly_presence_data)
-    process_tours(all_tours, monthly_presence_data)
     process_sundays_and_holidays(
         employees,
         holidays,
@@ -460,6 +469,9 @@ def generate_monthly_presence_data_detailed(
         converted_from_datetime,
         converted_to_datetime,
     )
+    process_logs(logs, monthly_presence_data)
+    process_leaves(leaves, monthly_presence_data)
+    process_tours(all_tours, monthly_presence_data)
 
     return monthly_presence_data
 
@@ -478,26 +490,38 @@ def process_logs(logs, monthly_presence_data):
             "reg": "R" if log.regularized else "",
         }
 
-
 def process_leaves(leaves, monthly_presence_data):
     for leave in leaves:
-        emp_code = leave.appliedBy.personal_detail.employee_code
-        current_date = leave.startDate.date()
-        end_date = leave.endDate.date()
-        while current_date <= end_date:
-            leave_type = mark_leave_attendance(
-                current_date, leave, current_date.strftime("%Y-%m-%d")
-            )
-            monthly_presence_data[emp_code][current_date.strftime("%Y-%m-%d")][
-                "leave"
-            ] = {
-                "leave": leave_type,
-                "in_time": None,
-                "out_time": None,
-                "total_duration": None,
-            }
-            current_date += timedelta(days=1)
+        emp_code = leave.leave_application.appliedBy.personal_detail.employee_code
+        code = (
+            leave.leave_application.leave_type.leave_type_short_code
+            if leave.is_full_day
+            else leave.leave_application.leave_type.half_day_short_code
+        )
+        # Fetch attendance for the current, previous, and next dates
+        employee_attendance = monthly_presence_data.get(emp_code, {})
+        date_key = leave.date.strftime("%Y-%m-%d")
+        current_entry = employee_attendance.get(date_key, {}) if employee_attendance else None
 
+        # Check if current_entry contains FL or OFF and remove them
+        if current_entry and (
+            current_entry.get("sunday", {}).get("status") == "OFF" or 
+            current_entry.get("holiday", {}).get("status") == "FL"
+        ):
+            current_entry.pop("sunday", None)
+            current_entry.pop("holiday", None)
+        # Add the leave entry
+        if emp_code not in monthly_presence_data:
+            monthly_presence_data[emp_code] = {}
+        if date_key not in monthly_presence_data[emp_code]:
+            monthly_presence_data[emp_code][date_key] = {}
+        
+        monthly_presence_data[emp_code][date_key]["leave"] = {
+            "leave": code,
+            "in_time": None,
+            "out_time": None,
+            "total_duration": None,
+        }
 
 from datetime import datetime, timedelta
 
@@ -527,7 +551,9 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
     daily_durations = []
     while current_datetime.date() <= end_datetime.date():
         # Calculate the end of the current day
-        attendance_log = AttendanceLog.objects.filter(start_date__date=current_datetime.date()).first()
+        attendance_log = AttendanceLog.objects.filter(
+            start_date__date=current_datetime.date()
+        ).first()
         log_duration = 0
         if attendance_log and attendance_log.duration.hour < 4:
             log_duration = attendance_log.duration.hour
@@ -538,7 +564,7 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
         duration = actual_end_time - current_datetime
         duration_hours = duration.total_seconds() / 3600
         # Determine the short code based on duration
-        duration_hours +=log_duration
+        duration_hours += log_duration
         short_code = "T" if duration_hours >= 8 else "TH"
         # Append the result for the current day
         daily_durations.append((current_datetime.date(), short_code, duration))
@@ -630,6 +656,7 @@ def format_emp_code(emp_code):
 import pandas as pd
 from django.http import HttpResponse
 
+
 def exportDetailedMonthlyPresenceView(request):
     location = request.GET.get("location")
     from_date = request.GET.get("from_date")
@@ -637,26 +664,29 @@ def exportDetailedMonthlyPresenceView(request):
     active = request.GET.get("active")
     active = True if active == "on" else False
     # Generate the table and export to Excel as before
-    table_data = get_monthly_presence_html_table(converted_from_datetime=from_date,
-                                                converted_to_datetime=to_date,
-                                                location=location,is_active=active)
+    table_data = get_monthly_presence_html_table(
+        converted_from_datetime=from_date,
+        converted_to_datetime=to_date,
+        location=location,
+        is_active=active,
+    )
     # Convert HTML table to DataFrame
     df = pd.read_html(table_data)[0]  # Assuming only one table in HTML content
-    filename = f'monthly_presence_data_from_{from_date}_to_{to_date}.xlsx'
+    filename = f"monthly_presence_data_from_{from_date}_to_{to_date}.xlsx"
     # Create an Excel writer object
-    excel_writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+    excel_writer = pd.ExcelWriter(filename, engine="xlsxwriter")
     # Convert DataFrame to Excel
-    df.to_excel(excel_writer, index=False, sheet_name='Sheet1')
+    df.to_excel(excel_writer, index=False, sheet_name="Sheet1")
     # Close the Excel writer object
     excel_writer.close()
     # Prepare the response with the Excel file
-    with open(filename, 'rb') as excel_file:
+    with open(filename, "rb") as excel_file:
         response = HttpResponse(
             excel_file.read(),
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
 
     # Set the file name in the response headers
-    response['Content-Disposition'] = f'attachment; filename={filename}'
+    response["Content-Disposition"] = f"attachment; filename={filename}"
 
     return response
