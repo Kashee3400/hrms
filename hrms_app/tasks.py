@@ -314,32 +314,71 @@ import platform
 
 @shared_task
 def backup_database(include_schema=True):
-    DB_NAME, mysql_user, mysql_password, mysql_host, mysql_port = get_database_config()
-    is_wsl = 'microsoft' in platform.uname().release.lower()    
-    backup_dir = os.getenv('BACKUP_DIR', "E:/MySQLBackups/DBBACKUP")
-    if is_wsl:
-        backup_dir = backup_dir.replace("E:/", "/mnt/e/").replace("\\", "/")
-    mysqldump_path = 'E:/postgres/16/bin/pg_dump.exe'
-    if is_wsl:
-        mysqldump_path = mysqldump_path.replace("E:/", "/mnt/e/").replace("\\", "/")    
-    seven_zip_path = 'C:/Program Files/7-Zip/7z.exe'
-    if is_wsl:
-        seven_zip_path = seven_zip_path.replace("C:/", "/mnt/c/").replace("\\", "/")
-    os.makedirs(backup_dir, exist_ok=True)
-    backup_name = os.path.join(backup_dir, f'hrms_db_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.sql')
-    if include_schema:
-        mysqldump_cmd = f'"{mysqldump_path}" --user={mysql_user} --password={mysql_password} --host={mysql_host} --port={mysql_port} {DB_NAME} > "{backup_name}"'
-    else:
-        mysqldump_cmd = f'"{mysqldump_path}" --user={mysql_user} --password={mysql_password} --host={mysql_host} --port={mysql_port} --no-create-info {DB_NAME} > "{backup_name}"'
-    backup_zip_name = create_backup(DB_NAME, backup_dir, mysqldump_cmd, backup_name, 'Backup failed: error during dump creation', seven_zip_path)
-    
-    if backup_zip_name:
-        message = f'Database backup successful for the HRMS employee data: {backup_name}'
-        dept = Department.objects.get(department='IT')
-        emp_emails = PersonalDetails.objects.filter(designation__department=dept).values_list('user__email', flat=True)
-        send_backup_email('Database backup successful:', message, emp_emails)
-        return True
-    return False
+    try:
+        # Get database configuration
+        DB_NAME, mysql_user, mysql_password, mysql_host, mysql_port = get_database_config()
+
+        # Detect if running on WSL
+        is_wsl = 'microsoft' in platform.uname().release.lower()
+
+        # Backup directory and paths
+        backup_dir = os.getenv('BACKUP_DIR', "E:/MySQLBackups/DBBACKUP")
+        if is_wsl:
+            backup_dir = backup_dir.replace("E:/", "/mnt/e/").replace("\\", "/")
+
+        mysqldump_path = 'E:/postgres/16/bin/pg_dump.exe'
+        if is_wsl:
+            mysqldump_path = mysqldump_path.replace("E:/", "/mnt/e/").replace("\\", "/")
+
+        seven_zip_path = 'C:/Program Files/7-Zip/7z.exe'
+        if is_wsl:
+            seven_zip_path = seven_zip_path.replace("C:/", "/mnt/c/").replace("\\", "/")
+
+        # Ensure backup directory exists
+        os.makedirs(backup_dir, exist_ok=True)
+
+        # Backup file name
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        backup_name = os.path.join(backup_dir, f'hrms_db_{timestamp}.sql')
+
+        # Construct the pg_dump command
+        command = [
+            mysqldump_path,
+            "-U", mysql_user,
+            "-h", mysql_host,
+            "-p", str(mysql_port),
+            "-d", DB_NAME,
+        ]
+
+        # Include schema or data only
+        if not include_schema:
+            command.append("--data-only")
+
+        # Set environment variable for password (avoids passing it in command)
+        os.environ["PGPASSWORD"] = mysql_password
+
+        # Execute the command and write output to the backup file
+        with open(backup_name, "w") as backup_file:
+            result = subprocess.run(command, stdout=backup_file, stderr=subprocess.PIPE, text=True)
+
+        # Check for errors
+        if result.returncode != 0:
+            raise Exception(f"pg_dump failed: {result.stderr.strip()}")
+
+        # Create a zip backup
+        backup_zip_name = create_backup(DB_NAME, backup_dir, None, backup_name, 'Backup failed: error during zip creation', seven_zip_path)
+
+        # If backup is successful, send email notification
+        if backup_zip_name:
+            message = f"Database backup successful for the HRMS employee data: {backup_zip_name}"
+            dept = Department.objects.get(department='IT')
+            emp_emails = PersonalDetails.objects.filter(designation__department=dept).values_list('user__email', flat=True)
+            send_backup_email('Database Backup Successful', message, emp_emails)
+            return True
+
+    except Exception as e:
+        print(f"Backup failed: {str(e)}")
+        return False
 
 def send_backup_email(subject, message, recipients):
     from django.core.mail import EmailMessage
