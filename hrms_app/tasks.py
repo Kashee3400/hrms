@@ -84,7 +84,6 @@ def send_leave_application_notifications(application_id, protocol, domain):
 @shared_task
 def send_leave_application_email(subject, message, recipient_list):
     # print(f"Mail sent")
-
     if not DEBUG:
         send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
@@ -310,20 +309,28 @@ def get_database_config():
     mysql_port = config("DB_PORT", default="5432")
     return DB_NAME, mysql_user, mysql_password, mysql_host, mysql_port
 
+import os
+import platform
+
 @shared_task
 def backup_database(include_schema=True):
     DB_NAME, mysql_user, mysql_password, mysql_host, mysql_port = get_database_config()
+    is_wsl = 'microsoft' in platform.uname().release.lower()    
     backup_dir = os.getenv('BACKUP_DIR', "E:/MySQLBackups/DBBACKUP")
+    if is_wsl:
+        backup_dir = backup_dir.replace("E:/", "/mnt/e/").replace("\\", "/")
     mysqldump_path = 'E:/postgres/16/bin/pg_dump.exe'
+    if is_wsl:
+        mysqldump_path = mysqldump_path.replace("E:/", "/mnt/e/").replace("\\", "/")    
     seven_zip_path = 'C:/Program Files/7-Zip/7z.exe'
-
+    if is_wsl:
+        seven_zip_path = seven_zip_path.replace("C:/", "/mnt/c/").replace("\\", "/")
+    os.makedirs(backup_dir, exist_ok=True)
     backup_name = os.path.join(backup_dir, f'hrms_db_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}.sql')
-    
     if include_schema:
         mysqldump_cmd = f'"{mysqldump_path}" --user={mysql_user} --password={mysql_password} --host={mysql_host} --port={mysql_port} {DB_NAME} > "{backup_name}"'
     else:
         mysqldump_cmd = f'"{mysqldump_path}" --user={mysql_user} --password={mysql_password} --host={mysql_host} --port={mysql_port} --no-create-info {DB_NAME} > "{backup_name}"'
-
     backup_zip_name = create_backup(DB_NAME, backup_dir, mysqldump_cmd, backup_name, 'Backup failed: error during dump creation', seven_zip_path)
     
     if backup_zip_name:
