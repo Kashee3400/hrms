@@ -245,9 +245,9 @@ def send_greeting_email(obj, occasion_type):
         occasion_name = WishingCard.JobAnniversaryCard
     
     if date_to_check and date_to_check.day == today.day and date_to_check.month == today.month:
-        subject = f'Wishing Happy {occasion_name} {obj.admin.first_name} {obj.admin.last_name}'
+        subject = f'Wishing Happy {occasion_name} {obj.user.first_name} {obj.user.last_name}'
         flag = 'Shri' if obj.gender.gender == 'Male' else 'Mis'
-        salutation = f"Dear {flag} {obj.admin.first_name} {obj.admin.last_name},<br><br>"
+        salutation = f"Dear {flag} {obj.user.get_full_name()},<br><br>"
         regards = '<br><br>Regards,<br>HR Team'
         random_card = WishingCard.objects.filter(type=occasion_name).order_by('?').first()
         
