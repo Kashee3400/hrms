@@ -256,7 +256,7 @@ def send_greeting_email(obj, occasion_type):
             encoded_image = base64.b64encode(image_data).decode('utf-8')
         
         if occasion_type == 'job_anniversary':
-            years = today.year - obj.date_of_joining.year
+            years = today.year - obj.doj.year
             anniversary_msg = f"Congratulations on your {ordinal(years)} job anniversary with Kashee!<br><br>"
             html_content = f"<html><body>{salutation}{anniversary_msg}<img style='height:350px;width:200px' src='data:image/jpeg;base64,{encoded_image}' alt='{occasion_name} Card'><br><br>{regards}</body></html>"
         else:
