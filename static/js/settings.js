@@ -12,7 +12,13 @@
       $("#theme-settings").toggleClass("open");
     });
 
-
+    // Toggle notification panel
+    $("#notificationOpen").on("click", function() {
+      $("#notification").toggleClass("open");
+    });
+    $("#notification .settings-close").on("click", function() {
+      $("#notification").removeClass("open");
+    });
     //background constants
     var navbar_classes = "navbar-danger navbar-success navbar-warning navbar-dark navbar-light navbar-primary navbar-info navbar-pink";
     var sidebar_classes = "sidebar-light sidebar-dark";

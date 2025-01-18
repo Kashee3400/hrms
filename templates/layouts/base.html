@@ -1,4 +1,4 @@
-{% load i18n static webpush_notifications %}
+{% load i18n static hrms_tag webpush_notifications %}
 <!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 {% get_current_language_bidi as LANGUAGE_BIDI %}
@@ -86,9 +86,13 @@
             {% include 'includes/footer.html' %}
           </div>
         </div>
+        {% block notification %}
+        {% load_side_notifications request.user %}
+        {% endblock %}
         {% block settings_panel %}
           {% include 'includes/settings-panel.html' %}
         {% endblock %}
+        
       </div>
     </div>
     <!-- END Container -->

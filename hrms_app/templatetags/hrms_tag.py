@@ -96,6 +96,16 @@ def load_notifications(user):
     pending_reg = get_regularization_requests(user=user)
     total_counts = len(pending_leaves) + pending_tours.count() + pending_reg.count()
     return {
+        "count": total_counts,
+    }
+
+@register.inclusion_tag("notifications/notification.html")
+def load_side_notifications(user):
+    pending_leaves = get_employee_requested_leave(user=user)
+    pending_tours = get_employee_requested_tour(user=user)
+    pending_reg = get_regularization_requests(user=user)
+    total_counts = len(pending_leaves) + pending_tours.count() + pending_reg.count()
+    return {
         "pending_leaves": pending_leaves,
         "pending_tours": pending_tours,
         "pending_reg": pending_reg,

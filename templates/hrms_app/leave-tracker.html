@@ -116,11 +116,11 @@
                               </li>
                               <li class="list-group-item">
                                   <strong>From:</strong>
-                                  <span class="float-end">{{ leave.start_date }} - {% leave_start_end_status leave.leaveApplication.startDayChoice %}</span>
+                                  <span class="float-end">{{ leave.leaveApplication.startDate|localtime_filter }} - {% leave_start_end_status leave.leaveApplication.startDayChoice %}</span>
                               </li>
                               <li class="list-group-item">
                                   <strong>To:</strong>
-                                  <span class="float-end">{{ leave.end_date }} - {% leave_start_end_status leave.leaveApplication.endDayChoice %}</span>
+                                  <span class="float-end">{{ leave.leaveApplication.endDate|localtime_filter }} - {% leave_start_end_status leave.leaveApplication.endDayChoice %}</span>
                               </li>
                           </ul>
                       </div>
