@@ -1,6 +1,9 @@
 from .base import *
 
 DEBUG  = False
+LOGIN_URL = "/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/login/"
 
 DATABASES = {
     "default": {
