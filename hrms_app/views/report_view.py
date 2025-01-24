@@ -600,8 +600,8 @@ def process_logs(logs, monthly_presence_data):
             "present"
         ] = {
             "status": log.att_status_short_code,
-            "in_time": localtime(log.start_date).strftime("%I:%M %p"),
-            "out_time": localtime(log.end_date).strftime("%I:%M %p"),
+            "in_time": localtime(log.start_date).strftime("%I:%M"),
+            "out_time": localtime(log.end_date).strftime("%I:%M"),
             "total_duration": log.duration,
             "reg": "R" if log.regularized else "",
         }

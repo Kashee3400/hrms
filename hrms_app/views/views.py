@@ -797,6 +797,10 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
+    
+    def get_count(self):
+        logs_count = AttendanceLog.objects.filter(applied_by=self.request.user,regularized=True).count()
+        return logs_count
 
     def get_object(self, queryset=None):
         attendance_log = super().get_object(queryset)
@@ -838,6 +842,7 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             {
                 "title": self.title,
                 "subtitle": self.get_object().slug,
+                "reg_count":self.get_count()
             }
         )
         return context

@@ -81,7 +81,7 @@
       <div class="card">
         <div class="card-header d-flex align-items-center">
           <span class="me-2"><i class="bi bi-grid"></i></span>
-          <span>{{ object.reg_status|capfirst }}</span>
+          <span>{{ object.reg_status|capfirst }}&nbsp;&nbsp; <span class="text-warning">| Regularized Attendance {{reg_count}} times in {{ object.start_date|date:"F" }}</span></span>
         </div>
         <div class="card-body">
           <form id="reg-application-form" method="post">
