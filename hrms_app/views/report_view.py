@@ -657,7 +657,6 @@ def process_tours(all_tours, monthly_presence_data):
                 "total_duration": str(duration),
             }
 
-
 def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
     # Combine date and time into datetime objects
     start_datetime = datetime.combine(start_date, start_time or datetime.min.time())
@@ -665,32 +664,47 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
     # Initialize the current datetime to the start datetime
     current_datetime = start_datetime
     daily_durations = []
+
     while current_datetime.date() <= end_datetime.date():
         # Calculate the end of the current day
         attendance_log = AttendanceLog.objects.filter(
             start_date__date=current_datetime.date()
         ).first()
-        log_duration = 0
-        if attendance_log and attendance_log.duration.hour < 4:
-            log_duration = attendance_log.duration.hour
+        
+        # Initialize log duration
+        log_duration = timedelta(hours=0)  # Default duration is 0
+        
+        # Add attendance log duration if it exists
+        if attendance_log and attendance_log.duration:
+            log_duration = timedelta(
+                hours=attendance_log.duration.hour,
+                minutes=attendance_log.duration.minute,
+                seconds=attendance_log.duration.second,
+            )
+
         end_of_day = datetime.combine(current_datetime.date(), datetime.max.time())
         # Determine the actual end time for the current day
         actual_end_time = min(end_of_day, end_datetime)
+
         # Calculate the duration for the current day
         duration = actual_end_time - current_datetime
-        duration_hours = duration.total_seconds() / 3600
-        # Determine the short code based on duration
-        duration_hours += log_duration
-        short_code = "T" if duration_hours >= 8 else "TH"
+
+        # Combine log duration and calculated duration
+        total_duration = duration + log_duration
+        total_hours = total_duration.total_seconds() / 3600
+
+        # Determine the short code based on the total hours
+        short_code = "T" if total_hours >= 8 else "TH"
+
         # Append the result for the current day
-        daily_durations.append((current_datetime.date(), short_code, duration))
+        daily_durations.append((current_datetime.date(), short_code, total_duration))
+
         # Move to the next day
         current_datetime = datetime.combine(
             current_datetime.date() + timedelta(days=1), datetime.min.time()
         )
 
     return daily_durations
-
 
 def process_sundays_and_holidays(
     employees,
