@@ -163,7 +163,6 @@ class LeavePolicyManager:
         self.apply_min_notice_days_policy()
         self.validate_min_days()
         self.apply_max_days_limit_policy()
-
     def apply_el_policy(self):
         """
         Applies Earned Leave specific policies.
@@ -174,6 +173,13 @@ class LeavePolicyManager:
         el_min_notice_days = self.leave_type.min_notice_days
         current_date = timezone.now().date()
         days_difference = (self.start_date.date() - current_date).days
+
+        # Check if booked_leave is an integer
+        if not isinstance(self.booked_leave, int):
+            raise ValidationError(
+                f"EL can only be applied for whole days. Fractional days like {self.booked_leave} are not allowed."
+            )
+
         if el_min_notice_days is not None and days_difference < int(el_min_notice_days):
             raise ValidationError(
                 f"EL should be applied at least {int(el_min_notice_days)} days in advance."
