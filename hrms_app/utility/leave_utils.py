@@ -171,6 +171,11 @@ class LeavePolicyManager:
         el_allowed_days = self.leave_type.allowed_days_per_year
         el_min_days = self.leave_type.min_days_limit
         el_max_days = self.leave_type.max_days_limit
+        el_min_notice_days = self.leave_type.min_notice_days
+        if el_min_notice_days and self.booked_leave > el_min_notice_days:
+            raise ValidationError(
+                f"EL should be applied {el_min_notice_days} in advance."
+            )
 
         if el_min_days and self.booked_leave < el_min_days:
             raise ValidationError(
