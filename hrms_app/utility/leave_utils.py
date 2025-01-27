@@ -172,9 +172,11 @@ class LeavePolicyManager:
         el_min_days = self.leave_type.min_days_limit
         el_max_days = self.leave_type.max_days_limit
         el_min_notice_days = self.leave_type.min_notice_days
-        if el_min_notice_days and self.booked_leave > el_min_notice_days:
+        current_date = timezone.now().date()
+        days_difference = (self.start_date.date() - current_date).days
+        if el_min_notice_days is not None and days_difference < int(el_min_notice_days):
             raise ValidationError(
-                f"EL should be applied {el_min_notice_days} in advance."
+                f"EL should be applied at least {int(el_min_notice_days)} days in advance."
             )
 
         if el_min_days and self.booked_leave < el_min_days:
