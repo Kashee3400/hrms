@@ -591,20 +591,50 @@ def generate_monthly_presence_data_detailed(
 
     return monthly_presence_data
 
+from datetime import datetime
+from django.utils.timezone import make_aware, localtime, utc
 
 def process_logs(logs, monthly_presence_data):
     for log in logs:
         emp_code = log.applied_by.personal_detail.employee_code
         log_date = log.start_date
-        monthly_presence_data[emp_code][log_date.date().strftime("%Y-%m-%d")][
-            "present"
-        ] = {
-            "status": log.att_status_short_code,
-            "in_time": localtime(log.start_date).strftime("%I:%M"),
-            "out_time": localtime(log.end_date).strftime("%I:%M"),
-            "total_duration": log.duration,
+        history = None
+
+        if log.regularized:
+            history = AttendanceLogHistory.objects.filter(attendance_log=log).last()
+
+        if history:
+            # Parse and make `start_date` and `end_date` timezone-aware if they aren't already
+            parsed_in_time = datetime.strptime(history.previous_data['start_date'], "%Y-%m-%dT%H:%M:%SZ")
+            parsed_out_time = datetime.strptime(history.previous_data['end_date'], "%Y-%m-%dT%H:%M:%SZ")
+
+            # Convert to aware datetime objects if naive
+            parsed_in_time = make_aware(parsed_in_time, timezone=utc) if parsed_in_time.tzinfo is None else parsed_in_time
+            parsed_out_time = make_aware(parsed_out_time, timezone=utc) if parsed_out_time.tzinfo is None else parsed_out_time
+
+            # Convert to local timezone and format
+            in_time = localtime(parsed_in_time).strftime("%I:%M")
+            out_time = localtime(parsed_out_time).strftime("%I:%M")
+
+            # Other fields from history
+            status = history.previous_data['att_status_short_code']
+            duration = history.previous_data['duration']
+        else:
+            # Use log's start_date and end_date
+            in_time = localtime(log.start_date).strftime("%I:%M")
+            out_time = localtime(log.end_date).strftime("%I:%M")
+            status = log.att_status_short_code
+            duration = log.duration
+
+        # Update the monthly_presence_data dictionary
+        monthly_presence_data[emp_code][log_date.date().strftime("%Y-%m-%d")]["present"] = {
+            "status": status,
+            "in_time": in_time,
+            "out_time": out_time,
+            "total_duration": duration,
             "reg": "R" if log.regularized else "",
         }
+
 
 def process_leaves(leaves, monthly_presence_data):
     for leave in leaves:
@@ -620,12 +650,13 @@ def process_leaves(leaves, monthly_presence_data):
         current_entry = employee_attendance.get(date_key, {}) if employee_attendance else None
 
         # Check if current_entry contains FL or OFF and remove them
-        if current_entry and (
-            current_entry.get("sunday", {}).get("status") == "OFF" or 
-            current_entry.get("holiday", {}).get("status") == "FL"
-        ):
-            current_entry.pop("sunday", None)
-            current_entry.pop("holiday", None)
+        if not code == 'CL':
+            if current_entry and (
+                current_entry.get("sunday", {}).get("status") == "OFF" or 
+                current_entry.get("holiday", {}).get("status") == "FL"
+            ):
+                current_entry.pop("sunday", None)
+                current_entry.pop("holiday", None)
         # Add the leave entry
         if emp_code not in monthly_presence_data:
             monthly_presence_data[emp_code] = {}
@@ -638,6 +669,71 @@ def process_leaves(leaves, monthly_presence_data):
             "out_time": None,
             "total_duration": None,
         }
+
+# def process_leaves(leaves, monthly_presence_data, holiday_days):
+#     for leave in leaves:
+#         emp_code = leave.leave_application.appliedBy.personal_detail.employee_code
+#         leave_type = leave.leave_application.leave_type
+#         code = (
+#             leave_type.leave_type_short_code
+#             if leave.is_full_day
+#             else leave_type.half_day_short_code
+#         )
+#         date_key = leave.date.strftime("%Y-%m-%d")
+
+#         # Fetch attendance for the employee on the leave date
+#         if emp_code not in monthly_presence_data:
+#             monthly_presence_data[emp_code] = {}
+#         if date_key not in monthly_presence_data[emp_code]:
+#             monthly_presence_data[emp_code][date_key] = {}
+
+#         current_entry = monthly_presence_data[emp_code][date_key]
+
+#         # Handle "CL" (Casual Leave) policy
+#         if code == "CL":
+#             if date_key in holiday_days:
+#                 # On holidays, set status to empty and use the holiday's color
+#                 current_entry["leave"] = {
+#                     "leave": "",
+#                     "color": holiday_days[date_key]["color"],
+#                     "in_time": None,
+#                     "out_time": None,
+#                     "total_duration": None,
+#                 }
+#             elif leave.date.weekday() == 6:  # Sunday
+#                 # On Sundays, mark as OFF
+#                 current_entry["leave"] = {
+#                     "leave": "OFF",
+#                     "color": "#CCCCCC",
+#                     "in_time": None,
+#                     "out_time": None,
+#                     "total_duration": None,
+#                 }
+#             else:
+#                 # Otherwise, use CL or its half-day short code
+#                 current_entry["leave"] = {
+#                     "leave": code,
+#                     "color": leave_type.color_hex or "#FF0000",
+#                     "in_time": None,
+#                     "out_time": None,
+#                     "total_duration": None,
+#                 }
+        
+#         # else:
+#         #     # Handle other leave types
+#         #     # Remove FL (holiday) or OFF (Sunday) if they exist
+#         #     if current_entry.get("leave") in ["OFF", ""]:
+#         #         current_entry.pop("leave", None)
+
+#         #     # Add the leave entry
+#         #     current_entry["leave"] = {
+#         #         "leave": code,
+#         #         "color": leave_type.color_hex or "#FF0000",
+#         #         "in_time": None,
+#         #         "out_time": None,
+#         #         "total_duration": None,
+#         #     }
+
 
 from datetime import datetime, timedelta
 
