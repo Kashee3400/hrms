@@ -771,32 +771,6 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
         return self.request.user.has_perm(permission_required)
 
-    # def form_valid(self, form):
-    #     count = AttendanceLog.objects.filter(
-    #         applied_by=self.request.user,
-    #         start_date__date__month=self.object.start_date.date().month,
-    #     ).filter(
-    #         Q(regularized=True) | Q(is_submitted=True)
-    #     ).count()
-    #     reg_limit_setting = AppSetting.objects.filter(key="REGULARIZATION_LIMIT").first()
-    #     reg_limit = int(reg_limit_setting.value) if reg_limit_setting else 3
-    #     if count >= reg_limit:
-    #         messages.error(
-    #             self.request, _("Your already have applied regularization 3 times.")
-    #         )
-    #     else:
-    #         form.instance.is_submitted = True
-    #         self.object = form.save()
-    #         self.object.add_action(
-    #             action="Submitted regularization",
-    #             performed_by=self.request.user,
-    #             comment=form.instance.reason,
-    #         )
-    #         messages.success(self.request, _("Regularization Updated Successfully"))
-    #     return HttpResponseRedirect(
-    #         reverse("event_detail", kwargs={"slug": self.object.slug})
-    #     )
-
     def form_valid(self, form):
         # Count the number of regularizations applied by the user for the current month
         count = AttendanceLog.objects.filter(
@@ -860,7 +834,13 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return self.render_to_response(self.get_context_data(form=form))
     
     def get_count(self):
-        logs_count = AttendanceLog.objects.filter(applied_by=self.request.user,regularized=True).count()
+        obj = self.get_object()
+        logs_count = AttendanceLog.objects.filter(
+            applied_by=obj.applied_by,
+            regularized=True,
+            start_date__year=obj.start_date.date().year,
+            start_date__month=obj.start_date.date().month,
+        ).count()
         return logs_count
 
     def get_object(self, queryset=None):
