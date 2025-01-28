@@ -27,8 +27,8 @@ class AttendanceStatusHandler:
         reg_status = None
         is_regularization = False
         rfrom_date = rto_date = reg_duration = None
-
         if total_hours == 0:
+            
             return self._handle_absent(
                 login_date_time, user_expected_logout_date_time, self.absent_color
             )
@@ -37,9 +37,12 @@ class AttendanceStatusHandler:
             return self._handle_full_day(self.present_color)
 
         if self._is_late_coming(login_date_time, logout_date_time):
+            
             return self._handle_late_coming(login_date_time, self.user_shift, self.half_day_color)
 
         if self._is_early_going(login_date_time, logout_date_time, user_expected_logout_time):
+            
+            
             return self._handle_early_going(
                 logout_date_time, self.user_shift, user_expected_logout_date_time, self.half_day_color
             )
@@ -58,8 +61,20 @@ class AttendanceStatusHandler:
             att_status_short_code,
             None
         )
+    def _is_late_coming(self, login_date_time, logout_date_time):
+        return login_date_time.time() > self.user_shift.grace_start_time and (   #  10:00 > 9:45  
+            logout_date_time.time() <= self.user_shift.grace_end_time             # 5:50 < 5:45
+            or logout_date_time.time() >= self.user_shift.end_time                # 5:50 > 5:45
+        )
+
+    def _is_early_going(self, login_date_time, logout_date_time, user_expected_logout_time):
+        return (
+            login_date_time.time() <= self.user_shift.grace_start_time #  09:45:00 <  09:45:00
+            and logout_date_time.time() < user_expected_logout_time   # 17:43:00 < 17:45:00
+        )
 
     def _is_full_day(self, login_date_time, logout_date_time, total_hours, user_expected_logout_date_time):
+
         return (
             login_date_time.time() <= self.user_shift.grace_start_time
             and total_hours >= self.full_day_hours
@@ -67,6 +82,7 @@ class AttendanceStatusHandler:
         )
 
     def _is_half_day(self, login_date_time, logout_date_time):
+
         return (
             login_date_time.time() >= self.user_shift.grace_start_time
             and logout_date_time.time() < self.user_shift.end_time
@@ -180,14 +196,3 @@ class AttendanceStatusHandler:
             "H",
         )
 
-    def _is_late_coming(self, login_date_time, logout_date_time):
-        return login_date_time.time() >= self.user_shift.grace_start_time and (
-            logout_date_time.time() < self.user_shift.grace_end_time
-            or logout_date_time.time() > self.user_shift.end_time
-        )
-
-    def _is_early_going(self, login_date_time, logout_date_time, user_expected_logout_time):
-        return (
-            login_date_time.time() <= self.user_shift.grace_start_time
-            and logout_date_time.time() < user_expected_logout_time
-        )
