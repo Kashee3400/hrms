@@ -222,6 +222,7 @@ class AttendanceLogAdmin(admin.ModelAdmin):
                 previous_data=make_json_serializable(model_to_dict(obj)),
                 modified_by=obj.applied_by,
             )
+
             if obj.reg_status == settings.EARLY_GOING:
                 obj.end_date = obj.to_date
             elif obj.reg_status == settings.LATE_COMING:
@@ -272,8 +273,6 @@ class AttendanceLogAdmin(admin.ModelAdmin):
             obj.regularized = True
             obj.is_submitted = True
             obj.save()
-
-
 
     approve_attendance.short_description = "Regularize selected attendance logs"
 

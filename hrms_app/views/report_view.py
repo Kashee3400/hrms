@@ -558,7 +558,7 @@ def generate_monthly_presence_data_detailed(
     leaves = LeaveDay.objects.filter(
         leave_application__appliedBy__in=employees.values_list("id", flat=True),
         leave_application__status=settings.APPROVED,
-        leave_application__startDate__range=[
+        leave_application__endDate__range=[
             converted_from_datetime,
             converted_to_datetime,
         ],
@@ -669,71 +669,6 @@ def process_leaves(leaves, monthly_presence_data):
             "out_time": None,
             "total_duration": None,
         }
-
-# def process_leaves(leaves, monthly_presence_data, holiday_days):
-#     for leave in leaves:
-#         emp_code = leave.leave_application.appliedBy.personal_detail.employee_code
-#         leave_type = leave.leave_application.leave_type
-#         code = (
-#             leave_type.leave_type_short_code
-#             if leave.is_full_day
-#             else leave_type.half_day_short_code
-#         )
-#         date_key = leave.date.strftime("%Y-%m-%d")
-
-#         # Fetch attendance for the employee on the leave date
-#         if emp_code not in monthly_presence_data:
-#             monthly_presence_data[emp_code] = {}
-#         if date_key not in monthly_presence_data[emp_code]:
-#             monthly_presence_data[emp_code][date_key] = {}
-
-#         current_entry = monthly_presence_data[emp_code][date_key]
-
-#         # Handle "CL" (Casual Leave) policy
-#         if code == "CL":
-#             if date_key in holiday_days:
-#                 # On holidays, set status to empty and use the holiday's color
-#                 current_entry["leave"] = {
-#                     "leave": "",
-#                     "color": holiday_days[date_key]["color"],
-#                     "in_time": None,
-#                     "out_time": None,
-#                     "total_duration": None,
-#                 }
-#             elif leave.date.weekday() == 6:  # Sunday
-#                 # On Sundays, mark as OFF
-#                 current_entry["leave"] = {
-#                     "leave": "OFF",
-#                     "color": "#CCCCCC",
-#                     "in_time": None,
-#                     "out_time": None,
-#                     "total_duration": None,
-#                 }
-#             else:
-#                 # Otherwise, use CL or its half-day short code
-#                 current_entry["leave"] = {
-#                     "leave": code,
-#                     "color": leave_type.color_hex or "#FF0000",
-#                     "in_time": None,
-#                     "out_time": None,
-#                     "total_duration": None,
-#                 }
-        
-#         # else:
-#         #     # Handle other leave types
-#         #     # Remove FL (holiday) or OFF (Sunday) if they exist
-#         #     if current_entry.get("leave") in ["OFF", ""]:
-#         #         current_entry.pop("leave", None)
-
-#         #     # Add the leave entry
-#         #     current_entry["leave"] = {
-#         #         "leave": code,
-#         #         "color": leave_type.color_hex or "#FF0000",
-#         #         "in_time": None,
-#         #         "out_time": None,
-#         #         "total_duration": None,
-#         #     }
-
 
 from datetime import datetime, timedelta
 

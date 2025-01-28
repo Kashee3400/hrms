@@ -75,18 +75,19 @@ def get_regularization_requests(user, status=None):
 
     if user.is_superuser:
         # Fetch all regularization requests with the given status for superusers
-        return AttendanceLog.objects.filter(is_submitted=True, status=reg_status)
+        return AttendanceLog.objects.filter(is_submitted=True,regularized=False, status=reg_status)
     elif user.personal_detail.designation.department.department == "admin":
         return AttendanceLog.objects.filter(
             is_submitted=True,
+            regularized=False,
             status__in=[reg_status],
             applied_by__in=user.employees.all(),
-        ) | AttendanceLog.objects.filter(is_submitted=True, status=settings.RECOMMEND)
+        ) | AttendanceLog.objects.filter(is_submitted=True,regularized=False, status=settings.RECOMMEND)
 
     else:
         # Fetch regularization requests applied by employees assigned to the user
         return AttendanceLog.objects.filter(
-            applied_by__in=user.employees.all(), is_submitted=True, status=reg_status
+            applied_by__in=user.employees.all(), is_submitted=True,regularized=False, status=reg_status
         )
 
 
