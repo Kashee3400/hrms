@@ -439,3 +439,14 @@ class WishingCardAdmin(admin.ModelAdmin):
     search_fields = ('type',)  # Enable search by type
     date_hierarchy = 'created_at'  # Date hierarchy for navigation by creation date
     ordering = ('-created_at',)  # Default ordering by creation date (descending)
+
+
+from .models import AppSetting
+
+@admin.register(AppSetting)
+class AppSettingAdmin(admin.ModelAdmin):
+    list_display = ("key", "value", "beyond_policy", "updated_at")
+    search_fields = ("key", "description")
+    list_filter = ("updated_at",)
+    readonly_fields = ("updated_at",)
+    ordering = ("key",)

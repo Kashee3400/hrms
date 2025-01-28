@@ -771,29 +771,90 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
         return self.request.user.has_perm(permission_required)
 
+    # def form_valid(self, form):
+    #     count = AttendanceLog.objects.filter(
+    #         applied_by=self.request.user,
+    #         start_date__date__month=self.object.start_date.date().month,
+    #     ).filter(
+    #         Q(regularized=True) | Q(is_submitted=True)
+    #     ).count()
+    #     reg_limit_setting = AppSetting.objects.filter(key="REGULARIZATION_LIMIT").first()
+    #     reg_limit = int(reg_limit_setting.value) if reg_limit_setting else 3
+    #     if count >= reg_limit:
+    #         messages.error(
+    #             self.request, _("Your already have applied regularization 3 times.")
+    #         )
+    #     else:
+    #         form.instance.is_submitted = True
+    #         self.object = form.save()
+    #         self.object.add_action(
+    #             action="Submitted regularization",
+    #             performed_by=self.request.user,
+    #             comment=form.instance.reason,
+    #         )
+    #         messages.success(self.request, _("Regularization Updated Successfully"))
+    #     return HttpResponseRedirect(
+    #         reverse("event_detail", kwargs={"slug": self.object.slug})
+    #     )
+
     def form_valid(self, form):
+        # Count the number of regularizations applied by the user for the current month
         count = AttendanceLog.objects.filter(
             applied_by=self.request.user,
             start_date__date__month=self.object.start_date.date().month,
         ).filter(
             Q(regularized=True) | Q(is_submitted=True)
         ).count()
-        if count >= 3:
-            messages.error(
-                self.request, _("Your already have applied regularization 3 times.")
-            )
+
+        # Retrieve the REGULARIZATION_LIMIT setting
+        reg_limit_setting = AppSetting.objects.filter(key="REGULARIZATION_LIMIT").first()
+
+        if reg_limit_setting:
+            reg_limit = int(reg_limit_setting.value)
+            beyond_policy = reg_limit_setting.beyond_policy
         else:
+            reg_limit = 3  # Default value
+            beyond_policy = False  # Default behavior if setting is not found
+
+        # If beyond_policy is allowed, proceed without checking the limit
+        if beyond_policy:
             form.instance.is_submitted = True
             self.object = form.save()
+
+            # Log the action
             self.object.add_action(
                 action="Submitted regularization",
                 performed_by=self.request.user,
                 comment=form.instance.reason,
             )
-            messages.success(self.request, _("Regularization Updated Successfully"))
-        return HttpResponseRedirect(
-            reverse("event_detail", kwargs={"slug": self.object.slug})
+
+            # Success message and redirect
+            messages.success(self.request, _("Regularization updated successfully."))
+            return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": self.object.slug}))
+
+        # If beyond_policy is not allowed, enforce the limit
+        if count >= reg_limit:
+            messages.error(
+                self.request,
+                _("You have already applied for the maximum number of regularizations (%d times)." % reg_limit),
+            )
+            return self.form_invalid(form)
+
+        # If within the limit, proceed with submission
+        form.instance.is_submitted = True
+        self.object = form.save()
+
+        # Log the action
+        self.object.add_action(
+            action="Submitted regularization",
+            performed_by=self.request.user,
+            comment=form.instance.reason,
         )
+
+        # Success message and redirect
+        messages.success(self.request, _("Regularization updated successfully."))
+        return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": self.object.slug}))
+
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))

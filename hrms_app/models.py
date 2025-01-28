@@ -2473,6 +2473,46 @@ class Bill(models.Model):
         verbose_name = _("Tour Bill")
         verbose_name_plural = _("Tour Bills")
 
+# models.py
+from django.db import models
+
+class AppSetting(models.Model):
+    key = models.CharField(
+        max_length=255,
+        unique=True,
+        verbose_name="Setting Key",
+        help_text="Unique key for identifying the application setting (e.g., 'REGULARIZATION_LIMIT')."
+    )
+    value = models.CharField(
+        max_length=255,
+        verbose_name="Setting Value",
+        help_text="Value associated with the setting (e.g., '3' for the maximum number of times allowed)."
+    )
+    description = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Description",
+        help_text="Optional description of what this setting controls."
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Last Updated",
+        help_text="Timestamp of the last update to this setting."
+    )
+    beyond_policy = models.BooleanField(
+        default=True,
+        verbose_name="Allowed Beyond Policy",
+        help_text="Indicates whether this setting is allowed beyond policy or not."
+    )
+
+    class Meta:
+        verbose_name = "Application Setting"
+        verbose_name_plural = "Application Settings"
+        ordering = ["key"]
+
+    def __str__(self):
+        return f"{self.key}: {self.value} (Active: {self.beyond_policy})"
+
 
 class AttendanceLog(models.Model):
     applied_by = models.ForeignKey(
