@@ -270,8 +270,12 @@ class AttendanceLogAdmin(admin.ModelAdmin):
             hours = total_minutes // 60
             minutes = total_minutes % 60
             obj.duration = f"{int(hours):02}:{int(minutes):02}"
-            obj.regularized = True
-            obj.is_submitted = True
+            if obj.att_status_short_code == 'P':                
+                obj.regularized = True
+                obj.is_submitted = True
+            else:
+                obj.regularized = True
+                obj.is_submitted = True
             obj.save()
 
     approve_attendance.short_description = "Regularize selected attendance logs"
