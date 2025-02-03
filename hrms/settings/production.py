@@ -49,8 +49,9 @@ CELERY_BEAT_SCHEDULE = {
         'schedule': crontab(minute=59, hour=22),
     },
     'send_reminder_email': {
-        'task': 'hrms_app.tasks.send_reminder_email',
-        'schedule': crontab(minute=0, hour=10),    },
+    'task': 'hrms_app.tasks.send_reminder_email',
+    'schedule': crontab(minute=0, hour=10, day_of_month='15-20'),
+    },
     'backup_database': {
         'task': 'hrms_app.tasks.backup_database',
         'schedule': crontab(minute=0, hour=3),    },
