@@ -93,7 +93,6 @@ def get_regularization_requests(user, status=None):
 
 def format_date(date):
     from django.utils.timezone import make_aware, make_naive
-
     naive_date = make_naive(date)
     output_format = "%Y-%m-%d"
     formatted_date = naive_date.strftime(output_format)
@@ -102,8 +101,36 @@ def format_date(date):
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+logger = logging.getLogger(__name__)
+from django.db.models import Q
 
+def filter_leaves(queryset, form):
+    """Apply filters to a LeaveApplication queryset based on form data."""
+    if form.is_valid():
+        status = form.cleaned_data.get("status")
+        from_date = form.cleaned_data.get("fromDate")
+        to_date = form.cleaned_data.get("toDate")
+        if status:
+            queryset = queryset.filter(status=status)
+        if from_date:
+            queryset = queryset.filter(startDate__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(endDate__lte=to_date)
+    return queryset
 
+def get_filtered_leaves(self, user, form):
+    """Apply filters to the leave applications."""
+    try:
+        employee_leaves = LeaveApplication.objects.filter(
+            appliedBy__in=user.employees.all()
+        )
+        return filter_leaves(employee_leaves, form)
+    except ValidationError as ve:
+        logger.warning(f"Validation error while filtering leaves: {ve}")
+        return LeaveApplication.objects.none()
+    except Exception as e:
+        logger.exception(f"Unexpected error while filtering leaves: {e}")
+        return LeaveApplication.objects.none()
 class LeavePolicyManager:
     def __init__(
         self, user, leave_type, start_date, end_date, start_day_choice, end_day_choice
@@ -164,6 +191,7 @@ class LeavePolicyManager:
         self.apply_min_notice_days_policy()
         self.validate_min_days()
         self.apply_max_days_limit_policy()
+    
     def apply_el_policy(self):
         """
         Applies Earned Leave specific policies.

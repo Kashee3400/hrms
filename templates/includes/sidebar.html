@@ -37,7 +37,8 @@
                 data-bs-toggle="collapse"
                 href="#submenu-{{ app.app_label }}"
                 aria-expanded="{% if app.app_label in request.path %}true{% else %}false{% endif %}"
-                aria-controls="submenu-{{ app.app_label }}">
+                aria-controls="submenu-{{ app.app_label }}"
+                >
                 <i class="menu-icon mdi {% if app.icon %}
                     {{ app.icon }}
                   {% else %}mdi-octagon{% endif %}">

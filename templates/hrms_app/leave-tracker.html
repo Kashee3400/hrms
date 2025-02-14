@@ -26,8 +26,8 @@
       <div class="col-md-3">{{ form.from_date.label_tag }} {{ form.from_date }}</div>
       <div class="col-md-3">{{ form.to_date.label_tag }} {{ form.to_date }}</div>
       <div class="col-md-2 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary btn-sm"><span class="bi bi-funnel"></span> Filter</button>
-        <button type="button" class="btn btn-secondary btn-sm ms-2" onclick="window.location.href="{% url 'leave_tracker' %}"">Clear Filter</button>
+        <button type="submit" class="btn btn-primary btn-sm"><span class="bi bi-funnel"></span>{% trans "Filter" %}</button>
+        <button type="button" class="btn btn-secondary btn-sm ms-2" onclick="window.location.href="{% url 'leave_tracker' %}"">{% trans "Clear Filter" %}</button>
       </div>
     </div>
   </form>
@@ -40,7 +40,7 @@
       <div class="col-md-10">
         <div class="card">
           <div class="card-header">
-            <h5 class="mb-0"><span class="bi bi-table"></span> Applied Leaves</h5>
+            <h5 class="mb-0"><span class="bi bi-table"></span> {% trans "Applied Leaves" %}</h5>
           </div>
           <div class="card-body">
             <div class="table-responsive">
@@ -53,7 +53,7 @@
       <!-- Column Visibility Controls -->
       <div class="col-md-2">
         <div id="column-visibility-controls" class="bg-white border rounded p-3" style="max-height: 300px; overflow-y: auto;">
-          <h5>Select Columns</h5>
+          <h5>{% trans "Select Columns" %}</h5>
           {% for column in all_columns %}
             <label class="d-block">
               <input
@@ -70,13 +70,13 @@
     {% else %}
       <!-- If no leaves are available, show a message -->
       <div class="col-12 text-center p-4">
-        <p class="text-muted">No leave applications found.</p>
+        <p class="text-muted">{% trans "No leave applications found." %}</p>
       </div>
     {% endif %}
   </div>
 </div>
-{% if user.is_rm %}
-  <div class="container bg-light p-3 m-2">
+{% comment %} {% if user.is_rm %} {% endcomment %}
+  <div class="bg-light p-2">
     {% if employee_leaves %}
       <div class="row">
         <div class="col-12">
@@ -90,42 +90,42 @@
                 <div class="col-md-3 mb-4">
                   <div class="card shadow-sm">
                       <div class="card-header bg-info text-white d-flex align-items-center">
-                          {% if leave.leaveApplication.appliedBy.personal_detail.avatar %}
-                              <img style="height: 60px; width: 60px;" src="{{ leave.leaveApplication.appliedBy.personal_detail.avatar.url }}" class="avatar rounded-circle mr-3" alt="Avatar" />
+                          {% if leave.appliedBy.personal_detail.avatar %}
+                              <img style="height: 60px; width: 60px;" src="{{ leave.appliedBy.personal_detail.avatar.url }}" class="avatar rounded-circle mr-3" alt="Avatar" />
                           {% endif %}
                           <div>
-                              <h6 class="mb-0">{{ leave.leaveApplication.appliedBy }}</h6>
-                              <a href="{% url 'leave_application_detail' leave.leaveApplication.slug %}" class="text-white">
-                                  <p class="mb-0">Application No: {{ leave.leaveApplication.applicationNo }}</p>
+                              <h6 class="mb-0">{{ leave.appliedBy }}</h6>
+                              <a href="{% url 'leave_application_detail' leave.slug %}" class="text-white">
+                                  <p class="mb-0">Application No: {{ leave.applicationNo }}</p>
                               </a>
                           </div>
                       </div>
                       <div class="card-body p-1">
                           <ul class="list-group">
                               <li class="list-group-item">
-                                  <strong>{{ leave.leaveApplication.leave_type.leave_type_short_code }} Leave Balance:</strong>
-                                  <span class="float-end fw-bold">{{ leave.leaveApplication.balanceLeave }}</span>
+                                  <strong>{{ leave.leave_type.leave_type_short_code }} Leave Balance:</strong>
+                                  <span class="float-end fw-bold">{{ leave.balanceLeave }}</span>
                               </li>
                               <li class="list-group-item">
                                   <strong>{% trans "Day(s)" %}:</strong>
-                                  <span class="float-end fw-bold">{{ leave.leaveApplication.usedLeave }}</span>
+                                  <span class="float-end fw-bold">{{ leave.usedLeave }}</span>
                               </li>
                               <li class="list-group-item">
                                   <strong>Status:</strong>
-                                  <span class="float-end fw-bold text-uppercase {{ leave.leaveApplication.status }}">{{ leave.leaveApplication.status|upper }}</span>
+                                  <span class="float-end fw-bold text-uppercase {{ leave.status }}">{{ leave.status|upper }}</span>
                               </li>
                               <li class="list-group-item">
                                   <strong>From:</strong>
-                                  <span class="float-end">{{ leave.leaveApplication.startDate|localtime_filter }} - {% leave_start_end_status leave.leaveApplication.startDayChoice %}</span>
+                                  <span class="float-end">{{ leave.startDate|localtime_filter|date:'d-M-Y' }} - {% leave_start_end_status leave.startDayChoice %}</span>
                               </li>
                               <li class="list-group-item">
                                   <strong>To:</strong>
-                                  <span class="float-end">{{ leave.leaveApplication.endDate|localtime_filter }} - {% leave_start_end_status leave.leaveApplication.endDayChoice %}</span>
+                                  <span class="float-end">{{ leave.endDate|localtime_filter|date:'d-M-Y' }} - {% leave_start_end_status leave.endDayChoice %}</span>
                               </li>
                           </ul>
                       </div>
                       <div class="card-footer">
-                        <a href="{% url 'leave_application_detail' leave.leaveApplication.slug %}" class="btn btn-primary btn-sm btn-block mt-3">
+                        <a href="{% url 'leave_application_detail' leave.slug %}" class="btn btn-primary btn-sm btn-block mt-3">
                           <i class="fas fa-eye"></i> View Details
                         </a>
                       </div>
@@ -139,12 +139,12 @@
         </div>
       </div>
     {% else %}
-      <div class="container">
-        <div class="alert alert-warning">No requested {{ selected_status}} leaves found.</div>
+      <div class="row">
+        <div class="col-12 alert alert-warning">{% blocktrans with status=selected_status %}No requested {{ status}} leaves found.{% endblocktrans %}</div>
       </div>
     {% endif %}
   </div>
-{% endif %}
+{% comment %} {% endif %} {% endcomment %}
 
 {% endblock %}
 

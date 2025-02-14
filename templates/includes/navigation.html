@@ -14,7 +14,7 @@
       <li class="nav-item font-weight-semibold d-none d-lg-block ms-0">
         <h1 class="welcome-text">{{ GREETING }}, {{user.personal_detail.salutation}} <span class="text-black fw-bold"><strong>{% firstof user.get_short_name user.get_username %}</strong>.</span></h1>
         <h3 class="welcome-sub-text">
-          {% block nav-breadcrumbs %}
+          {% comment %} {% block nav-breadcrumbs %}
           <nav aria-label="{% translate 'Breadcrumbs' %}">
             {% block breadcrumbs %}
               <div class="breadcrumbs">
@@ -25,13 +25,13 @@
               </div>
             {% endblock %}
           </nav>
-          {% endblock %}
+          {% endblock %} {% endcomment %}
         </h3>
       </li>
     </ul>
     <ul class="navbar-nav ms-auto">
       <li class="nav-item">
-        <form class="search-form" action="/" method="get">
+        <form class="search-form method="get">
           <i class="icon-search"></i>
           <input type="search" name="q" class="form-control" placeholder="Search Here" title="Search here" />
         </form>

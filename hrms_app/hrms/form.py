@@ -753,6 +753,19 @@ class LeaveTypeForm(forms.ModelForm):
 from hrms_app.utility.leave_utils import LeavePolicyManager
 
 
+class CustomFileInput(forms.ClearableFileInput):
+    template_name = "widgets/custom_file_input.html"  # Path to your custom template
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.attrs.update(
+            {
+                "class": "custom-file-input",  # Add a CSS class
+                "accept": ".pdf,.jpg,.jpeg,.png",  # Restrict file types
+            }
+        )
+
+
 class LeaveApplicationForm(forms.ModelForm):
     class Meta:
         model = LeaveApplication
@@ -801,6 +814,7 @@ class LeaveApplicationForm(forms.ModelForm):
         self.user = kwargs.pop("user", None)
         leave_type = kwargs.pop("leave_type", None)
         super(LeaveApplicationForm, self).__init__(*args, **kwargs)
+        leave_type_obj = LeaveType.objects.filter(id=leave_type).first()
         if self.user:
             leave_balance = LeaveBalanceOpenings.objects.filter(
                 user=self.user, leave_type_id=leave_type
@@ -809,7 +823,16 @@ class LeaveApplicationForm(forms.ModelForm):
                 self.fields["balanceLeave"].initial = (
                     leave_balance.remaining_leave_balances
                 )
-
+        if leave_type_obj.leave_type_short_code == "SL":
+            self.fields["attachment"] = forms.FileField(
+                required=False,  # Initially not required
+                label=_("Attachment"),
+                help_text=_("Upload a medical certificate or supporting document (required for Sick Leave > 3 days)."),
+                widget=forms.ClearableFileInput(attrs={
+                    "class": "form-control-file",  # Bootstrap class
+                    "accept": ".pdf,.jpg,.jpeg,.png",  # Restrict file types
+                }),
+            )
         self.fields["leave_type"].initial = leave_type
 
     def clean(self):
@@ -820,14 +843,18 @@ class LeaveApplicationForm(forms.ModelForm):
         leaveTypeId = cleaned_data.get("leave_type")
         startDayChoice = cleaned_data.get("startDayChoice")
         endDayChoice = cleaned_data.get("endDayChoice")
-
+        attachment = cleaned_data.get("attachment")
         if not startDate or not endDate:
             raise ValidationError(_("Start Date and End Date are required."))
-
         if startDate > endDate:
             raise ValidationError(_("End Date must be after Start Date."))
-
-        cleaned_data["usedLeave"] = usedLeave
+        if leaveTypeId.leave_type_short_code == "SL" and usedLeave > 3:
+            if not attachment:
+                raise ValidationError(
+                    _(
+                        "Attachment is required for Sick Leave applications exceeding 3 days."
+                    )
+                )
         try:
             policy_manager = LeavePolicyManager(
                 user=self.user,
@@ -1588,63 +1615,64 @@ class PopulateAttendanceForm(forms.Form):
         return cleaned_data
 
 
-
 class LeaveTransactionForm(forms.Form):
     leave_balance = forms.ChoiceField(
         required=False,
-        label=_('Leave Balance'),
+        label=_("Leave Balance"),
         choices=[],  # To be dynamically populated in the form initialization
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        help_text=_('The leave balance associated with this transaction.'),
+        widget=forms.Select(attrs={"class": "form-control"}),
+        help_text=_("The leave balance associated with this transaction."),
     )
     leave_type = forms.ChoiceField(
         required=False,
-        label=_('Leave Type'),
+        label=_("Leave Type"),
         choices=[],  # To be dynamically populated in the form initialization
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        help_text=_('The type of leave being requested (e.g., sick leave, vacation).'),
+        widget=forms.Select(attrs={"class": "form-control"}),
+        help_text=_("The type of leave being requested (e.g., sick leave, vacation)."),
     )
     no_of_days_approved = forms.FloatField(
         required=True,
-        label=_('Number of Days Approved'),
-        widget=forms.NumberInput(attrs={'class': 'form-control'}),
-        help_text=_('Number of leave days that have been approved.'),
+        label=_("Number of Days Approved"),
+        widget=forms.NumberInput(attrs={"class": "form-control"}),
+        help_text=_("Number of leave days that have been approved."),
     )
     transaction_type = forms.ChoiceField(
         required=True,
-        label=_('Transaction Type'),
-        choices=[('add', _('Add')), ('subtract', _('Subtract'))],
-        widget=forms.Select(attrs={'class': 'form-control'}),
-        help_text=_('The type of transaction (add or subtract leaves).'),
+        label=_("Transaction Type"),
+        choices=[("add", _("Add")), ("subtract", _("Subtract"))],
+        widget=forms.Select(attrs={"class": "form-control"}),
+        help_text=_("The type of transaction (add or subtract leaves)."),
     )
     remarks = forms.CharField(
         required=False,
-        label=_('Remarks'),
-        widget=forms.Textarea(attrs={'class': 'form-control'}),
-        help_text=_('Any additional remarks regarding the leave transaction.'),
+        label=_("Remarks"),
+        widget=forms.Textarea(attrs={"class": "form-control"}),
+        help_text=_("Any additional remarks regarding the leave transaction."),
     )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['leave_balance'].choices = self.get_leave_balance_choices()
-        self.fields['leave_type'].choices = self.get_leave_type_choices()
+        self.fields["leave_balance"].choices = self.get_leave_balance_choices()
+        self.fields["leave_type"].choices = self.get_leave_type_choices()
 
     def get_leave_balance_choices(self):
         # Replace with actual queryset to populate choices
         leave_balances = LeaveBalanceOpenings.objects.filter(year=timezone.now().year)
-        return [('', _('Select Leave Balance'))] + [
+        return [("", _("Select Leave Balance"))] + [
             (lb.pk, str(lb)) for lb in leave_balances
         ]
 
     def get_leave_type_choices(self):
         # Replace with actual queryset to populate choices
         leave_types = LeaveType.objects.all()
-        return [('', _('Select Leave Type'))] + [(lt.pk, lt.leave_type) for lt in leave_types]
+        return [("", _("Select Leave Type"))] + [
+            (lt.pk, lt.leave_type) for lt in leave_types
+        ]
 
     def clean(self):
         cleaned_data = super().clean()
-        leave_balance = cleaned_data.get('leave_balance')
-        leave_type = cleaned_data.get('leave_type')
+        leave_balance = cleaned_data.get("leave_balance")
+        leave_type = cleaned_data.get("leave_type")
 
         # Ensure only one of leave_balance or leave_type is selected
         if leave_balance and leave_type:
@@ -1664,11 +1692,11 @@ class LeaveTransactionForm(forms.Form):
         Handles form processing to create LeaveTransaction instances.
         """
         cleaned_data = self.cleaned_data
-        leave_balance_id = cleaned_data.get('leave_balance')
-        leave_type = cleaned_data.get('leave_type')
-        no_of_days_approved = cleaned_data.get('no_of_days_approved')
-        transaction_type = cleaned_data.get('transaction_type')
-        remarks = cleaned_data.get('remarks')
+        leave_balance_id = cleaned_data.get("leave_balance")
+        leave_type = cleaned_data.get("leave_type")
+        no_of_days_approved = cleaned_data.get("no_of_days_approved")
+        transaction_type = cleaned_data.get("transaction_type")
+        remarks = cleaned_data.get("remarks")
 
         if leave_balance_id:
             leave_balance = LeaveBalanceOpenings.objects.get(id=leave_balance_id)
@@ -1685,8 +1713,7 @@ class LeaveTransactionForm(forms.Form):
 
         elif leave_type:
             leave_balances = LeaveBalanceOpenings.objects.filter(
-                leave_type=leave_type,
-                year=timezone.now().year
+                leave_type=leave_type, year=timezone.now().year
             )
             for leave_balance in leave_balances:
                 transaction = LeaveTransaction(
@@ -1708,66 +1735,86 @@ class LeaveBalanceForm(forms.Form):
         queryset=User.objects.all(),
         required=False,
         label=_("User"),
-        help_text=_("Select a user to update their leave balance. Leave blank to update all users."),
-        widget=forms.Select(attrs={
-            'class': 'form-control',
-            'placeholder': _("Select a user"),
-        })
+        help_text=_(
+            "Select a user to update their leave balance. Leave blank to update all users."
+        ),
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Select a user"),
+            }
+        ),
     )
     leave_type = forms.ModelChoiceField(
         queryset=LeaveType.objects.all(),
         required=True,
         label=_("Leave Type"),
         help_text=_("The type of leave to update or create balances for."),
-        widget=forms.Select(attrs={
-            'class': 'form-control',
-            'placeholder': _("Select a leave type"),
-        })
+        widget=forms.Select(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Select a leave type"),
+            }
+        ),
     )
     year = forms.IntegerField(
         required=True,
         label=_("Year"),
         help_text=_("The year for which the leave balance is applicable."),
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': _("Enter year"),
-        })
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Enter year"),
+            }
+        ),
     )
     opening_balance = forms.FloatField(
         required=False,
         label=_("Opening Balance"),
         help_text=_("Enter the opening balance for the leave."),
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': _("Enter opening balance"),
-        })
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Enter opening balance"),
+            }
+        ),
     )
     closing_balance = forms.FloatField(
         required=False,
         label=_("Closing Balance"),
         help_text=_("Enter the closing balance for the leave."),
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': _("Enter closing balance"),
-        })
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Enter closing balance"),
+            }
+        ),
     )
     no_of_leaves = forms.FloatField(
         required=False,
         label=_("Number of Leaves"),
-        help_text=_("The total number of leaves allocated to the user for this leave type."),
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': _("Enter number of leaves"),
-        })
+        help_text=_(
+            "The total number of leaves allocated to the user for this leave type."
+        ),
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Enter number of leaves"),
+            }
+        ),
     )
     remaining_leave_balances = forms.FloatField(
         required=False,
         label=_("Remaining Leave Balance"),
-        help_text=_("The remaining balance of leaves available to the user for this leave type."),
-        widget=forms.NumberInput(attrs={
-            'class': 'form-control',
-            'placeholder': _("Enter remaining leave balance"),
-        })
+        help_text=_(
+            "The remaining balance of leaves available to the user for this leave type."
+        ),
+        widget=forms.NumberInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": _("Enter remaining leave balance"),
+            }
+        ),
     )
 
     def clean(self):
@@ -1778,8 +1825,12 @@ class LeaveBalanceForm(forms.Form):
         remaining_leave_balances = cleaned_data.get("remaining_leave_balances")
 
         # Ensure at least one balance field is provided
-        if not any([opening_balance, closing_balance, no_of_leaves, remaining_leave_balances]):
+        if not any(
+            [opening_balance, closing_balance, no_of_leaves, remaining_leave_balances]
+        ):
             raise forms.ValidationError(
-                _("At least one balance field (Opening Balance, Closing Balance, Number of Leaves, or Remaining Leave Balance) must be provided.")
+                _(
+                    "At least one balance field (Opening Balance, Closing Balance, Number of Leaves, or Remaining Leave Balance) must be provided."
+                )
             )
         return cleaned_data

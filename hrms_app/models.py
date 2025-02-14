@@ -1076,6 +1076,15 @@ class LeaveApplication(models.Model):
             "Automatically generated unique identifier for the leave application."
         ),
     )
+        # Add a file upload field
+    attachment = models.FileField(
+        upload_to="leave_attachments/",  # Files will be uploaded to MEDIA_ROOT/leave_attachments/
+        blank=True,
+        null=True,
+        verbose_name=_("Attachment"),
+        help_text=_("Upload an image or PDF file (optional)."),
+    )
+
 
     def save(self, *args, **kwargs):
         if self.startDate and self.endDate and self.startDate > self.endDate:

@@ -20,7 +20,11 @@ from django.views.generic import (
 )
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import (
+    LoginRequiredMixin,
+    UserPassesTestMixin,
+    PermissionRequiredMixin,
+)
 from django.apps import apps
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
@@ -51,6 +55,7 @@ from django.views.decorators.csrf import csrf_exempt
 User = get_user_model()
 logger = logging.getLogger(__name__)
 from hrms_app.tasks import push_notification
+
 
 def custom_permission_denied(request, exception=None):
     error_message = (
@@ -122,7 +127,12 @@ class HomePageView(LoginRequiredMixin, TemplateView):
         """Add custom context data for the dashboard."""
         context = super().get_context_data(**kwargs)
         context["current_date"] = datetime.now()
-        push_notification(user=self.request.user,head="Hello There",body="Testing the webpush notification",url="http://hr.kasheemilk.com:7777/dashboard")
+        push_notification(
+            user=self.request.user,
+            head="Hello There",
+            body="Testing the webpush notification",
+            url="http://hr.kasheemilk.com:7777/dashboard",
+        )
         # Fetch all users to pass in the context
         users = User.objects.all()  # Adjust this if you want to filter the users
         context["users"] = users
@@ -185,7 +195,7 @@ class AboutPageView(TemplateView):
     template_name = "hrms_app/calendar.html"
 
 
-class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
+class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, TemplateView):
     template_name = "hrms_app/leave-tracker.html"
     model = LeaveApplication
     permission_action = "view"
@@ -205,6 +215,23 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
 
         return super().dispatch(request, *args, **kwargs)
 
+    def perform_search(self, queryset, search_term):
+        if search_term:
+            queryset = queryset.filter(
+                Q(appliedBy__username__icontains=search_term)
+                | Q(
+                    appliedBy__first_name__icontains=search_term
+                )  # Search by first name
+                | Q(appliedBy__last_name__icontains=search_term)
+            )
+        return queryset
+
+    def get_assigned_employee_leaves(self, user, form, *args, **kwargs):
+        if user.is_superuser:
+            return self.get_filtered_leaves(queryset=LeaveApplication.objects.all().exclude(appliedBy=user),form=form)
+        queryset = LeaveApplication.objects.filter(appliedBy__in=user.employees.all())
+        return self.get_filtered_leaves(queryset=queryset, form=form)
+
     def get_table_class(self):
         # Dynamically define table columns based on session data or defaults
         class DynamicLeaveApplicationTable(LeaveApplicationTable):
@@ -217,112 +244,68 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, FilterView):
 
         return DynamicLeaveApplicationTable
 
-    def get_filtered_leaves(self, user, form):
+    def get_filtered_leaves(self, queryset, form=None):
         """Apply filters to the leave applications."""
-        try:
-            employee_leaves = LeaveApplication.objects.filter(
-                appliedBy__in=user.employees.all()
-            )
-            if form.is_valid():
-                status = form.cleaned_data.get("status")
-                from_date = form.cleaned_data.get("fromDate")
-                to_date = form.cleaned_data.get("toDate")
-                if status:
-                    employee_leaves = employee_leaves.filter(status=status)
-                if from_date:
-                    employee_leaves = employee_leaves.filter(startDate__gte=from_date)
-                if to_date:
-                    employee_leaves = employee_leaves.filter(endDate__lte=to_date)
-            else:
-                messages.warning(self.request, "Invalid filter data provided.")
-            return employee_leaves
-        except ValidationError as ve:
-            logger.warning(f"Validation error while filtering leaves: {ve}")
-            messages.error(
-                self.request,
-                "There was an issue processing your filter. Please try again.",
-            )
-            return LeaveApplication.objects.none()
-        except Exception as e:
-            logger.exception(f"Unexpected error while filtering leaves: {e}")
-            messages.error(
-                self.request, "An unexpected error occurred. Please contact support."
-            )
-            return LeaveApplication.objects.none()
-
-    def get_queryset(self):
-        """Filter tours based on the logged-in user's tours and their employees' tours."""
-        user = self.request.user
-        user_leaves = LeaveApplication.objects.filter(appliedBy=user)
-
-        # Get the search query parameter (if any)
+        if form is not None and form.is_valid():
+            status = form.cleaned_data.get("status")
+            from_date = form.cleaned_data.get("fromDate")
+            to_date = form.cleaned_data.get("toDate")
+            if status:
+                queryset = queryset.filter(status=status)
+            if from_date:
+                queryset = queryset.filter(startDate__gte=from_date)
+            if to_date:
+                queryset = queryset.filter(endDate__lte=to_date)
         search_term = self.request.GET.get("q", "").strip()
         if search_term:
-            user_leaves = user_leaves.filter(
-                Q(appliedby__username__icontains=search_term)
-                | Q(
-                    appliedby__first_name__icontains=search_term
-                )  # Search by first name
-                | Q(appliedby__last_name__icontains=search_term)
-                | Q(
-                    from_destination__icontains=search_term
-                )  # Search by from_destination
-                | Q(to_destination__icontains=search_term)
-            )
+            queryset = self.perform_search(queryset=queryset, search_term=search_term)
+        return queryset
 
-        return user_leaves
+    def get_queryset(self):
+        user = self.request.user
+        user_leaves = LeaveApplication.objects.filter(appliedBy=user)
+        return self.get_filtered_leaves(queryset=user_leaves, form=None)
 
     def get_context_data(self, **kwargs):
         """Prepare the context for the template."""
         context = super().get_context_data(**kwargs)
         user = self.request.user
-
-        # Initialize filter form
         form = FilterForm(self.request.GET)
-
         try:
             # Prepare leave balances and filtered leaves
-            combined_leaves = self.get_filtered_leaves(user, form)
-            employee_leaves = combined_leaves.filter(appliedBy__in=user.employees.all())
+            all_columns = [
+                field.name
+                for field in LeaveApplication._meta.fields
+                if field.name not in ["id", "slug", "reason", "attachment"]
+            ]
+            selected_columns = self.request.session.get(
+                "selected_columns", ["appliedBy", "status", "startDate", "endDate"]
+            )
             context.update(
                 {
                     "current_date": now(),
                     "form": form,
-                    "employee_leaves": [
-                        {
-                            "leaveApplication": leave,
-                            "start_date": leave.startDate.strftime("%Y-%m-%d"),
-                            "end_date": leave.endDate.strftime("%Y-%m-%d"),
-                        }
-                        for leave in employee_leaves
-                    ],
+                    "employee_leaves": self.get_assigned_employee_leaves(
+                        user=user, form=form
+                    ),
                     "pending_leave_count": LeaveApplication.objects.filter(
                         appliedBy=user, status=settings.PENDING
                     ).count(),
+                    "all_columns": all_columns,
+                    "selected_columns": selected_columns,
+                    "title": self.title,
                     "urls": [
                         ("dashboard", {"label": "Dashboard"}),
                         ("leave_tracker", {"label": "Leave Tracker"}),
                     ],
                 }
             )
-            all_columns = [
-                field.name
-                for field in LeaveApplication._meta.fields
-                if field.name not in ["id", "slug", "reason"]
-            ]
-            selected_columns = self.request.session.get(
-                "selected_columns", ["appliedBy", "status", "startDate", "endDate"]
-            )
-            context["all_columns"] = all_columns
-            context["selected_columns"] = selected_columns
-            context["title"] = self.title
         except Exception as e:
             logger.exception(f"Unexpected error in context preparation: {e}")
             messages.error(
                 self.request,
                 "An error occurred while loading the page. Please try again later.",
             )
-
         return context
 
 
@@ -574,6 +557,7 @@ class LeaveApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, Update
 
 from django.core.exceptions import ObjectDoesNotExist
 
+
 class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     model = LeaveApplication
     template_name = "hrms_app/leave_application_detail.html"
@@ -599,8 +583,13 @@ class LeaveApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, Detail
                 return leave_application
             raise PermissionDenied(self.permission_denied_message)
         except ObjectDoesNotExist:
-            messages.error(self.request, _("Leave application does not exist, perhaps it was deleted."))
-            return redirect('calendar')  # Replace 'dashboard' with the name of your dashboard URL
+            messages.error(
+                self.request,
+                _("Leave application does not exist, perhaps it was deleted."),
+            )
+            return redirect(
+                "calendar"
+            )  # Replace 'dashboard' with the name of your dashboard URL
 
     def has_permission_to_view(self, leave_application):
         user = self.request.user
@@ -773,15 +762,19 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
     def form_valid(self, form):
         # Count the number of regularizations applied by the user for the current month
-        count = AttendanceLog.objects.filter(
-            applied_by=self.request.user,
-            start_date__date__month=self.object.start_date.date().month,
-        ).filter(
-            Q(regularized=True) | Q(is_submitted=True)
-        ).count()
+        count = (
+            AttendanceLog.objects.filter(
+                applied_by=self.request.user,
+                start_date__date__month=self.object.start_date.date().month,
+            )
+            .filter(Q(regularized=True) | Q(is_submitted=True))
+            .count()
+        )
 
         # Retrieve the REGULARIZATION_LIMIT setting
-        reg_limit_setting = AppSetting.objects.filter(key="REGULARIZATION_LIMIT").first()
+        reg_limit_setting = AppSetting.objects.filter(
+            key="REGULARIZATION_LIMIT"
+        ).first()
 
         if reg_limit_setting:
             reg_limit = int(reg_limit_setting.value)
@@ -804,13 +797,18 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
             # Success message and redirect
             messages.success(self.request, _("Regularization updated successfully."))
-            return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": self.object.slug}))
+            return HttpResponseRedirect(
+                reverse("event_detail", kwargs={"slug": self.object.slug})
+            )
 
         # If beyond_policy is not allowed, enforce the limit
         if count >= reg_limit:
             messages.error(
                 self.request,
-                _("You have already applied for the maximum number of regularizations (%d times)." % reg_limit),
+                _(
+                    "You have already applied for the maximum number of regularizations (%d times)."
+                    % reg_limit
+                ),
             )
             return self.form_invalid(form)
 
@@ -827,12 +825,13 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
         # Success message and redirect
         messages.success(self.request, _("Regularization updated successfully."))
-        return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": self.object.slug}))
-
+        return HttpResponseRedirect(
+            reverse("event_detail", kwargs={"slug": self.object.slug})
+        )
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
-    
+
     def get_count(self):
         obj = self.get_object()
         logs_count = AttendanceLog.objects.filter(
@@ -883,7 +882,7 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             {
                 "title": self.title,
                 "subtitle": self.get_object().slug,
-                "reg_count":self.get_count()
+                "reg_count": self.get_count(),
             }
         )
         return context
@@ -1039,6 +1038,7 @@ class EventListView(View):
         holidays = Holiday.objects.all()
         attendances = AttendanceLog.objects.filter(applied_by=user)
         leave_applications = LeaveApplication.objects.filter(appliedBy=user)
+        # leave_days = LeaveDay.objects.filter(leave_application__appliedBy=user)
         tour_applications = UserTour.objects.filter(applied_by=user)
 
         events_data = []
@@ -1098,12 +1098,9 @@ class EventListView(View):
                 {
                     "id": leave.slug,
                     "title": f"{leave.leave_type.leave_type} {leave.status}",
-                    "start": localtime(
-                        leave.startDate
-                    ),
-                    "end": localtime(
-                        leave.endDate
-                    ),
+                    "start": timezone.localdate(leave.startDate),
+                    "end":datetime.combine(timezone.localdate(leave.endDate), datetime.min.time())
+                            + timezone.timedelta(days=1),
                     "color": leave.leave_type.color_hex,
                     "url": reverse_lazy(
                         "leave_application_detail", kwargs={"slug": leave.slug}

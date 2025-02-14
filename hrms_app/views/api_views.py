@@ -613,6 +613,11 @@ from rest_framework.pagination import PageNumberPagination
 class HolidaysPagination(PageNumberPagination):
     page_size = 20  # Set the default page size to 20
 
+
+###########################################################################
+########   HolidayViewSet modules
+########   By Divyanshu
+###########################################################################
 class HolidayViewSet(viewsets.ModelViewSet):
     queryset = Holiday.objects.all()
     serializer_class = HolidaySerializer

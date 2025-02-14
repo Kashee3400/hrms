@@ -51,10 +51,10 @@
             </ul>
             <div class="mt-3">
               <p>
-                <strong>From:</strong> {{ leave_application.startDate|localtime_filter}} -{% leave_start_end_status leave_application.startDayChoice %}
+                <strong>From:</strong> {{ leave_application.startDate|localtime_filter|date:'d-M-Y'}} -{% leave_start_end_status leave_application.startDayChoice %}
               </p>
               <p>
-                <strong>To:</strong> {{ leave_application.endDate|localtime_filter}} -{% leave_start_end_status leave_application.endDayChoice %}
+                <strong>To:</strong> {{ leave_application.endDate|localtime_filter|date:'d-M-Y'}} -{% leave_start_end_status leave_application.endDayChoice %}
               </p>             <hr />
               <p>
                 <strong>Reason:</strong>
