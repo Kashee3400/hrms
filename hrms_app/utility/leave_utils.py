@@ -242,6 +242,11 @@ class LeavePolicyManager:
         Applies minimum notice days policy for Casual Leave.
         """
         min_notice_days = self.leave_type.min_notice_days
+
+        # Skip the check if min_notice_days is None
+        if min_notice_days is None:
+            return  
+
         if (self.start_date.date() - timezone.now().date()).days < min_notice_days:
             raise ValidationError(
                 f"{self.leave_type.leave_type_short_code} should be applied at least {min_notice_days} days in advance."
