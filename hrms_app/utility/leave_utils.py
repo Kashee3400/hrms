@@ -204,10 +204,11 @@ class LeavePolicyManager:
         days_difference = (self.start_date.date() - current_date).days
 
         # Check if booked_leave is an integer
-        if not isinstance(self.booked_leave, int):
+        if not (isinstance(self.booked_leave, (int, float)) or not (self.booked_leave == int(self.booked_leave))):
             raise ValidationError(
                 f"EL can only be applied for whole days. Fractional days like {self.booked_leave} are not allowed."
             )
+
 
         if el_min_notice_days is not None and days_difference < int(el_min_notice_days):
             raise ValidationError(
