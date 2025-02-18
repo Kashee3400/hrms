@@ -1038,7 +1038,6 @@ class EventListView(View):
         holidays = Holiday.objects.all()
         attendances = AttendanceLog.objects.filter(applied_by=user)
         leave_applications = LeaveApplication.objects.filter(appliedBy=user)
-        # leave_days = LeaveDay.objects.filter(leave_application__appliedBy=user)
         tour_applications = UserTour.objects.filter(applied_by=user)
 
         events_data = []
@@ -1140,6 +1139,21 @@ class EventListView(View):
                         "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
                     }
                 )
+            if att.regularized:
+                events_data.append(
+                    {
+                        "id": att.slug,
+                        "title": "Regularized",
+                        "start": timezone.localtime(
+                            att.start_date
+                        ).isoformat(),  # Convert to local time
+                        "end": timezone.localtime(
+                            att.end_date
+                        ).isoformat(),  # Convert to local time
+                        "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
+                    }
+                )
+
         return JsonResponse(events_data, safe=False)
 
 
