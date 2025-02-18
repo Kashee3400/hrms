@@ -199,20 +199,10 @@ class LeavePolicyManager:
         el_allowed_days = self.leave_type.allowed_days_per_year
         el_min_days = self.leave_type.min_days_limit
         el_max_days = self.leave_type.max_days_limit
-        el_min_notice_days = self.leave_type.min_notice_days
-        current_date = timezone.now().date()
-        days_difference = (self.start_date.date() - current_date).days
-
-        # Check if booked_leave is an integer
-        if not (isinstance(self.booked_leave, (int, float)) or not (self.booked_leave == int(self.booked_leave))):
+        self.apply_min_notice_days_policy()
+        if not isinstance(self.booked_leave, (int, float)) or self.booked_leave % 1 != 0:
             raise ValidationError(
                 f"EL can only be applied for whole days. Fractional days like {self.booked_leave} are not allowed."
-            )
-
-
-        if el_min_notice_days is not None and days_difference < int(el_min_notice_days):
-            raise ValidationError(
-                f"EL should be applied at least {int(el_min_notice_days)} days in advance."
             )
 
         if el_min_days and self.booked_leave < el_min_days:
@@ -258,7 +248,7 @@ class LeavePolicyManager:
         Applies maximum days limit policy for Casual Leave.
         """
         max_days = self.leave_type.max_days_limit
-        if self.booked_leave > max_days:
+        if max_days is not None and self.booked_leave > max_days:
             raise ValidationError(
                 f"{self.leave_type.leave_type_short_code} can be applied for a maximum of {max_days} days."
             )
