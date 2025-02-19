@@ -75,24 +75,32 @@ def get_regularization_requests(user, status=None):
 
     if user.is_superuser:
         # Fetch all regularization requests with the given status for superusers
-        return AttendanceLog.objects.filter(is_submitted=True,regularized=False, status=reg_status)
+        return AttendanceLog.objects.filter(
+            is_submitted=True, regularized=False, status=reg_status
+        )
     elif user.personal_detail.designation.department.department == "admin":
         return AttendanceLog.objects.filter(
             is_submitted=True,
             regularized=False,
             status__in=[reg_status],
             applied_by__in=user.employees.all(),
-        ) | AttendanceLog.objects.filter(is_submitted=True,regularized=False, status=settings.RECOMMEND)
+        ) | AttendanceLog.objects.filter(
+            is_submitted=True, regularized=False, status=settings.RECOMMEND
+        )
 
     else:
         # Fetch regularization requests applied by employees assigned to the user
         return AttendanceLog.objects.filter(
-            applied_by__in=user.employees.all(), is_submitted=True,regularized=False, status=reg_status
+            applied_by__in=user.employees.all(),
+            is_submitted=True,
+            regularized=False,
+            status=reg_status,
         )
 
 
 def format_date(date):
     from django.utils.timezone import make_aware, make_naive
+
     naive_date = make_naive(date)
     output_format = "%Y-%m-%d"
     formatted_date = naive_date.strftime(output_format)
@@ -101,8 +109,10 @@ def format_date(date):
 
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+
 logger = logging.getLogger(__name__)
 from django.db.models import Q
+
 
 def filter_leaves(queryset, form):
     """Apply filters to a LeaveApplication queryset based on form data."""
@@ -118,6 +128,7 @@ def filter_leaves(queryset, form):
             queryset = queryset.filter(endDate__lte=to_date)
     return queryset
 
+
 def get_filtered_leaves(self, user, form):
     """Apply filters to the leave applications."""
     try:
@@ -131,6 +142,8 @@ def get_filtered_leaves(self, user, form):
     except Exception as e:
         logger.exception(f"Unexpected error while filtering leaves: {e}")
         return LeaveApplication.objects.none()
+
+
 class LeavePolicyManager:
     def __init__(
         self, user, leave_type, start_date, end_date, start_day_choice, end_day_choice
@@ -183,7 +196,6 @@ class LeavePolicyManager:
                 "There is an overlapping leave application in the selected date range."
             )
 
-
     def apply_cl_policy(self):
         """
         Applies Casual Leave specific policies.
@@ -191,7 +203,7 @@ class LeavePolicyManager:
         self.apply_min_notice_days_policy()
         self.validate_min_days()
         self.apply_max_days_limit_policy()
-    
+
     def apply_el_policy(self):
         """
         Applies Earned Leave specific policies.
@@ -200,7 +212,10 @@ class LeavePolicyManager:
         el_min_days = self.leave_type.min_days_limit
         el_max_days = self.leave_type.max_days_limit
         self.apply_min_notice_days_policy()
-        if not isinstance(self.booked_leave, (int, float)) or self.booked_leave % 1 != 0:
+        if (
+            not isinstance(self.booked_leave, (int, float))
+            or self.booked_leave % 1 != 0
+        ):
             raise ValidationError(
                 f"EL can only be applied for whole days. Fractional days like {self.booked_leave} are not allowed."
             )
@@ -236,7 +251,7 @@ class LeavePolicyManager:
 
         # Skip the check if min_notice_days is None
         if min_notice_days is None:
-            return  
+            return
 
         if (self.start_date.date() - timezone.now().date()).days < min_notice_days:
             raise ValidationError(
@@ -252,6 +267,7 @@ class LeavePolicyManager:
             raise ValidationError(
                 f"{self.leave_type.leave_type_short_code} can be applied for a maximum of {max_days} days."
             )
+
     def validate_consecutive_leave_restrictions(self):
         """
         Enforce the consecutive leave restrictions based on the `LeaveType` settings.
@@ -264,14 +280,14 @@ class LeavePolicyManager:
                     settings.PENDING,
                     settings.PENDING_CANCELLATION,
                 ],
+                endDate__lt=self.start_date  # Only consider leaves that ended before new leave
             )
-            .order_by("-endDate")
+            .order_by("-endDate")  # Get the most recent leave before the new leave date
             .first()
         )
 
         if not last_leave:
-            return  # No previous leaves to check against
-
+            return 
         last_leave_type = last_leave.leave_type
         last_end_date = (
             timezone.localtime(last_leave.endDate).date()
@@ -294,8 +310,8 @@ class LeavePolicyManager:
         ):
             days_between -= non_work_days
         if (
-            last_leave_type in self.leave_type.restricted_after_leave_types.all()
-            and days_between <= 0
+            self.leave_type in last_leave_type.restricted_after_leave_types.all()
+            and days_between <= 1
         ):
             raise ValidationError(
                 f"You cannot apply for {self.leave_type} immediately after {last_leave_type}. "
@@ -306,7 +322,9 @@ class LeavePolicyManager:
 from django.utils import timezone
 
 
-def calculate_day_difference_btn_last_current_leave(last_leave_date, current_leave_date, last_end_day_choice, current_start_day_choice):
+def calculate_day_difference_btn_last_current_leave(
+    last_leave_date, current_leave_date, last_end_day_choice, current_start_day_choice
+):
     """
     Calculate total leave days between the start and end dates, considering start and end day choices.
     Uses database-stored adjustment values for flexibility.
@@ -318,9 +336,9 @@ def calculate_day_difference_btn_last_current_leave(last_leave_date, current_lea
     # Calculate the total number of days between the dates
     total_days = (current_leave_date - last_leave_date).days
     if last_end_day_choice == settings.FIRST_HALF:
-        total_days -=0.5
+        total_days -= 0.5
     if current_start_day_choice == settings.SECOND_HALF:
-        total_days -=0.5
+        total_days -= 0.5
     final_days = max(float(total_days), 0.0)
     return final_days
 

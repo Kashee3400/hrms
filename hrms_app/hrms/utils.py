@@ -127,7 +127,6 @@ def is_holiday(date):
 
 
 def get_non_working_days(start, end):
-    print(f"Getting non working days between: {start} & {end}")
     non_working_days = 0
     for n in range((end - start).days + 1):
         day = start + timedelta(n)
