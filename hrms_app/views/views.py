@@ -366,6 +366,7 @@ class ApplyOrUpdateLeaveView(
         """Handle successful form submission."""
         leave_application = form.save(commit=False)
         leave_application.appliedBy = self.request.user
+        leave_application.attachment = self.request.FILES.get("attachment")
         leave_application.save()
         if self.object:  # Update
             success_message = self.success_message_update

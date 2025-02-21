@@ -39,7 +39,7 @@
 {% block content %}
   {% render_breadcrumb 'Apply Leave' urls %}
   <div class="bg-white p-3 mt-3">
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
       <div id="leave_type_div">{{ form.leave_type }}</div>
       <div class="row g-3">
