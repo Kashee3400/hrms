@@ -2137,7 +2137,7 @@ class Holiday(models.Model):
 
 
 from datetime import datetime, timedelta
-from django.utils.timezone import make_aware, is_naive
+from django.utils.timezone import make_aware, is_naive,now
 
 
 def make_datetime_aware(date, time):
@@ -2258,7 +2258,20 @@ class UserTour(models.Model):
             raise ValidationError(
                 _("End time must be after start time on the same day.")
             )
+        # Get today's date
+        today = now().date()
 
+        # New validation for approval type
+        if self.approval_type == settings.PRE_APPROVAL and self.start_date < today:
+            raise ValidationError(
+                _("For Pre Approval, the start date must be today or a future date.")
+            )
+
+        if self.approval_type == settings.POST_APPROVAL and self.start_date >= today:
+            raise ValidationError(
+                _("For Post Approval, the start date must be in the past.")
+            )
+            
     def __str__(self):
         return f"Tour {self.id} by {self.applied_by.username}"
 

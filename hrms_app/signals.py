@@ -96,6 +96,7 @@ def create_or_update_user_tour(sender, instance, created, **kwargs):
         except:
             pass
 
+
 @receiver(pre_save, sender=UserTour)
 def set_user_tour_slug(sender, instance, **kwargs):
     if not instance.slug:

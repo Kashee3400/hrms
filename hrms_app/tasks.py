@@ -175,12 +175,10 @@ def send_regularization_notification(regularization_id, protocol, domain):
     employee_content = (
         f"Dear {user.first_name},\n\n"
         f"Your regularization update. \n\n"
-        f"Tour Details:\n"
-        f"- {log.from_date} to {log.to_date}  ({log.reg_status}).\n"
-        f"- Status: {log.status}\n"
+        f"-For {log.start_date}.\n"
         f"Thank you,\n"
         f"Your HR Team\n\n"
-        f"You can review the tour detail at the following link:"
+        f"You can review the regularization at the following link:"
     )
     employee_email = user.official_email if user.official_email else user.email
     send_email("Regularization Status", employee_content, employee_email)
@@ -189,10 +187,8 @@ def send_regularization_notification(regularization_id, protocol, domain):
     manager_content = (
         f"Dear {manager.first_name} {manager.last_name},\n\n"
         f"A regularization requested by {user.get_full_name()} \n\n"
-        f"Tour Details:\n"
-        f"- from ({log.from_date}) to ({log.to_date})  has been {log.status}.\n"
-        f"- Status: {log.status}\n"
-        f"You can review the tour detail at the following link:"
+        f"-For {log.start_date}.\n"
+        f"You can review the regularization at the following link:"
     )
     send_email(
         "Regularization Status",
