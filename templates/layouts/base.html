@@ -44,25 +44,11 @@
                   <div class="messages">
                     {% for message in messages %}
                       <div class="alert {% if message.tags == 'success' %}
-                          alert-success
-
-                        {% elif message.tags == 'info' %}
-                          
-                          alert-info
-
-                        {% elif message.tags == 'warning' %}
-                          
-                          alert-warning
-
-                        {% elif message.tags == 'error' %}
-                          
-                          alert-danger
-
-                        {% else %}
-                          
-                          alert-secondary
-
-                        {% endif %} alert-dismissible fade show"
+                          alert-success{% elif message.tags == 'info' %}
+                          alert-info{% elif message.tags == 'warning' %}
+                          alert-warning{% elif message.tags == 'error' %}
+                          alert-danger{% else %}alert-secondary
+                          {% endif %} alert-dismissible fade show"
                         role="alert">
                         {{ message|capfirst }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
@@ -82,17 +68,16 @@
                 {% endblock %}
               </div>
             </div>
-            {% comment %} {% webpush_button with_class="btn btn-outline-info" %} {% endcomment %}
+            {% comment %} {% webpush_button with_class='btn btn-outline-info' %} {% endcomment %}
             {% include 'includes/footer.html' %}
           </div>
         </div>
         {% block notification %}
-        {% load_side_notifications request.user %}
+          {% load_side_notifications request.user %}
         {% endblock %}
         {% block settings_panel %}
           {% include 'includes/settings-panel.html' %}
         {% endblock %}
-        
       </div>
     </div>
     <!-- END Container -->
@@ -114,25 +99,49 @@
         })
       })
       $(document).ready(function () {
-        // Initialize datepicker for fields with vDateField class
         $('.vDateField').each(function () {
-          var fieldValue = $(this).val();
-          var dateValue = new Date(fieldValue); // Manually parse the date string
-          $(this).datepicker({
-              dateFormat: 'yy-mm-dd', // Ensure the correct date format
-              defaultDate: dateValue
-          });
-      });
-
+          var fieldValue = $(this).val()
+      
+          // Ensure the fieldValue is not empty
+          if (fieldValue) {
+            // Manually parse the date in "YYYY-MM-DD" format
+            var parts = fieldValue.split('-') // Split by hyphen
+            var year = parseInt(parts[0], 10)
+            var month = parseInt(parts[1], 10) - 1 // Month is 0-based in JS
+            var day = parseInt(parts[2], 10)
+      
+            var dateValue = new Date(year, month, day)
+      
+            // Initialize Datepicker with the correct date format
+            $(this)
+              .datepicker({
+                dateFormat: 'yy-mm-dd', // Correct jQuery UI Datepicker format
+                defaultDate: dateValue
+              })
+              .datepicker('setDate', dateValue)
+          } else {
+            $(this).datepicker()
+          }
+        })
         // Initialize timepicker for fields with vTimeField class
         $('.vTimeField').each(function () {
           var fieldValue = $(this).val()
-          var timeValue = fieldValue
-          $(this)
-            .timepicker({
-              showMeridian: false, // Use 24-hour format
-              defaultTime: timeValue
-            })
+      
+          if (fieldValue) {
+            // Ensure proper parsing
+            var timeParts = fieldValue.split(':')
+            var hours = parseInt(timeParts[0], 10)
+            var minutes = parseInt(timeParts[1], 10)
+      
+            var timeValue = (hours < 10 ? '0' + hours : hours) + ':' + (minutes < 10 ? '0' + minutes : minutes)
+      
+            $(this)
+              .timepicker({
+                showMeridian: false, // 24-hour format
+                defaultTime: timeValue
+              })
+              .timepicker('setTime', timeValue) // Ensure it sets the value correctly
+          }
         })
       })
     </script>

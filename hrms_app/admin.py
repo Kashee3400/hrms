@@ -559,18 +559,7 @@ class LeaveApplicationAdmin(admin.ModelAdmin):
         "appliedBy__last_name",
     ]
 
-
 admin.site.register(LeaveApplication, LeaveApplicationAdmin)
-
-
-class FormProgressAdmin(admin.ModelAdmin):
-    list_display = ["user", "step", "status"]
-
-    search_fields = ["user__first_name", "user__last_name", "email"]
-
-
-admin.site.register(FormProgress, FormProgressAdmin)
-
 
 class DeviceInformationAdmin(admin.ModelAdmin):
     list_display = [
@@ -792,3 +781,18 @@ class AppSettingAdmin(admin.ModelAdmin):
     list_filter = ("updated_at",)
     readonly_fields = ("updated_at",)
     ordering = ("key",)
+
+
+@admin.register(PermanentAddress)
+class PermanentAddressAdmin(admin.ModelAdmin):
+    list_display = ("user", "address_line_1", "state", "zipcode", "is_active", "created_at")
+    search_fields = ("user__username", "user__first_name", "user__last_name", "address_line_1", "state", "zipcode")
+    list_filter = ("state", "is_active")
+    ordering = ("-created_at",)
+
+@admin.register(CorrespondingAddress)
+class CorrespondingAddressAdmin(admin.ModelAdmin):
+    list_display = ("user", "address_line_1", "state", "zipcode")
+    search_fields = ("user__username", "user__first_name", "user__last_name", "address_line_1", "state", "zipcode")
+    list_filter = ("state",)
+    ordering = ("user",)

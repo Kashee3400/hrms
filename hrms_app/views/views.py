@@ -5,7 +5,7 @@ from datetime import datetime
 from urllib.parse import urlparse
 from hrms_app.utility.leave_utils import format_date
 from django.utils.http import urlencode
-
+from hrms_app.tasks import send_regularization_notification
 # Third-party imports
 from django.http import HttpResponseForbidden, HttpResponseRedirect, JsonResponse
 from django.contrib import messages
@@ -18,6 +18,7 @@ from django.views.generic import (
     DeleteView,
     ListView,
 )
+from hrms_app.hrms.managers import AttendanceStatusHandler
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.auth.mixins import (
@@ -25,6 +26,9 @@ from django.contrib.auth.mixins import (
     UserPassesTestMixin,
     PermissionRequiredMixin,
 )
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.serializers.json import DjangoJSONEncoder
+from django.contrib.sites.models import Site
 from django.apps import apps
 from django_filters.views import FilterView
 from django_tables2.views import SingleTableMixin
@@ -40,6 +44,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.utils.translation import gettext_lazy as _
 from django.conf import settings
 from django.views.generic.edit import ModelFormMixin
+from hrms_app.hrms.filters import AttendanceLogFilter
 
 # Local imports
 from hrms_app.hrms.form import *
@@ -127,12 +132,12 @@ class HomePageView(LoginRequiredMixin, TemplateView):
         """Add custom context data for the dashboard."""
         context = super().get_context_data(**kwargs)
         context["current_date"] = datetime.now()
-        push_notification(
-            user=self.request.user,
-            head="Hello There",
-            body="Testing the webpush notification",
-            url="http://hr.kasheemilk.com:7777/dashboard",
-        )
+        # push_notification(
+        #     user=self.request.user,
+        #     head="Hello There",
+        #     body="Testing the webpush notification",
+        #     url="http://hr.kasheemilk.com:7777/dashboard",
+        # )
         # Fetch all users to pass in the context
         users = User.objects.all()  # Adjust this if you want to filter the users
         context["users"] = users
@@ -176,20 +181,46 @@ class EmployeeProfileView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        print(self.request.user)
-        context["current_date"] = datetime.now()
+        employee = self.get_object()
         urls = [
             ("dashboard", {"label": "Dashboard"}),
         ]
-        context["urls"] = urls
+        context.update({
+            "profile_ob": employee,
+            "cform": CorrespondingAddressForm(instance=employee.corres_addresses.last()),
+            "pform": PermanentAddressForm(instance=employee.permanent_addresses.last()),
+            "avatar_form" : AvatarUpdateForm(),
+            "cform_name": "cform_submit",
+            "pform_name": "pform_submit",
+            "cform_button_text": "Update Corresponding Address",
+            "button_text": "Update Address",
+            "urls":urls
+        })
         return context
 
     def get(self, request, *args, **kwargs):
         return super().get(request, *args, **kwargs)
-
+    
     def post(self, request, *args, **kwargs):
-        return super().post(request, *args, **kwargs)
+        employee = self.get_object()
+        if "form_submit" in request.POST:
+            form_type = request.POST.get("form_submit")
+            if form_type == "cform":
+                form = CorrespondingAddressForm(request.POST, instance=employee.corres_addresses.last())
+            elif form_type == "pform":
+                form = PermanentAddressForm(request.POST, instance=employee.permanent_addresses.last())
+            elif form_type == "avatar_form":
+                form = AvatarUpdateForm(request.POST, request.FILES, instance=employee.personal_detail)
+            else:
+                form = None
+            if form and form.is_valid():
+                print(form)
+                form.save()
+                messages.success(request, "Address updated successfully.")
+            else:
+                messages.error(request, "There was an error updating the address.")
 
+        return redirect(request.path)
 
 class AboutPageView(TemplateView):
     template_name = "hrms_app/calendar.html"
@@ -226,11 +257,33 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, TemplateView):
             )
         return queryset
 
-    def get_assigned_employee_leaves(self, user, form, *args, **kwargs):
+    def get_assigned_employee_leaves(self, user, form, page=1, per_page=10, *args, **kwargs):
         if user.is_superuser:
-            return self.get_filtered_leaves(queryset=LeaveApplication.objects.all().exclude(appliedBy=user),form=form)
-        queryset = LeaveApplication.objects.filter(appliedBy__in=user.employees.all())
-        return self.get_filtered_leaves(queryset=queryset, form=form)
+            queryset = LeaveApplication.objects.all().exclude(appliedBy=user)
+        else:
+            queryset = LeaveApplication.objects.filter(appliedBy__in=user.employees.all())
+        queryset = self.get_filtered_leaves(queryset=queryset, form=form)
+        # Apply pagination
+        paginator = Paginator(queryset, per_page)
+        try:
+            leaves = paginator.page(page)
+        except PageNotAnInteger:
+            leaves = paginator.page(1)
+        except EmptyPage:
+            leaves = paginator.page(paginator.num_pages)
+
+        # Return paginated leaves along with pagination metadata
+        return {
+            "leaves": leaves,  # The actual paginated records
+            "pagination": {
+                "has_previous": leaves.has_previous(),
+                "has_next": leaves.has_next(),
+                "current_page": leaves.number,
+                "total_pages": paginator.num_pages,
+                "total_items": paginator.count,
+                "per_page": per_page,
+            }
+        }
 
     def get_table_class(self):
         # Dynamically define table columns based on session data or defaults
@@ -285,9 +338,7 @@ class LeaveTrackerView(LoginRequiredMixin, SingleTableMixin, TemplateView):
                 {
                     "current_date": now(),
                     "form": form,
-                    "employee_leaves": self.get_assigned_employee_leaves(
-                        user=user, form=form
-                    ),
+                    "employee_leaves": self.get_assigned_employee_leaves(user, form, page=self.request.GET.get('page', 1), per_page=12),
                     "pending_leave_count": LeaveApplication.objects.filter(
                         appliedBy=user, status=settings.PENDING
                     ).count(),
@@ -363,20 +414,37 @@ class ApplyOrUpdateLeaveView(
         return kwargs
 
     def form_valid(self, form):
-        """Handle successful form submission."""
+        """Handle successful form submission with probation check."""
+        user = self.request.user
+
+        # Check if user has a joining date (DOJ)
+        if hasattr(user, "personal_detail") and user.personal_detail.doj:
+            doj = user.personal_detail.doj  # DateField (no time component)
+            probation_period_end = doj + timedelta(days=180)  # 6 months probation
+
+            # Get leave type (assuming it's in the form)
+            leave_type = form.cleaned_data.get("leave_type")  
+
+            # If applying for EL and still in probation, reject application
+            if leave_type and leave_type.leave_type_short_code == "EL" and now().date() < probation_period_end:
+                messages.error(self.request, "You are still in the probation period and cannot apply for Earned Leave (EL).")
+                return self.form_invalid(form)  # Return form with an error message
+
+        # Proceed with normal form submission
         leave_application = form.save(commit=False)
-        leave_application.appliedBy = self.request.user
+        leave_application.appliedBy = user
         leave_application.attachment = self.request.FILES.get("attachment")
         leave_application.save()
-        if self.object:  # Update
-            success_message = self.success_message_update
-        else:  # Create
-            success_message = self.success_message_create
+
+        # Determine success message
+        success_message = self.success_message_update if self.object else self.success_message_create
         messages.success(self.request, success_message)
-        # Redirect to the next URL if provided, or fallback to leave tracker
+
+        # Redirect logic
         next_url = self.request.POST.get("next")
         if next_url and urlparse(next_url).netloc == "":
             return redirect(next_url)
+        
         return redirect(reverse_lazy("leave_tracker"))
 
     def form_invalid(self, form):
@@ -725,7 +793,7 @@ class EventPageView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class EventDetailPageView(LoginRequiredMixin, UpdateView):
     model = AttendanceLog
     template_name = "hrms_app/event_detail.html"
     form_class = AttendanceLogForm
@@ -735,85 +803,75 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     permission_required = "hrms_app.change_attendancelog"
 
     def dispatch(self, request, *args, **kwargs):
-        # Check if the user is authenticated
+        """Ensure the user is authenticated and has the required permissions."""
         if not request.user.is_authenticated:
             return self.handle_no_permission()
-
-        # Perform the permission check
         if not self.test_func():
             raise PermissionDenied(_("You do not have permission to access this page."))
-
         return super().dispatch(request, *args, **kwargs)
 
     def test_func(self):
-        # Determine the required permission dynamically based on the HTTP method
-        if self.request.method in ["GET"]:
-            permission_required = (
-                f"{self.model._meta.app_label}.view_{self.model._meta.model_name}"
-            )
+        """Dynamically determine the required permission based on the HTTP method."""
+        if self.request.method == "GET":
+            permission_required = f"{self.model._meta.app_label}.view_{self.model._meta.model_name}"
         elif self.request.method in ["POST", "PUT", "PATCH"]:
-            permission_required = (
-                f"{self.model._meta.app_label}.change_{self.model._meta.model_name}"
-            )
+            permission_required = f"{self.model._meta.app_label}.change_{self.model._meta.model_name}"
         else:
-            # Default to the permission specified in the class
             permission_required = self.permission_required
-
         return self.request.user.has_perm(permission_required)
 
     def form_valid(self, form):
-        # Count the number of regularizations applied by the user for the current month
-        count = (
-            AttendanceLog.objects.filter(
-                applied_by=self.request.user,
-                start_date__date__month=self.object.start_date.date().month,
-            )
-            .filter(Q(regularized=True) | Q(is_submitted=True))
-            .count()
-        )
-
-        # Retrieve the REGULARIZATION_LIMIT setting
-        reg_limit_setting = AppSetting.objects.filter(
-            key="REGULARIZATION_LIMIT"
-        ).first()
-
-        if reg_limit_setting:
-            reg_limit = int(reg_limit_setting.value)
-            beyond_policy = reg_limit_setting.beyond_policy
-        else:
-            reg_limit = 3  # Default value
-            beyond_policy = False  # Default behavior if setting is not found
-
-        # If beyond_policy is allowed, proceed without checking the limit
-        if beyond_policy:
-            form.instance.is_submitted = True
-            self.object = form.save()
-
-            # Log the action
-            self.object.add_action(
-                action="Submitted regularization",
-                performed_by=self.request.user,
-                comment=form.instance.reason,
-            )
-
-            # Success message and redirect
-            messages.success(self.request, _("Regularization updated successfully."))
-            return HttpResponseRedirect(
-                reverse("event_detail", kwargs={"slug": self.object.slug})
-            )
-
-        # If beyond_policy is not allowed, enforce the limit
-        if count >= reg_limit:
+        """Handle form submission for regularization requests."""
+        
+        if self._is_beyond_policy_allowed():
+            return self._process_submission(form)
+    
+        if self._has_exceeded_regularization_limit():
             messages.error(
                 self.request,
-                _(
-                    "You have already applied for the maximum number of regularizations (%d times)."
-                    % reg_limit
-                ),
+                _(f"You have already applied for the maximum number of regularizations ({self._get_regularization_limit()} times)."),
             )
             return self.form_invalid(form)
+        
+        return self._process_submission(form)
 
-        # If within the limit, proceed with submission
+    def form_invalid(self, form):
+        """Handle invalid form submissions."""
+        messages.error(self.request, _("There were errors in your submission. Please correct them and try again."))
+        print(form.errors)
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def _is_beyond_policy_allowed(self):
+        """Check if the user is allowed to bypass the regularization limit."""  
+        reg_limit_setting = AppSetting.objects.filter(key="REGULARIZATION_LIMIT").first()
+        return reg_limit_setting.beyond_policy if reg_limit_setting else False
+
+    def _get_regularization_limit(self):
+        """Retrieve the regularization limit from settings."""
+        reg_limit_setting = AppSetting.objects.filter(key="REGULARIZATION_LIMIT").first()
+        return int(reg_limit_setting.value) if reg_limit_setting else 3
+
+    def _has_exceeded_regularization_limit(self):
+        """Check if the user has exceeded the regularization limit for the current month."""
+        count = AttendanceLog.objects.filter(
+            applied_by=self.request.user,
+            start_date__month=self.object.start_date.month,
+            start_date__year=self.object.start_date.year,
+        ).filter(Q(regularized=True) | Q(is_submitted=True)).count()
+        return count >= self._get_regularization_limit()
+
+    def _process_submission(self, form):
+        """Process the form submission and log the action."""
+        reg_max_allowed = AppSetting.objects.filter(key="REGULARIZATION_MAX_HR").first()
+        regularization_hr = (form.instance.to_date - form.instance.from_date).total_seconds() / 3600
+        if form.instance.reg_status != settings.MIS_PUNCHING:
+            if not reg_max_allowed.beyond_policy and regularization_hr > reg_max_allowed.value:
+                messages.error(
+                    self.request,
+                    _(f"You can only regularize up to {reg_max_allowed.value}) hrs."),
+                )
+                return self.form_invalid(form)
+
         form.instance.is_submitted = True
         self.object = form.save()
 
@@ -830,72 +888,67 @@ class EventDetailPageView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
             reverse("event_detail", kwargs={"slug": self.object.slug})
         )
 
-    def form_invalid(self, form):
-        return self.render_to_response(self.get_context_data(form=form))
-
-    def get_count(self):
-        obj = self.get_object()
-        logs_count = AttendanceLog.objects.filter(
-            applied_by=obj.applied_by,
-            regularized=True,
-            start_date__year=obj.start_date.date().year,
-            start_date__month=obj.start_date.date().month,
-        ).count()
-        return logs_count
-
     def get_object(self, queryset=None):
+        """Retrieve the object and check if the user has permission to access it."""
         attendance_log = super().get_object(queryset)
         user = self.request.user
         if (
             attendance_log.applied_by == user
             or attendance_log.applied_by.reports_to == user
-            or self.request.user.is_staff
-            or self.request.user.is_superuser
+            or user.is_staff
+            or user.is_superuser
             or user.personal_detail.designation.department.department == "admin"
         ):
             return attendance_log
         raise PermissionDenied()
 
     def get_form_kwargs(self):
+        """Add additional kwargs to the form."""
         kwargs = super().get_form_kwargs()
         attendance_log = self.get_object()
-        kwargs["user"] = self.request.user
-        kwargs["is_manager"] = self.request.user == attendance_log.applied_by.reports_to
+        kwargs.update({
+            "user": self.request.user,
+            "is_manager": self.request.user == attendance_log.applied_by.reports_to,
+        })
         return kwargs
 
     def get_context_data(self, **kwargs):
+        """Add additional context data for the template."""
         context = super().get_context_data(**kwargs)
         attendance_log = self.get_object()
-        context["is_manager"] = (
-            self.request.user == attendance_log.applied_by.reports_to
-        )
-        urls = [
+        context.update({
+            "is_manager": self.request.user == attendance_log.applied_by.reports_to,
+            "urls": self._get_breadcrumb_urls(attendance_log),
+            "action_form": AttendanceLogActionForm(),
+            "title": self.title,
+            "subtitle": attendance_log.slug,
+            "reg_count": self._get_regularization_count(attendance_log),
+        })
+        return context
+
+    def _get_breadcrumb_urls(self, attendance_log):
+        """Generate breadcrumb URLs for the template."""
+        return [
             ("dashboard", {"label": "Dashboard"}),
             ("calendar", {"label": "Attendance"}),
-            (
-                "event_detail",
-                {"label": f"{attendance_log.title}", "slug": attendance_log.slug},
-            ),
+            ("event_detail", {"label": attendance_log.title, "slug": attendance_log.slug}),
         ]
-        context["urls"] = urls
-        context["action_form"] = AttendanceLogActionForm()
-        context.update(
-            {
-                "title": self.title,
-                "subtitle": self.get_object().slug,
-                "reg_count": self.get_count(),
-            }
-        )
-        return context
+
+    def _get_regularization_count(self, attendance_log):
+        """Get the count of regularizations applied by the user for the current month."""
+        return AttendanceLog.objects.filter(
+            applied_by=attendance_log.applied_by,
+            regularized=True,
+            start_date__year=attendance_log.start_date.year,
+            start_date__month=attendance_log.start_date.month,
+        ).count()
 
 
 class AttendanceLogActionView(LoginRequiredMixin, View):
     def fetch_static_data(self):
         """Fetch static data used in attendance calculations."""
         return {
-            "half_day_color": AttendanceStatusColor.objects.get(
-                status=settings.HALF_DAY
-            ),
+            "half_day_color": AttendanceStatusColor.objects.get(status=settings.HALF_DAY),
             "present_color": AttendanceStatusColor.objects.get(status=settings.PRESENT),
             "absent_color": AttendanceStatusColor.objects.get(status=settings.ABSENT),
             "asettings": AttendanceSetting.objects.first(),
@@ -908,18 +961,12 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
 
     def parse_dates(self, from_date_str, to_date_str):
         """Parse string dates into timezone-aware datetime objects."""
-        parse_date = lambda d: (
-            make_aware(datetime.strptime(d, "%Y-%m-%d")) if d else None
-        )
+        parse_date = lambda d: make_aware(datetime.strptime(d, "%Y-%m-%d")) if d else None
         return parse_date(from_date_str), parse_date(to_date_str)
 
     def get_user_shift(self, user):
         """Retrieve the shift timing for a given user."""
-        emp_shift = (
-            EmployeeShift.objects.filter(employee=user)
-            .select_related("shift_timing")
-            .first()
-        )
+        emp_shift = EmployeeShift.objects.filter(employee=user).select_related("shift_timing").first()
         return emp_shift.shift_timing if emp_shift else None
 
     def handle_attendance_update(self, log, form_data, static_data):
@@ -931,12 +978,7 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
         )
 
         reason = form_data["reason"]
-        if log.reg_status == settings.EARLY_GOING:
-            log.end_date = log.to_date
-        elif log.reg_status == settings.LATE_COMING:
-            log.start_date = log.from_date
-        log.save()
-        from hrms_app.hrms.managers import AttendanceStatusHandler
+        self.update_log_dates(log)
 
         status_handler = AttendanceStatusHandler(
             self.get_user_shift(log.applied_by),
@@ -946,20 +988,38 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
             static_data["absent_color"],
         )
 
+        status_data = self.calculate_status_data(log, static_data, status_handler)
+        self.update_log_status(log, status_data)
+
+        log.regularized = True
+        log.save()
+        log.approve(action_by=self.request.user, reason=reason)
+        return _("Attendance log approved and updated successfully.")
+
+    def update_log_dates(self, log):
+        """Adjust the start and end dates for early-going and late-coming logs."""
+        if log.reg_status == settings.EARLY_GOING:
+            log.end_date = log.to_date
+        elif log.reg_status == settings.LATE_COMING:
+            log.start_date = log.from_date
+        else:
+            log.start_date = log.from_date
+            log.end_date = log.to_date
+        log.save()
+
+    def calculate_status_data(self, log, static_data, status_handler):
+        """Calculate the attendance status and return necessary data."""
         log_start_date = localtime(log.start_date)
         log_end_date = localtime(log.end_date)
         total_duration = log_end_date - log_start_date
-        user_expected_logout_time = log_start_date + timedelta(
-            hours=static_data["asettings"].full_day_hours
+        user_expected_logout_time = log_start_date + timedelta(hours=static_data["asettings"].full_day_hours)
+
+        return status_handler.determine_attendance_status(
+            log_start_date, log_end_date, total_duration, user_expected_logout_time.time(), user_expected_logout_time
         )
 
-        status_data = status_handler.determine_attendance_status(
-            log_start_date,
-            log_end_date,
-            total_duration,
-            user_expected_logout_time.time(),
-            user_expected_logout_time,
-        )
+    def update_log_status(self, log, status_data):
+        """Update the log with the calculated status data."""
         (
             log.att_status,
             log.color_hex,
@@ -971,56 +1031,57 @@ class AttendanceLogActionView(LoginRequiredMixin, View):
             log.status,
             log.att_status_short_code,
         ) = status_data
-        total_minutes = total_duration.total_seconds() // 60
+        total_minutes = (log.end_date - log.start_date).total_seconds() // 60
 
         # Calculate hours and minutes
         hours = total_minutes // 60
         minutes = total_minutes % 60
-        time_difference = f"{int(hours):02}:{int(minutes):02}"
-        log.duration = time_difference
-        log.regularized = True
-        log.save()
-        log.approve(action_by=self.request.user, reason=reason)
-        return _("Attendance log approved and updated successfully.")
+        log.duration = f"{int(hours):02}:{int(minutes):02}"
+
+    def handle_action(self, action, log, form, static_data):
+        """Handle the action specified in the form."""
+        reason = form.cleaned_data["reason"]
+        action_handlers = {
+            "approve": lambda: self.handle_attendance_update(log, form.cleaned_data, static_data),
+            "reject": lambda: log.reject(action_by=self.request.user, reason=reason),
+            "recommend": lambda: log.recommend(action_by=self.request.user, reason=reason),
+            "notrecommend": lambda: log.notrecommend(action_by=self.request.user, reason=reason),
+        }
+
+        if action in action_handlers:
+            return action_handlers[action]()
+        else:
+            return _("Invalid action.")
 
     def post(self, request, *args, **kwargs):
         action = request.POST.get("action")
         log_id = kwargs.get("slug")
         log = get_object_or_404(AttendanceLog, slug=log_id)
         form = AttendanceLogActionForm(request.POST)
+
         if form.is_valid():
             static_data = self.fetch_static_data()
-            reason = form.cleaned_data["reason"]
-            action_handlers = {
-                "approve": lambda: self.handle_attendance_update(
-                    log, form.cleaned_data, static_data
-                ),
-                "reject": lambda: log.reject(action_by=request.user, reason=reason),
-                "recommend": lambda: log.recommend(
-                    action_by=request.user, reason=reason
-                ),
-                "notrecommend": lambda: log.notrecommend(
-                    action_by=request.user, reason=reason
-                ),
-            }
-
-            if action in action_handlers:
-                message = action_handlers[action]()
+            try:
+                message = self.handle_action(action, log, form, static_data)
                 messages.success(request, message)
-            else:
-                messages.error(request, _("Invalid action."))
-
-            return HttpResponseRedirect(
-                reverse("event_detail", kwargs={"slug": log.slug})
-            )
+            except Exception as e:
+                messages.error(request, _("Error handling action: %s" % str(e)))
+            self.send_notification(log)
+            return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": log.slug}))
 
         messages.error(request, _("Invalid action or form data."))
         return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": log.slug}))
 
-
-import json
-from django.forms.models import model_to_dict
-from django.core.serializers.json import DjangoJSONEncoder
+    def send_notification(self, log):
+        """Send notification for regularization."""
+        current_site = Site.objects.get_current()
+        protocol = 'http'  # or 'https' if needed
+        domain = current_site.domain
+        try:
+            send_regularization_notification.delay(log.id, protocol, domain)
+        except Exception as e:
+            # Log the exception here
+            pass
 
 
 def make_json_serializable(data):
@@ -1157,10 +1218,6 @@ class EventListView(View):
 
         return JsonResponse(events_data, safe=False)
 
-
-from django_filters.views import FilterView
-
-from hrms_app.hrms.filters import AttendanceLogFilter
 
 
 class AttendanceLogListView(LoginRequiredMixin, SingleTableMixin, FilterView):
@@ -1618,139 +1675,22 @@ class CustomUploadView(View):
             response = {"uploaded": False, "message": "No file uploaded"}
         return JsonResponse(response)
 
-
-from formtools.wizard.views import SessionWizardView
-
-FORMS = [
-    ("user", CustomUserForm),
-    ("personal", PersonalDetailsForm),
-    ("paddress", PermanentAddressForm),
-    ("caddress", CorrespondingAddressForm),
-]
-
-TEMPLATES = {
-    "user": "hrms_app/wizard/user_form.html",
-    "personal": "hrms_app/wizard/personal_details_form.html",
-    "paddress": "hrms_app/wizard/paddress_form.html",
-    "caddress": "hrms_app/wizard/caddress_form.html",
-}
-
-
-class UserCreationWizard(LoginRequiredMixin, SessionWizardView):
-    file_storage = FileSystemStorage(location=settings.MEDIA_ROOT)
-    template_name = "hrms_app/form_wizard.html"
-    url_name = reverse_lazy("/")
-
-    def get_template_names(self):
-        return [TEMPLATES[self.steps.current]]
-
-    def get_user_instance(self):
-        user_id = self.kwargs.get("pk")
-        return get_object_or_404(CustomUser, pk=user_id) if user_id else None
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["urls"] = [
-            ("dashboard", {"label": "Dashboard"}),
-            ("create_user", {"label": "Create Employee"}),
-        ]
-        return context
-
-    def get_form_initial(self, step):
-        user = self.get_user_instance()
-        if user:
-            progress = FormProgress.objects.filter(user=user, step=step).first()
-            if progress:
-                return progress.data
-
-            model_class = self.form_list[step]._meta.model
-            instance = (
-                model_class.objects.filter(user_id=user.pk).first()
-                if model_class != CustomUser
-                else model_class.objects.filter(pk=user.pk).first()
-            )
-            return model_to_dict(instance) if instance else None
-
-        return super().get_form_initial(step)
-
-    def done(self, form_list, **kwargs):
-        try:
-            with transaction.atomic():
-                return self.save_forms(form_list)
-        except Exception as e:
-            logger.error(f"Error during form submission in done method: {e}")
-            return self.render_error_page()
-
-    def save_forms(self, form_list):
-        user_form, personal_details_form, paddress_form, caddress_form = form_list
-        user = self.get_user_instance()
-
-        if not user:
-            user = user_form.save(commit=False)
-            user.set_password("12345@Kmpcl")  # Set a default password for new users
-            user.save()
-        else:
-            user_form.save()
-
-        personal_details = personal_details_form.save(commit=False)
-        personal_details.user = user
-        personal_details.save()
-
-        paddress = paddress_form.save(commit=False)
-        paddress.user = user
-        paddress.save()
-
-        caddress = caddress_form.save(commit=False)
-        caddress.user = user
-        caddress.save()
-
-        FormProgress.objects.filter(user=user).update(status="completed")
-        return redirect("employees")
-
-    def post(self, *args, **kwargs):
-        current_step = self.steps.current
-        user = self.get_user_instance()
-
-        if "wizard_goto_step" in self.request.POST:
-            return self.render_goto_step(self.request.POST["wizard_goto_step"])
-
-        form = self.get_form(
-            current_step, data=self.request.POST, files=self.request.FILES
-        )
-        if form.is_valid():
-            if user:
-                self.save_form_data(user, current_step, form.cleaned_data)
-            return super().post(*args, **kwargs)
-
-        return self.render(form)
-
-    def save_form_data(self, user, current_step, form_data):
-        try:
-            FormProgress.objects.update_or_create(
-                user=user, step=current_step, defaults={"data": form_data}
-            )
-        except IntegrityError as e:
-            logger.error(f"Error saving form data for step {current_step}: {e}")
-            raise
-
-    def render_error_page(self):
-        return redirect("error_page")
-
-
-def cancel_user_creation(request):
-    request.session.pop("current_step", None)
-    return redirect("/")
-
-
-class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
+class EmployeeListView(LoginRequiredMixin, ListView):
     model = CustomUser
     template_name = "hrms_app/employee/employees.html"
     context_object_name = "users"
     paginate_by = 20
 
-    def test_func(self):
-        # Allow access only to staff and superusers
-        return self.request.user.is_staff or self.request.user.is_superuser
+    def dispatch(self, request, *args, **kwargs):
+        # First, enforce login requirement
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+        
+        # Then, enforce staff or superuser check
+        if not (request.user.is_staff or request.user.is_superuser):
+            return self.handle_no_permission()
+
+        return super().dispatch(request, *args, **kwargs)
 
     def get_queryset(self):
         queryset = CustomUser.objects.all()
@@ -1771,20 +1711,17 @@ class EmployeeListView(LoginRequiredMixin, UserPassesTestMixin, ListView):
                 | Q(official_email__icontains=search_query)
             )
 
-        return queryset.order_by("-date_joined")
+        return queryset.order_by("first_name")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Pass search query and is_active filter to the context for form persistence
         context["search_query"] = self.request.GET.get("q", "")
         context["is_active"] = self.request.GET.get("is_active", "")
-        urls = [
+        context["urls"] = [
             ("dashboard", {"label": "Dashboard"}),
             ("employees", {"label": "Employee List"}),
         ]
-        context["urls"] = urls
         return context
-
 
 class LeaveTransactionCreateView(FormView):
     form_class = LeaveTransactionForm
@@ -1821,7 +1758,6 @@ class LeaveTransactionCreateView(FormView):
         ]
         context.update({"urls": urls, "title": self.title})
         return context
-
 
 class LeaveBalanceUpdateView(View):
     template_name = "hrms_app/leave_bal_up.html"

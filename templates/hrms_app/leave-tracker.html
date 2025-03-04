@@ -27,7 +27,7 @@
       <div class="col-md-3">{{ form.to_date.label_tag }} {{ form.to_date }}</div>
       <div class="col-md-2 d-flex align-items-end">
         <button type="submit" class="btn btn-primary btn-sm"><span class="bi bi-funnel"></span>{% trans "Filter" %}</button>
-        <button type="button" class="btn btn-secondary btn-sm ms-2" onclick="window.location.href="{% url 'leave_tracker' %}"">{% trans "Clear Filter" %}</button>
+        <a class="btn btn-secondary btn-sm ms-2" href="{% url 'leave_tracker' %}">{% trans "Clear Filter" %}</a>
       </div>
     </div>
   </form>
@@ -77,16 +77,35 @@
 </div>
 {% comment %} {% if user.is_rm %} {% endcomment %}
   <div class="bg-light p-2">
-    {% if employee_leaves %}
+    {% if employee_leaves.leaves %}
       <div class="row">
         <div class="col-12">
           <div class="card mt-4">
-            <div class="card-header bg-info text-white">
-              <h5>Requested Leaves</h5>
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">{% trans "Requested Leaves" %}</h5>
+              
+              <!-- Search Input -->
+              <div class="col-12 col-md-4 col-lg-3">
+                <form method="get">
+                  <div class="input-group">
+                    <span class="input-group-text bg-primary text-white">
+                      <i class="fa-solid fa-magnifying-glass"></i>
+                    </span>
+                    <input 
+                      type="text" 
+                      class="form-control px-3 py-2" 
+                      name="q" 
+                      value="{{ search_query }}" 
+                      placeholder="Search users leave..."
+                    />
+                  </div>
+                </form>
+              </div>
+            </div>            
             </div>
             <div class="card-body">
               <div class="row">
-                {% for leave in employee_leaves %}
+                {% for leave in employee_leaves.leaves %}
                 <div class="col-md-3 mb-4">
                   <div class="card shadow-sm">
                       <div class="card-header bg-info text-white d-flex align-items-center">
@@ -137,6 +156,35 @@
             </div>
           </div>
         </div>
+      </div>
+      
+      <!-- Pagination -->
+      <div class="container mt-3">
+        <nav>
+          <ul class="pagination justify-content-center">
+            {% if employee_leaves.leaves.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page=1">&laquo; First</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.previous_page_number }}">Previous</a>
+              </li>
+            {% endif %}
+
+            <li class="page-item active">
+              <span class="page-link">Page {{ employee_leaves.leaves.number }} of {{ employee_leaves.leaves.paginator.num_pages }}.</span>
+            </li>
+
+            {% if employee_leaves.leaves.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.next_page_number }}">Next</a>
+              </li>
+              <li class="page-item">
+                <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.paginator.num_pages }}">Last &raquo;</a>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
       </div>
     {% else %}
       <div class="row">

@@ -8,9 +8,9 @@
 
   <ul class="nav flex-column">
     {% if request.user.is_superuser or request.user.is_staff %}
-    {% url 'dashboard' as index_url %}
+      {% url 'dashboard' as index_url %}
       <li class="nav-item {% if request.path == index_url %} active {% endif %}">
-        <a class="nav-link" href="{{index_url}}">
+        <a class="nav-link" href="{{ index_url }}">
           <i class="mdi mdi-grid-large menu-icon"></i>
           <span class="menu-title">{% trans 'Dashboard' %}</span>
         </a>
@@ -36,12 +36,30 @@
               <a class="nav-link"
                 data-bs-toggle="collapse"
                 href="#submenu-{{ app.app_label }}"
-                aria-expanded="{% if app.app_label in request.path %}true{% else %}false{% endif %}"
-                aria-controls="submenu-{{ app.app_label }}"
-                >
+                aria-expanded="{% if app.app_label in request.path %}
+                  
+                  
+                  true
+
+
+                {% else %}
+                  
+                  
+                  false
+
+
+                {% endif %}"
+                aria-controls="submenu-{{ app.app_label }}">
                 <i class="menu-icon mdi {% if app.icon %}
                     {{ app.icon }}
-                  {% else %}mdi-octagon{% endif %}">
+                  {% else %}
+                    
+                    
+                    mdi-octagon
+
+
+                  {% endif %}">
+
                 </i>
                 <span class="menu-title">{{ app.label|slice:10 }}{% if app.label|length > 10 %}..{% endif %}</span>
                 <i class="menu-arrow"></i>
@@ -95,6 +113,61 @@
           </ul>
         </div>
       </li>
+
+      <!-- HRMS URLs (manually registered) -->
+      {% url 'leave_transaction_create' as leave_transaction_create_url %}
+      {% url 'leave_bal_up' as leave_bal_up_url %}
+      {% url 'attendance_report' as attendance_report_url %}
+      {% url 'detailed_attendance_report' as detailed_attendance_report_url %}
+      {% url 'leave_balance_report' as leave_balance_report_url %}
+
+      <li class="nav-item nav-category">
+        {% trans 'Reports' %}
+      </li>
+      <li class="nav-item {% if request.path == attendance_report_url or request.path == detailed_attendance_report_url or request.path == leave_balance_report_url or request.path == leave_transaction_create_url %} active {% endif %}">
+        <a class="nav-link"
+          data-bs-toggle="collapse"
+          href="#report"
+          aria-expanded="{% if request.path == attendance_report_url or request.path == detailed_attendance_report_url or request.path == leave_balance_report_url or request.path == leave_transaction_create_url %}
+            true
+          {% else %}
+            false
+          {% endif %}"
+          aria-controls="report">
+          <i class="mdi mdi-file menu-icon"></i>
+          <span class="menu-title">{% trans 'Reports' %}</span>
+          <i class="menu-arrow"></i>
+        </a>
+        <div class="collapse {% if request.path == attendance_report_url or request.path == detailed_attendance_report_url or request.path == leave_balance_report_url or request.path == leave_transaction_create_url %} show {% endif %}" id="report">
+          <ul class="nav flex-column sub-menu">
+            <!-- Reports -->
+            <li class="nav-item {% if request.path == attendance_report_url %} active {% endif %}">
+              <a class="nav-link" href="{{ attendance_report_url }}">
+                <i class="mdi mdi-file menu-icon"></i>
+                <span class="menu-title">{% trans 'Attendance Report' %}</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.path == detailed_attendance_report_url %} active {% endif %}">
+              <a class="nav-link" href="{{ detailed_attendance_report_url }}">
+                <i class="mdi mdi-file menu-icon"></i>
+                <span class="menu-title">{% trans 'Detailed Attendance' %}</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.path == leave_balance_report_url %} active {% endif %}">
+              <a class="nav-link" href="{{ leave_balance_report_url }}">
+                <i class="mdi mdi-file menu-icon"></i>
+                <span class="menu-title">{% trans 'Leave Balance Report' %}</span>
+              </a>
+            </li>
+            <li class="nav-item {% if request.path == leave_transaction_create_url %} active {% endif %}">
+              <a class="nav-link" href="{{ leave_transaction_create_url }}">
+                <i class="mdi mdi-file menu-icon"></i>
+                <span class="menu-title">{% trans 'Leave Transaction' %}</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </li>
     {% endif %}
 
     <!-- Leave Tracker -->
@@ -115,30 +188,6 @@
       </a>
     </li>
 
-    {% if user.is_superuser or user.is_staff %}
-      <!-- Attendance Report -->
-      {% url 'attendance_report' as attendance_report_url %}
-      <li class="nav-item {% if request.path == attendance_report_url %} active {% endif %}">
-        <a class="nav-link" href="{{ attendance_report_url }}">
-          <i class="mdi mdi-file-document menu-icon"></i>
-          <span class="menu-title">{% trans 'Attendance Report' %}</span>
-        </a>
-      </li>
-      {% url 'leave_transaction_create' as leave_transaction_create_url %}
-      <li class="nav-item {% if request.path == leave_transaction_create_url %} active {% endif %}">
-        <a class="nav-link" href="{{ leave_transaction_create_url }}">
-          <i class="mdi mdi-file-document menu-icon"></i>
-          <span class="menu-title">{% trans 'Leave Transaction' %}</span>
-        </a>
-      </li>
-      {% url 'leave_bal_up' as leave_bal_up_url %}
-      <li class="nav-item {% if request.path == leave_bal_up_url %} active {% endif %}">
-        <a class="nav-link" href="{{ leave_bal_up_url }}">
-          <i class="mdi mdi-file-document menu-icon"></i>
-          <span class="menu-title">{% trans 'Leave Balance' %}</span>
-        </a>
-      </li>
-    {% endif %}
     <!-- Regularizations -->
     {% url 'regularization' as regularization_url %}
     <li class="nav-item {% if request.path == regularization_url %} active {% endif %}">

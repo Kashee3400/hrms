@@ -1725,11 +1725,13 @@ class LeaveTransaction(models.Model):
 
     def apply_transaction(self):
         if self.transaction_type == 'add':
-            if self.leave_balance.remaining_leave_balances is None:
+            if self.leave_balance.remaining_leave_balances is not None:
                 self.leave_balance.remaining_leave_balances += self.no_of_days_approved
+                self.leave_balance.no_of_leaves += self.no_of_days_approved
         elif self.transaction_type == 'subtract':
-            if self.leave_balance.remaining_leave_balances is None:
+            if self.leave_balance.remaining_leave_balances is not None:
                 self.leave_balance.remaining_leave_balances -= self.no_of_days_approved
+                self.leave_balance.no_of_leaves -= self.no_of_days_approved
         self.leave_balance.save()
 
 
@@ -2665,11 +2667,15 @@ class AttendanceLog(models.Model):
     )
 
     def clean(self):
-        if self.start_date is not None and self.end_date is not None:
-            if self.start_date >= self.end_date:
-                raise ValidationError(_("End date must be after start date."))
-        if self.from_date and self.to_date and self.from_date >= self.to_date:
-            raise ValidationError(_("To date must be after from date."))
+        if self.reg_status != settings.MIS_PUNCHING:
+            if self.start_date is not None and self.end_date is not None:
+                if self.start_date >= self.end_date:
+                    raise ValidationError(_("End date must be after start date."))
+            if self.from_date and self.to_date and self.from_date >= self.to_date:
+                raise ValidationError(_("To date must be after from date."))
+        else:
+            self.start_date = self.from_date
+            self.end_date = self.to_date
 
     def save(self, *args, **kwargs):
         # Automatically generate slug if not provided

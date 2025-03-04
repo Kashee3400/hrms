@@ -5,10 +5,20 @@
   <div class="card shadow-sm mt-5 mx-auto">
     <div class="card-header bg-warning text-dark d-flex align-items-center">
       <span class="bi bi-geo-alt me-2"></span>
-      <strong>{% trans "Step 3: Permanent Address" %}</strong>
+      <strong>{% trans "Step 4: Permanent Address" %}</strong>
     </div>
     <div class="card-body">
       <div class="row">
+        <div class="row">
+          <!-- Copy Address Checkbox -->
+          <div class="container col-12 col-sm-6 col-md-4 col-lg-3 mb-3">
+            <div class="form-check mb-3">
+              <input type="checkbox" id="copyAddressCheckbox" class="form-check-input">
+              <label for="copyAddressCheckbox" class="form-check-label">Copy Corresponding Address</label>
+            </div>
+          </div>
+          
+        </div>
         {% for field in wizard.form %}
           <div class="col-12 col-sm-6 col-md-4 col-lg-3 mb-3">
             <label for="{{ field.id_for_label }}" class="form-label">
@@ -17,7 +27,10 @@
                 <span class="text-danger">*</span> <!-- Red asterisk for required fields -->
               {% endif %}
             </label>
-            {{ field }}
+            
+            <!-- Add ID for jQuery to target fields -->
+            {{ field}}
+            
             {% if field.help_text %}
               <small class="form-text text-muted">{{ field.help_text }}</small>
             {% endif %}
@@ -29,7 +42,8 @@
               </div>
             {% endif %}
           </div>
-        {% endfor %}
+        {% endfor %}        
+
       </div>
     </div>
   </div>

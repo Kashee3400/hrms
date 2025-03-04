@@ -11,35 +11,56 @@
 
 {% block content %}
   {% render_breadcrumb 'Employees' urls %}
-  <div class="container bg-white p-2">
-    <div class="container">
+  <div class="bg-white px-2 py-4">
+    <div class="container bg-light py-2">
       <form method="get" action="{% url 'employees' %}">
-        <div class="row">
-          <div class="col-md-4 col-sm-12 col-lg-3">
-            <div class="form-group">
-              <input type="text" class="form-control" name="q" value="{{ search_query }}" placeholder="Search users..." />
+        <div class="row g-2 align-items-center justify-content-between text-center text-md-start">
+          <!-- Search Input -->
+          <div class="col-12 col-md-4 col-lg-3">
+            <div class="input-group">
+              <span class="input-group-text bg-primary text-white">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </span>
+              <input 
+                type="text" 
+                class="form-control px-3 py-2" 
+                name="q" 
+                value="{{ search_query }}" 
+                placeholder="Search users..."
+              />
             </div>
           </div>
-          <div class="col-md-4 col-sm-12 col-lg-3">
-            <div class="form-group">
-              <select name="is_active" class="form-select">
+
+          <!-- Active/Inactive Filter -->
+          <div class="col-12 col-md-4 col-lg-3">
+            <div class="form-group mb-0">
+              <select name="is_active" class="form-select w-100">
                 <option value="">All</option>
-                <option value="True" {% if is_active == 'True' %}selected{% endif %}>Active</option>
-                <option value="False" {% if is_active == 'False' %}selected{% endif %}>Inactive</option>  
+                <option value="True" {% if is_active == 'True' %}selected{% endif %}>{% trans "Active" %}</option>
+                <option value="False" {% if is_active == 'False' %}selected{% endif %}>{% trans "Inactive" %}</option>  
               </select>
             </div>
           </div>
-          <div class="col-md-4 col-sm-12 col-lg-3 d-flex justify-content-between align-items-center">
-            <button type="submit" class="btn btn-primary btn-sm"><span class="mif-filter"></span> Filter</button>
-            <a class="btn btn-secondary btn-sm" href="{% url 'employees' %}">Clear Filter</a>
-            <a href="{% url 'create_user' %}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-user-plus"></i> Add Employee</a>
+      
+          <!-- Buttons Section -->
+          <div class="col-12 col-md-4 col-lg-3">
+            <div class="d-flex gap-2 justify-content-between">
+              <button type="submit" class="btn btn-primary btn-sm w-100">
+                <i class="fa-solid fa-filter"></i> {% trans "Filter" %}
+              </button>
+              <a class="btn btn-secondary btn-sm w-100" href="{% url 'employees' %}">{% trans "Clear" %}</a>
+              <a href="{% url 'create_user' %}" class="btn btn-outline-dark btn-sm w-100">
+                <i class="fa-solid fa-user-plus"></i> Add
+              </a>
+            </div>
           </div>
+      
         </div>
       </form>
-      <!-- User List -->
     </div>
+    <hr>
 
-    <div class="container mt-3">
+    <div class="mt-3">
       <div class="row">
         {% for user in users %}
           <div class="col-md-4 col-sm-12 col-lg-3 mt-3">
@@ -53,29 +74,29 @@
                     {% endif %}"
                     class="avatar rounded-circle mb-2 img-fluid"
                     style="max-width: 100px; max-height: 100px; width: auto; height: auto;" />
-                  <h5 class="card-title">{{ user.first_name }}</h5>
+                  <h5 class="card-title">{{ user.personal_detail.salutation }} {{ user.get_full_name }}</h5>
                   <h6 class="card-subtitle mb-2 text-muted">{{ user.personal_detail.designation }}</h6>
                 </div>
                 <ul class="list-unstyled">
-                  <li>
-                    <span>Department</span>
+                  <li class="d-flex justify-content-between align-items-center">
+                    <span>{% trans "Department" %}</span>
                     <span class="badge bg-warning text-dark">{{ user.personal_detail.designation.department }}</span>
                   </li>
-                  <li>
-                    <span>Joined At</span>
+                  <li class="d-flex justify-content-between align-items-center mt-2">
+                    <span>{% trans "Joined At" %}</span>
                     <span class="badge bg-info text-white">{{ user.personal_detail.doj }}</span>
                   </li>
-                </ul>
+                </ul>                
                 <div class="d-flex justify-content-between">
-                  <a href="{% url 'edit_user_wizard' user.pk %}" class="btn btn-info btn-sm"><i class="fa-solid fa-edit"></i> Edit</a>
-                  <a href="{% url 'employee_profile' user.pk %}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-eye"></i> View</a>
+                  <a href="{% url 'edit_user_wizard' user.pk %}" class="btn btn-info btn-sm"><i class="fa-solid fa-edit"></i> {% trans "Edit" %}</a>
+                  <a href="{% url 'employee_profile' user.pk %}" class="btn btn-outline-dark btn-sm"><i class="fa-solid fa-eye"></i> {% trans "View" %}</a>
               </div>              
               </div>
             </div>
           </div>
         {% empty %}
           <div class="col-12">
-            <p>No Employee found.</p>
+            <p>{% trans "No Employee found." %}</p>
           </div>
         {% endfor %}
       </div>
@@ -87,10 +108,10 @@
         <ul class="pagination justify-content-center">
           {% if page_obj.has_previous %}
             <li class="page-item">
-              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page=1">&laquo; First</a>
+              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page=1">&laquo; {% trans "First" %}</a>
             </li>
             <li class="page-item">
-              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.previous_page_number }}">Previous</a>
+              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.previous_page_number }}">{% trans "Previous" %}</a>
             </li>
           {% endif %}
 
@@ -100,10 +121,10 @@
 
           {% if page_obj.has_next %}
             <li class="page-item">
-              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.next_page_number }}">Next</a>
+              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.next_page_number }}">{% trans "Next" %}</a>
             </li>
             <li class="page-item">
-              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.paginator.num_pages }}">Last &raquo;</a>
+              <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ page_obj.paginator.num_pages }}">{% trans "Last" %} &raquo;</a>
             </li>
           {% endif %}
         </ul>

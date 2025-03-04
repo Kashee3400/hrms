@@ -22,8 +22,8 @@ class CustomSite:
 
     def wrap_view(self, view):
         def view_wrapper(request, *args, **kwargs):
-            if not self.has_permission(request.user, view):
-                return render(request, '403.html', status=403)
+            # if not self.has_permission(request.user, view):
+            #     return render(request, '403.html', status=403)
             return view.as_view()(request, *args, **kwargs)
         return view_wrapper
 
@@ -75,3 +75,4 @@ site.register_view('employee-profile/<int:pk>/', views.EmployeeProfileView, name
 ###############################################################################################
 site.register_view('attendance-report/', report_view.MonthAttendanceReportView, name='attendance_report')
 site.register_view('detailed-attendance-report/', report_view.DetailedMonthlyPresenceView, name='detailed_attendance_report')
+site.register_view('leave-balance-report/', report_view.LeaveBalanceReportView, name='leave_balance_report')

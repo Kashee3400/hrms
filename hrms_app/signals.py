@@ -1,13 +1,14 @@
 # myapp/signals.py
 from .tasks import send_leave_application_notifications,send_tour_notifications,send_regularization_notification
 from django.contrib.sites.models import Site
-from .models import LeaveApplication, UserTour, Notification,LeaveBalanceOpenings,CustomUser
+from .models import LeaveApplication, UserTour, Notification,LeaveBalanceOpenings,CustomUser,AttendanceLog
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save,pre_delete,pre_init,pre_migrate,post_delete,post_init,post_migrate,pre_save
 from django.dispatch import receiver
 from django.conf import settings
 from hrms_app.models import *
-
+from django.core.exceptions import ImproperlyConfigured
+from hrms_app.hrms.utils import check_lock_status
 
 @receiver(post_save, sender=CustomUser)
 def initialize_leave_balance(sender, instance, created, **kwargs):
@@ -110,18 +111,18 @@ def set_user_tour_slug(sender, instance, **kwargs):
         instance.slug = slug
 
 
-@receiver(post_save, sender=AttendanceLog)
-def create_or_update_regularization(sender, instance, created, **kwargs):
-    if created:
-        return
-    current_site = Site.objects.get_current()
-    protocol = 'http'  # or 'http' if applicable
-    domain = current_site.domain
-    try:
-        send_regularization_notification.delay(instance.id, protocol, domain)
-    except:
-        pass
-    
+# @receiver(post_save, sender=AttendanceLog)
+# def create_or_update_regularization(sender, instance, created, **kwargs):
+#     if created:
+#         return
+#     current_site = Site.objects.get_current()
+#     protocol = 'http'  # or 'http' if applicable
+#     domain = current_site.domain
+#     try:
+#         send_regularization_notification.delay(instance.id, protocol, domain)
+#     except:
+#         pass
+
 
 @receiver(post_save, sender=LeaveApplication)
 def create_leave_days(sender, instance, created, **kwargs):
@@ -166,12 +167,6 @@ def create_employee_shift(sender, instance, created, **kwargs):
             print(f"Error creating EmployeeShift: {e}")
 
 # signals.py
-
-from django.db.models.signals import pre_save, pre_delete
-from django.dispatch import receiver
-from django.core.exceptions import ImproperlyConfigured
-from .models import LeaveApplication, AttendanceLog, UserTour
-from hrms_app.hrms.utils import check_lock_status
 
 @receiver(pre_save, sender=LeaveApplication)
 @receiver(pre_save, sender=AttendanceLog)

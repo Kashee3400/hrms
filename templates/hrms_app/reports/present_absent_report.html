@@ -2,7 +2,7 @@
 {% load static hrms_tag humanize i18n %}
 
 {% block title %}
-  {% trans 'Employees' %} | {{ title }}
+  {% trans 'Report' %} | {{ title }}
 {% endblock %}
 
 {% block extrastyle %}
@@ -10,6 +10,8 @@
 {% endblock %}
 
 {% block content %}
+{% render_breadcrumb 'Attendance Report' urls %}
+
   <div class="bg-light my-2">
     <form method="get">
       <div class="row m-2">

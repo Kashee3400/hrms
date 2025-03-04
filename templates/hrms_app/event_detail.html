@@ -16,7 +16,6 @@
 
 {% block content %}
   {% render_breadcrumb 'Attendance' urls %}
-
   <div class="mt-4">
     <div class="row justify-content-center">
       <div class="col-md-6 col-sm-12 mb-4">
@@ -81,17 +80,31 @@
       <div class="card">
         <div class="card-header d-flex align-items-center">
           <span class="me-2"><i class="bi bi-grid"></i></span>
-          <span>{{ object.reg_status|capfirst }}&nbsp;&nbsp; <span class="text-warning">| Regularized Attendance {{reg_count}} times in {{ object.start_date|date:"F" }}</span></span>
+          <span>{{ object.reg_status|capfirst }}&nbsp;&nbsp; <span class="text-warning">| Regularized Attendance {{ reg_count }} times in {{ object.start_date|date:'F' }}</span></span>
         </div>
         <div class="card-body">
           <form id="reg-application-form" method="post">
             {% csrf_token %}
+
+            <!-- Display Non-Field Errors Here -->
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                <ul class="mb-0">
+                  {% for error in form.non_field_errors %}
+                    <li>{{ error }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+
             <div class="row">
               {% for field in form %}
                 <div class="col-lg-3 col-md-4 col-sm-12 mb-3">
                   <div class="form-group">
                     <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                     {{ field }}
+
+                    <!-- Field-Specific Errors -->
                     {% if field.errors %}
                       <div class="invalid-feedback d-block">
                         <ul class="mb-0">
@@ -105,6 +118,7 @@
                 </div>
               {% endfor %}
             </div>
+
             {% if object.is_submitted %}
               <div class="form-check mb-3 mx-5">
                 <input class="form-check-input" type="checkbox" id="submittedCheckbox" checked disabled />
@@ -113,6 +127,7 @@
             {% endif %}
           </form>
         </div>
+
         <div class="card-footer">
           {% if not is_manager %}
             <div class="d-flex justify-content-start">
@@ -165,8 +180,8 @@
               <p id="action-message"></p>
             </div>
             <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
-              <button type="button" class="btn btn-primary" id="confirm-action-btn">{% trans 'Submit' %}</button>
+              <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
+              <button type="button" class="btn btn-sm btn-primary" id="confirm-action-btn">{% trans 'Submit' %}</button>
             </div>
           </div>
         </div>

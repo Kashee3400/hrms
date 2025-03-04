@@ -6,7 +6,7 @@
 {% endblock %}
 
 {% block extrastyle %}
-  <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}}" />
+  <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
   <style>
     .progress-indicator {
       list-style: none;
@@ -105,8 +105,8 @@
           {% translate 'You want to submit the details. Please check carefully.' %}
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% translate 'Cancel' %}</button>
-          <button type="button" class="btn btn-primary" onclick="submitForm()">{% translate 'Submit' %}</button>
+          <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">{% translate 'Cancel' %}</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="submitForm()">{% translate 'Submit' %}</button>
         </div>
       </div>
     </div>
@@ -118,5 +118,40 @@
     function submitForm() {
       document.getElementById('creation_form').submit()
     }
+    $(document).ready(function () {
+      $("#copyAddressCheckbox").change(function () {
+        if ($(this).is(":checked")) {
+          let userId = "{{ employee_obj.id }}";
+  
+          $.ajax({
+            url: `/get_corresponding_address/${userId}/`,
+            type: "GET",
+            dataType: "json",
+            success: function (data) {
+              if (!data.error) {
+                // Populate form fields with fetched address data
+                $("#id_paddress-address_line_1").val(data.address_line_1);
+                $("#id_paddress-address_line_2").val(data.address_line_2);
+                $("#id_paddress-country").val(data.country);
+                $("#id_paddress-district").val(data.district);
+                $("#id_paddress-state").val(data.state);
+                $("#id_paddress-zipcode").val(data.zipcode);
+              }
+            },
+            error: function () {
+              alert("Failed to fetch corresponding address.");
+            }
+          });
+        } else {
+          // Clear the permanent address fields if unchecked
+          $("#id_paddress-address_line_1").val("");
+          $("#id_paddress-address_line_2").val("");
+          $("#id_paddress-country").val("");
+          $("#id_paddress-district").val("");
+          $("#id_paddress-state").val("");
+          $("#id_paddress-zipcode").val("");
+        }
+      });
+    });
   </script>
 {% endblock %}

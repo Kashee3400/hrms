@@ -827,11 +827,15 @@ class LeaveApplicationForm(forms.ModelForm):
             self.fields["attachment"] = forms.FileField(
                 required=False,  # Initially not required
                 label=_("Attachment"),
-                help_text=_("Upload a medical certificate or supporting document (required for Sick Leave > 3 days)."),
-                widget=forms.ClearableFileInput(attrs={
-                    "class": "form-control-file",  # Bootstrap class
-                    "accept": ".pdf,.jpg,.jpeg,.png",  # Restrict file types
-                }),
+                help_text=_(
+                    "Upload a medical certificate or supporting document (required for Sick Leave > 3 days)."
+                ),
+                widget=forms.ClearableFileInput(
+                    attrs={
+                        "class": "form-control-file",  # Bootstrap class
+                        "accept": ".pdf,.jpg,.jpeg,.png",  # Restrict file types
+                    }
+                ),
             )
         self.fields["leave_type"].initial = leave_type
 
@@ -1250,13 +1254,19 @@ class CustomUserForm(forms.ModelForm):
         }
 
     def save(self, commit=True):
+        # If an instance exists, update the existing user.
         user = super().save(commit=False)
+
+        # Ensure that we are saving the existing user if one exists.
         if commit:
-            user.save()
-            # Set permissions for the user
+            user.save()  # This saves the existing user or creates a new one if not present
+
+            # Set the permissions for the user
             user.user_permissions.set(self.cleaned_data["permissions"])
-            # Set groups for the user
+
+            # Set the groups for the user
             user.groups.set(self.cleaned_data["groups"])
+
         return user
 
 
@@ -1557,6 +1567,39 @@ class AttendanceReportFilterForm(forms.Form):
     )
 
 
+class LeaveReportFilterForm(forms.Form):
+    # Define the form fields
+    location = forms.ModelMultipleChoiceField(
+        queryset=OfficeLocation.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(),
+        label="Location",
+    )
+    year = forms.DateField(
+        widget=DatePickerInput(
+            options={
+                "format": "YYYY",  # Only show the year
+                "viewMode": "years",  # Restrict the view to years
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            attrs={"class": "form-control"},
+        ),
+        required=False,
+    )
+    active = forms.BooleanField(
+        required=False,
+        label="Active Employees Only",
+        initial=True,
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "form-check-input",
+            }
+        ),
+    )
+
+
 class AttendanceLogActionForm(forms.Form):
     reason = forms.CharField(
         widget=forms.Textarea(attrs={"class": "form-control", "rows": 4, "cols": 40}),
@@ -1729,6 +1772,42 @@ class LeaveTransactionForm(forms.Form):
         else:
             raise ValueError("Either leave_balance or leave_type must be provided.")
 
+from PIL import Image
+class AvatarUpdateForm(forms.ModelForm):
+    class Meta:
+        model = PersonalDetails
+        fields = ["avatar"]
+        widgets = {
+            "avatar": forms.FileInput(
+                attrs={
+                    "class": "form-control",
+                    "type": "file",
+                    "data-role": "file",
+                    "data-mode": "drop",
+                }
+            ),
+        }
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+
+        if avatar:
+            try:
+                # Open the image file using PIL (Pillow)
+                image = Image.open(avatar)
+
+                # Check if the image is square
+                if image.width != image.height:
+                    raise ValidationError("The avatar must be a square image (equal width and height).")
+
+                # Check minimum size requirement
+                if image.width < 512 or image.height < 512:
+                    raise ValidationError("The avatar must be at least 512x512 pixels.")
+
+            except Exception:
+                raise ValidationError("Invalid image file. Please upload a valid image.")
+
+        return avatar
 
 class LeaveBalanceForm(forms.Form):
     user = forms.ModelChoiceField(
