@@ -1801,8 +1801,8 @@ class AvatarUpdateForm(forms.ModelForm):
                     raise ValidationError("The avatar must be a square image (equal width and height).")
 
                 # Check minimum size requirement
-                if image.width < 512 or image.height < 512:
-                    raise ValidationError("The avatar must be at least 512x512 pixels.")
+                # if image.width < 512 or image.height < 512:
+                #     raise ValidationError("The avatar must be at least 512x512 pixels.")
 
             except Exception:
                 raise ValidationError("Invalid image file. Please upload a valid image.")
