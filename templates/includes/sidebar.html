@@ -36,32 +36,13 @@
               <a class="nav-link"
                 data-bs-toggle="collapse"
                 href="#submenu-{{ app.app_label }}"
-                aria-expanded="{% if app.app_label in request.path %}
-                  
-                  
-                  true
-
-
-                {% else %}
-                  
-                  
-                  false
-
-
-                {% endif %}"
+                aria-expanded="{% if app.app_label in request.path %}true{% else %}false{% endif %}"
                 aria-controls="submenu-{{ app.app_label }}">
                 <i class="menu-icon mdi {% if app.icon %}
                     {{ app.icon }}
-                  {% else %}
-                    
-                    
-                    mdi-octagon
-
-
-                  {% endif %}">
-
+                  {% else %}mdi-octagon{% endif %}">
                 </i>
-                <span class="menu-title">{{ app.label|slice:10 }}{% if app.label|length > 10 %}..{% endif %}</span>
+                <span class="menu-title">{{ app.label|slice:20 }}{% if app.label|length > 20 %}..{% endif %}</span>
                 <i class="menu-arrow"></i>
               </a>
               <div class="collapse {% if app.app_label in request.path %}show{% endif %}" id="submenu-{{ app.app_label }}">
@@ -70,7 +51,8 @@
                     {% for model in app.models %}
                       {% if model.url %}
                         <li class="nav-item">
-                          <a class="nav-link {% if model.url in request.path %} active {% endif %}" href="{{ model.url }}"><p>{{ model.label }}</p></a>
+                          <a class="nav-link {% if model.url in request.path %} active {% endif %}" href="{{ model.url }}">
+                            <i class="fa-solid fa-edit"></i><p>{{ model.label }}</p></a>
                         </li>
                       {% else %}
                         <li class="nav-item">{{ model.label }}</li>

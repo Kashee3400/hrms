@@ -284,22 +284,6 @@ class AttendanceLogAdmin(admin.ModelAdmin):
 admin.site.register(AttendanceLog, AttendanceLogAdmin)
 
 
-class AttendanceLogActionAdmin(admin.ModelAdmin):
-    list_display = (
-        "log",
-        "action_by",
-        "action_by_name",
-        "action_by_email",
-        "action",
-        "timestamp",
-        "notes",
-    )
-    search_fields = ["action_by__first_name", "action_by__last_name", "action_by_email"]
-
-
-admin.site.register(AttendanceLogAction, AttendanceLogActionAdmin)
-
-
 class UserTourAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     resource_class = UserTourResource
     list_display = (
@@ -435,16 +419,16 @@ class LeaveTransactionAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     resource_class = LeaveTransactionResource
 
 
-@admin.register(LeaveStatusPermission)
-class LeaveStatusPermissionAdmin(admin.ModelAdmin):
-    list_display = (
-        "role",
-        "user",
-        "status",
-    )  # Fields to display in the admin list view
-    list_filter = ("role", "status")  # Filters for the list view
-    search_fields = ("role", "user__username", "status")  # Search functionality
-    # autocomplete_fields = ("user",)
+# @admin.register(LeaveStatusPermission)
+# class LeaveStatusPermissionAdmin(admin.ModelAdmin):
+#     list_display = (
+#         "role",
+#         "user",
+#         "status",
+#     )  # Fields to display in the admin list view
+#     list_filter = ("role", "status")  # Filters for the list view
+#     search_fields = ("role", "user__username", "status")  # Search functionality
+#     # autocomplete_fields = ("user",)
 
 
 class PersonalDetailAdmin(admin.ModelAdmin):
@@ -676,11 +660,11 @@ class NotificationAdmin(admin.ModelAdmin):
 admin.site.register(Notification, NotificationAdmin)
 
 
-@admin.register(LeaveDayChoiceAdjustment)
-class LeaveDayChoiceAdjustmentAdmin(admin.ModelAdmin):
-    list_display = ("start_day_choice", "end_day_choice", "adjustment_value")
-    list_filter = ("start_day_choice", "end_day_choice")
-    search_fields = ("start_day_choice", "end_day_choice")
+# @admin.register(LeaveDayChoiceAdjustment)
+# class LeaveDayChoiceAdjustmentAdmin(admin.ModelAdmin):
+#     list_display = ("start_day_choice", "end_day_choice", "adjustment_value")
+#     list_filter = ("start_day_choice", "end_day_choice")
+#     search_fields = ("start_day_choice", "end_day_choice")
 
 
 @admin.register(Logo)
@@ -746,16 +730,16 @@ class MaritalStatusAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
 
 
-@admin.register(LeaveDay)
-class LeaveDayAdmin(admin.ModelAdmin):
-    list_display = ("leave_application", "date", "is_full_day")
-    list_filter = ("is_full_day", "date")
-    search_fields = (
-        "leave_application__applicationNo",
-        "leave_application__appliedBy__username",
-    )
-    date_hierarchy = "date"
-    ordering = ("-date",)
+# @admin.register(LeaveDay)
+# class LeaveDayAdmin(admin.ModelAdmin):
+#     list_display = ("leave_application", "date", "is_full_day")
+#     list_filter = ("is_full_day", "date")
+#     search_fields = (
+#         "leave_application__applicationNo",
+#         "leave_application__appliedBy__username",
+#     )
+#     date_hierarchy = "date"
+#     ordering = ("-date",)
 
 
 @admin.register(WishingCard)

@@ -20,16 +20,16 @@ from django.http import JsonResponse
 
 FORMS = [
     ("user", CustomUserForm),
-    ("personal", PersonalDetailsForm),
-    ("caddress", CorrespondingAddressForm),
-    ("paddress", PermanentAddressForm),
+    ("personal details", PersonalDetailsForm),
+    ("corresponding address", CorrespondingAddressForm),
+    ("permanent address", PermanentAddressForm),
 ]
 
 TEMPLATES = {
     "user": "hrms_app/wizard/user_form.html",
-    "personal": "hrms_app/wizard/personal_details_form.html",
-    "caddress": "hrms_app/wizard/caddress_form.html",
-    "paddress": "hrms_app/wizard/paddress_form.html",
+    "personal details": "hrms_app/wizard/personal_details_form.html",
+    "corresponding address": "hrms_app/wizard/caddress_form.html",
+    "permanent address": "hrms_app/wizard/paddress_form.html",
 }
 
 class UserCreationWizard(LoginRequiredMixin, SessionWizardView):

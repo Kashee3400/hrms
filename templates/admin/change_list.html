@@ -56,7 +56,7 @@
 {% endif %}
 
 {% block content %}
-    <div class="container-fluid">
+    <div class="px-0 container-fluid">
         <div class="table-settings">
             <div class="row align-items-center">
                 <div class="col col-md-8 col-lg-3 col-xl-8">
@@ -85,7 +85,7 @@
                     {% if cl.formset %}
                         <div>{{ cl.formset.management_form }}</div>
                     {% endif %}
-                    <div class="card card-body border-0 shadow table-wrapper table-responsive">
+                    <div class="card shadow-sm card-body border-0 shadow table-wrapper table-responsive">
                         {% block result_list %}
                             {% if action_form and actions_on_top and cl.show_admin_actions %}
                                 {% admin_actions %}
@@ -102,7 +102,7 @@
             <div class="col-md-2">
                 {% if cl.has_filters %}
                     {% block filters %}
-                        <div class="card card-body border-0 shadow table-wrapper table-responsive">
+                        <div class="card shadow-sm card-body border-0 shadow table-wrapper table-responsive">
                             <div class="card-header filter_card_header">
                                 <h5>{% trans 'Filter' %}</h5>
                             </div>

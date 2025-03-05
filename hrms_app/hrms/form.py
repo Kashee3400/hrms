@@ -1795,7 +1795,6 @@ class AvatarUpdateForm(forms.ModelForm):
             try:
                 # Open the image file using PIL (Pillow)
                 image = Image.open(avatar)
-
                 # Check if the image is square
                 if image.width != image.height:
                     raise ValidationError("The avatar must be a square image (equal width and height).")

@@ -28955,7 +28955,7 @@ div.tagsinput span.tag a {
   -webkit-align-items: center;
   align-items: center;
   white-space: nowrap;
-  padding: 10px 35px 10px 35px;
+  padding: 10px 10px 10px 10px;
   color: #484848;
   border-radius: 0px 20px 20px 0px;
   -webkit-transition-duration: 0.45s;
@@ -29079,10 +29079,10 @@ div.tagsinput span.tag a {
 .sidebar .nav .nav-item.nav-category {
   color: #404040;
   border-bottom: 1px solid rgba(255, 255, 255, 0.13);
-  margin: 0 30px;
+  margin: 0 10px;
   font-size: 11px;
   font-weight: 700;
-  padding: 20px 0px 5px 0px;
+  padding: 10px 0px 5px 0px;
   text-transform: uppercase;
 }
 
@@ -29124,7 +29124,7 @@ div.tagsinput span.tag a {
   margin-bottom: 0;
   margin-top: 0;
   list-style: none;
-  padding: 0.25rem 0 0 3.07rem;
+  padding: 0.25rem 0 0 1.07rem;
   background: #fff;
   padding-bottom: 12px;
 }
@@ -29133,7 +29133,7 @@ div.tagsinput span.tag a {
   padding: 0;
 }
 
-.sidebar .nav.sub-menu .nav-item::before {
+/* .sidebar .nav.sub-menu .nav-item::before {
   content: '';
   width: 5px;
   height: 5px;
@@ -29141,11 +29141,16 @@ div.tagsinput span.tag a {
   margin-top: 16px;
   border-radius: 50%;
   background: #b2b2b2;
+} */
+
+.sidebar .nav.sub-menu .nav-item::before {
+display: none;
 }
+
 
 .sidebar .nav.sub-menu .nav-item .nav-link {
   color: #484848;
-  padding: 0.7rem 1rem;
+  padding: 0.3rem 0.5rem;
   position: relative;
   font-size: 12px;
   line-height: 1;
@@ -29408,7 +29413,7 @@ div.tagsinput span.tag a {
   -moz-transition: width 0.25s ease;
   -ms-transition: width 0.25s ease;
   color: #6C7383;
-  padding-left: 3.5rem;
+  padding-left: 1.5rem;
   padding-right: 2.187rem;
   padding-top: 30px;
   padding-bottom: 25px;
