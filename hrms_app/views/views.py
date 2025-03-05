@@ -865,7 +865,7 @@ class EventDetailPageView(LoginRequiredMixin, UpdateView):
         reg_max_allowed = AppSetting.objects.filter(key="REGULARIZATION_MAX_HR").first()
         regularization_hr = (form.instance.to_date - form.instance.from_date).total_seconds() / 3600
         if form.instance.reg_status != settings.MIS_PUNCHING:
-            if not reg_max_allowed.beyond_policy and regularization_hr > reg_max_allowed.value:
+            if not reg_max_allowed.beyond_policy and regularization_hr > int(reg_max_allowed.value):
                 messages.error(
                     self.request,
                     _(f"You can only regularize up to {reg_max_allowed.value}) hrs."),
