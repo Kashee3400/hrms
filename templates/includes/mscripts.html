@@ -23,11 +23,15 @@
 <script type="text/javascript" charset="utf8" src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.53/vfs_fonts.js"></script>
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.html5.min.js"></script>
 <script type="text/javascript" charset="utf8" src="https://cdn.datatables.net/buttons/2.2.2/js/buttons.print.min.js"></script>
+
 <script>
   ;(function ($) {
     'use strict'
     $('select').select2({})
   })(jQuery)
+  $('.datepicker').datepicker({
+    uiLibrary: 'bootstrap5'
+  })
   $('.vDateField').each(function () {
     var fieldValue = $(this).val()
     // Ensure the fieldValue is not empty
