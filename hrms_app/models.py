@@ -2248,32 +2248,6 @@ class UserTour(models.Model):
         null=True,
     )
 
-    def clean(self):
-        if self.start_date > self.end_date:
-            raise ValidationError(_("End date must be after start date."))
-        if (
-            self.start_date == self.end_date
-            and self.start_time
-            and self.end_time
-            and self.start_time >= self.end_time
-        ):
-            raise ValidationError(
-                _("End time must be after start time on the same day.")
-            )
-        # Get today's date
-        today = now().date()
-
-        # New validation for approval type
-        if self.approval_type == settings.PRE_APPROVAL and self.start_date < today:
-            raise ValidationError(
-                _("For Pre Approval, the start date must be today or a future date.")
-            )
-
-        if self.approval_type == settings.POST_APPROVAL and self.start_date >= today:
-            raise ValidationError(
-                _("For Post Approval, the start date must be in the past.")
-            )
-            
     def __str__(self):
         return f"Tour {self.id} by {self.applied_by.username}"
 

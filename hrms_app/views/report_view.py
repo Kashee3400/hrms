@@ -255,12 +255,13 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
         form = AttendanceReportFilterForm(self.request.GET)
         if form.is_valid():
             # Get filtered data and generate HTML table
-            table_data = self._get_filtered_table_data(form.cleaned_data)
+            table_data = self._get_filtered_table_data(form.cleaned_data,self.request.GET.get("q",""))
             context.update(
                 {
                     "html_table": table_data,
                     "form": form,
                     "urls": self._get_breadcrumb_urls(),
+                    "query":self.request.GET.get("q","")
                 }
             )
         else:
@@ -269,13 +270,14 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
         context["title"] = self.title
         return context
 
-    def _get_filtered_table_data(self, form_data):
+    def _get_filtered_table_data(self, form_data,query):
         """Generate HTML table data based on form filters."""
         return get_monthly_presence_html_table(
             converted_from_datetime=form_data.get("from_date"),
             converted_to_datetime=form_data.get("to_date"),
-            is_active=form_data.get("active") == "on",
+            is_active=form_data.get("active"),
             location=form_data.get("location"),
+            query=query,
         )
 
     def _get_breadcrumb_urls(self):
@@ -296,7 +298,7 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
 
     def _export_table_data(self, form_data):
         """Export filtered table data to an Excel file."""
-        table_data = self._get_filtered_table_data(form_data)
+        table_data = self._get_filtered_table_data(form_data,self.request.GET.get("q",""))
 
         # Convert HTML table to DataFrame
         df = pd.read_html(table_data)[0]  # Assuming only one table in HTML content

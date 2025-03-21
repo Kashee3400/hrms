@@ -182,7 +182,7 @@ class AttendanceLogAdmin(admin.ModelAdmin):
         "applied_by__username",
         "applied_by__last_name",
     ]
-    list_filter = ["start_date", "end_date"]
+    list_filter = ["start_date", "end_date","att_status"]
     actions = ["approve_attendance"]
 
     def color_representation(self, obj):
@@ -728,18 +728,6 @@ class MaritalStatusAdmin(admin.ModelAdmin):
     search_fields = ("marital_status",)
     list_filter = ("is_active",)
     readonly_fields = ("created_at",)
-
-
-# @admin.register(LeaveDay)
-# class LeaveDayAdmin(admin.ModelAdmin):
-#     list_display = ("leave_application", "date", "is_full_day")
-#     list_filter = ("is_full_day", "date")
-#     search_fields = (
-#         "leave_application__applicationNo",
-#         "leave_application__appliedBy__username",
-#     )
-#     date_hierarchy = "date"
-#     ordering = ("-date",)
 
 
 @admin.register(WishingCard)

@@ -2,7 +2,14 @@ from django.contrib.auth import get_user_model
 from collections import defaultdict
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Prefetch
-from hrms_app.models import Holiday,AttendanceLog,AttendanceLogHistory,LeaveDay,UserTour
+from hrms_app.models import (
+    Holiday,
+    AttendanceLog,
+    AttendanceLogHistory,
+    LeaveDay,
+    UserTour,
+)
+
 User = get_user_model()
 import pandas as pd
 from django.utils.timezone import make_aware, localtime, utc
@@ -10,16 +17,15 @@ from datetime import datetime, timedelta
 from itertools import chain
 from django.conf import settings
 
+
 def get_monthly_presence_html_table(
-    converted_from_datetime, converted_to_datetime, is_active, location
+    converted_from_datetime, converted_to_datetime, is_active, location, query
 ):
     monthly_presence_data = generate_monthly_presence_data_detailed(
-        converted_from_datetime, converted_to_datetime, is_active, location
+        converted_from_datetime, converted_to_datetime, is_active, location,query
     )
-    converted_from_datetime = datetime.strptime(converted_from_datetime, "%Y-%m-%d")
-    converted_to_datetime = datetime.strptime(converted_to_datetime, "%Y-%m-%d")
     date_range = [
-        (converted_from_datetime + timedelta(days=day)).date()
+        (converted_from_datetime + timedelta(days=day))
         for day in range((converted_to_datetime - converted_from_datetime).days + 1)
     ]
 
@@ -33,8 +39,14 @@ def get_monthly_presence_html_table(
         + "".join(f'<th class="sticky-header">{header}</th>' for header in headers)
         + "</tr></thead><tbody>"
     )
-
     users = User.objects.filter(is_active=is_active).select_related("personal_detail")
+    if query:
+        users = users.filter(
+            Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(username__icontains=query)
+        )
+
     for user in users:
         emp_code = user.personal_detail.employee_code
         if emp_code in monthly_presence_data:
@@ -123,8 +135,11 @@ def get_style(row_type, cell_data):
     return ""
 
 
+from django.db.models import Q
+
+
 def generate_monthly_presence_data_detailed(
-    converted_from_datetime, converted_to_datetime, is_active, location
+    converted_from_datetime, converted_to_datetime, is_active, location,query
 ):
     monthly_presence_data = defaultdict(lambda: defaultdict(dict))
     employees = (
@@ -132,32 +147,60 @@ def generate_monthly_presence_data_detailed(
         .prefetch_related(Prefetch("personal_detail", to_attr="personal_detail_cache"))
         .order_by("first_name")
     )
-    if location:
-        employees = employees.filter(device_location_id=location).order_by("first_name")
+    if query:
+        employees = employees.filter(
+            Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+            | Q(username__icontains=query)
+        )
 
+    if location:
+        employees = employees.filter(
+            device_location__in=location.values_list("id", flat=True)
+        ).order_by("first_name")
     leaves = LeaveDay.objects.filter(
+        Q(
+            leave_application__startDate__date__range=[
+                converted_from_datetime,
+                converted_to_datetime,
+            ]
+        )
+        | Q(
+            leave_application__endDate__date__range=[
+                converted_from_datetime,
+                converted_to_datetime,
+            ]
+        )
+        | Q(
+            leave_application__startDate__date__lte=converted_from_datetime,
+            leave_application__endDate__date__gte=converted_to_datetime,
+        ),
         leave_application__appliedBy__in=employees.values_list("id", flat=True),
         leave_application__status=settings.APPROVED,
-        leave_application__endDate__range=[
-            converted_from_datetime,
-            converted_to_datetime,
-        ],
     ).select_related("leave_application__appliedBy__personal_detail")
 
     logs = AttendanceLog.objects.filter(
-        applied_by__in=employees,
-        start_date__range=[converted_from_datetime, converted_to_datetime],
+        Q(start_date__date__range=[converted_from_datetime, converted_to_datetime])
+        | Q(end_date__date__range=[converted_from_datetime, converted_to_datetime]),
+        Q(
+            start_date__date__lte=converted_from_datetime,
+            end_date__date__gte=converted_to_datetime,
+        ),
+        applied_by__in=employees.values_list("id", flat=True),
     ).select_related("applied_by__personal_detail")
 
+    # User Tours
     all_tours = UserTour.objects.filter(
-        applied_by__in=employees,
+        Q(start_date__range=[converted_from_datetime, converted_to_datetime])
+        | Q(end_date__range=[converted_from_datetime, converted_to_datetime])
+        | Q(
+            start_date__lte=converted_from_datetime, end_date__gte=converted_to_datetime
+        ),
+        applied_by__in=employees.values_list("id", flat=True),
         status=settings.APPROVED,
-        start_date__range=[converted_from_datetime, converted_to_datetime],
     ).select_related("applied_by__personal_detail")
 
     holidays = get_payroll_date_holidays(converted_from_datetime, converted_to_datetime)
-    converted_from_datetime = datetime.strptime(converted_from_datetime, "%Y-%m-%d")
-    converted_to_datetime = datetime.strptime(converted_to_datetime, "%Y-%m-%d")
     process_sundays_and_holidays(
         employees,
         holidays,
@@ -170,7 +213,6 @@ def generate_monthly_presence_data_detailed(
     process_tours(all_tours, monthly_presence_data)
 
     return monthly_presence_data
-
 
 
 def process_logs(logs, monthly_presence_data):
@@ -340,7 +382,7 @@ def process_sundays_and_holidays(
     converted_to_datetime,
 ):
     sundays = {
-        (converted_from_datetime + timedelta(days=day)).date().strftime("%Y-%m-%d")
+        (converted_from_datetime + timedelta(days=day)).strftime("%Y-%m-%d")
         for day in range((converted_to_datetime - converted_from_datetime).days + 1)
         if (converted_from_datetime + timedelta(days=day)).weekday() == 6
     }

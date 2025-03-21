@@ -57,7 +57,7 @@
 {% endblock %}
 
 {% block content %}
-{% render_breadcrumb 'Detailed Attendance Report' urls %}
+{% comment %} {% render_breadcrumb 'Detailed Attendance Report' urls %} {% endcomment %}
   <div class="bg-light my-2">
     <form method="get">
       <div class="row m-2">
@@ -70,11 +70,26 @@
         <div class="col-md-3 col-12 mb-2">{{ form.active.label_tag }} {{ form.active }}</div>
         <!-- Buttons: Filter, Clear Filter, Export -->
         <div class="col-md-3 col-12 mb-2">
+          <div class="input-group">
+            <input 
+              type="text" 
+              class="form-control px-3 py-2" 
+              name="q" 
+              value="{{ query }}" 
+              placeholder="Search users..."
+            />
+            <span class="input-group-text bg-primary text-white">
+              <i class="fa-solid fa-magnifying-glass"></i>
+            </span>
+          </div>
+        </div>
+        <div class="col-md-3 col-12 mb-2">
           <button type="submit" class="btn btn-sm btn-primary"><span class="mif-filter"></span> Filter</button>
-          <a class="btn btn-sm btn-secondary" href="{% url 'calendar' %}">Clear Filter</a>
+          <a class="btn btn-sm btn-secondary" href="{% url 'detailed_attendance_report' %}">Clear Filter</a>
           <button type="submit" name="export" value="true" class="btn btn-sm btn-success"><span class="mif-file-excel"></span> Export to Excel</button>
         </div>
       </div>
+    
     </form>
   </div>
   <div class="bg-white my-2 p-2">

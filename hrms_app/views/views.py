@@ -1446,7 +1446,7 @@ class ApplyTourView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
         return self.render_to_response(self.get_context_data(form=form))
 
 
-class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class TourApplicationDetailView(LoginRequiredMixin, UpdateView):
     model = UserTour
     template_name = "hrms_app/tour_application_detail.html"
     context_object_name = "tour_application"
@@ -1459,27 +1459,7 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         if not request.user.is_authenticated:
             return self.handle_no_permission()
 
-        # Perform the permission check
-        if not self.test_func():
-            raise PermissionDenied(_("You do not have permission to access this page."))
-
         return super().dispatch(request, *args, **kwargs)
-
-    def test_func(self):
-        # Determine the required permission dynamically based on the HTTP method
-        if self.request.method in ["GET"]:
-            permission_required = (
-                f"{self.model._meta.app_label}.view_{self.model._meta.model_name}"
-            )
-        elif self.request.method in ["POST", "PUT", "PATCH"]:
-            permission_required = (
-                f"{self.model._meta.app_label}.change_{self.model._meta.model_name}"
-            )
-        else:
-            # Default to a custom permission, if needed
-            permission_required = getattr(self, "permission_required", None)
-
-        return self.request.user.has_perm(permission_required)
 
     def get_object(self, queryset=None):
         tour_application = super().get_object(queryset)
@@ -1565,14 +1545,12 @@ class TourApplicationDetailView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
         )
 
 
-class TourApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class TourApplicationUpdateView(LoginRequiredMixin, UpdateView):
     model = UserTour
     form_class = TourForm
     template_name = "hrms_app/apply-tour.html"
     permission_required = "hrms_app.change_usertour"
 
-    def test_func(self):
-        return self.request.user.has_perm(self.permission_required)
 
     def get_object(self, queryset=None):
         return get_object_or_404(UserTour, slug=self.kwargs.get("slug"))
@@ -1608,6 +1586,8 @@ class TourApplicationUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateV
             )
         messages.success(self.request, "Tour status updated successfully.")
         return response
+    def form_invalid(self, form, msg=None):
+        return self.render_to_response(self.get_context_data(form=form))
 
     def get_success_url(self):
         return reverse_lazy(

@@ -718,7 +718,30 @@ class TourForm(forms.ModelForm):
         for field_name, field in self.fields.items():
             field.required = True
 
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date = cleaned_data.get("end_date")
+        start_time = cleaned_data.get("start_time")
+        end_time = cleaned_data.get("end_time")
+        approval_type = cleaned_data.get("approval_type")
 
+        if start_date and end_date:
+            if start_date > end_date:
+                raise ValidationError(_("End date must be after start date."))
+            if (
+                start_date == end_date
+                and start_time
+                and end_time
+                and start_time >= end_time
+            ):
+                raise ValidationError(_("End time must be after start time on the same day."))
+        today = now().date()
+        if approval_type == settings.PRE_APPROVAL and start_date < today:
+            raise ValidationError(_("For Pre Approval, the start date must be today or a future date."))
+        if approval_type == settings.POST_APPROVAL and start_date >= today:
+            raise ValidationError(_("For Post Approval, the start date must be in the past."))
+        return cleaned_data
 class BillForm(forms.ModelForm):
     class Meta:
         model = Bill

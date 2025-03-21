@@ -96,6 +96,15 @@
             {% endif %}
             <form id="tour-update-form" method="post">
               {% csrf_token %}
+            
+              {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                  {% for error in form.non_field_errors %}
+                    <p class="mb-0">{{ error }}</p>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            
               <div class="row">
                 <div class="col-12 mb-3">
                   <div class="form-group">
@@ -110,6 +119,7 @@
                     {% endif %}
                   </div>
                 </div>
+            
                 {% if not is_manager %}
                   <div class="col-md-6 mb-3">
                     <label for="{{ form.extended_end_date.id_for_label }}">{{ form.extended_end_date.label }}</label>
@@ -120,10 +130,12 @@
                     {{ form.extended_end_time }}
                   </div>
                 {% endif %}
+            
                 <div class="col-12 mb-3">
                   <label for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
                   {{ form.reason }}
                 </div>
+            
                 <div class="col-12 d-flex gap-2">
                   <button type="button" class="btn btn-sm btn-primary" onclick="$('#updateDialog').modal('show')">
                     <i class="fas fa-check-circle"></i>
@@ -133,6 +145,7 @@
                       Submit Request
                     {% endif %}
                   </button>
+            
                   {% if not is_manager %}
                     <a type="button" class="btn btn-sm btn-danger" href="{{ delete_url }}">{% trans 'Delete' %}</a>
                     {% if tour_application.status == 'pending' %}
@@ -142,6 +155,7 @@
                 </div>
               </div>
             </form>
+            
           </div>
         </div>
         <!-- Update Modal -->
