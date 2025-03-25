@@ -93,21 +93,32 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             half_status = leave_type.half_day_short_code
 
             # Handle "CL" leave type
+            # Handle "CL" leave type 
             if leave_status == "CL":
                 if log_date in holiday_days:
-                    attendance_data[employee_id][log_date] = [
-                        {
-                            "status": "",
-                            "color": holiday_days[log_date]["color"],
-                        }
-                    ]
+                    # If FL already exists, retain it
+                    existing_status = attendance_data[employee_id].get(log_date, [])
+                    if any(entry.get("status") == "FL" for entry in existing_status):
+                        attendance_data[employee_id][log_date] = existing_status  # Retain FL
+                    else:
+                        attendance_data[employee_id][log_date] = [
+                            {
+                                "status": "",
+                                "color": holiday_days[log_date]["color"],
+                            }
+                        ]
                 elif log_date.weekday() == 6:  # Sunday
-                    attendance_data[employee_id][log_date] = [
-                        {
-                            "status": "OFF",
-                            "color": "#CCCCCC",
-                        }
-                    ]
+                    # If OFF is already set, retain it
+                    existing_status = attendance_data[employee_id].get(log_date, [])
+                    if any(entry.get("status") == "OFF" for entry in existing_status):
+                        attendance_data[employee_id][log_date] = existing_status  # Retain OFF
+                    else:
+                        attendance_data[employee_id][log_date] = [
+                            {
+                                "status": "OFF",
+                                "color": "#CCCCCC",
+                            }
+                        ]
                 else:
                     attendance_data[employee_id][log_date] = [
                         {
@@ -121,7 +132,7 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
                     entry.get("status") == "FL"
                     for entry in attendance_data[employee_id].get(log_date, [])
                 ):
-                    attendance_data[employee_id][log_date] = []
+                    attendance_data[employee_id][log_date] = []  # Clear the list
 
                 attendance_data[employee_id][log_date] = [
                     {

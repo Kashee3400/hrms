@@ -22,7 +22,7 @@ def get_monthly_presence_html_table(
     converted_from_datetime, converted_to_datetime, is_active, location, query
 ):
     monthly_presence_data = generate_monthly_presence_data_detailed(
-        converted_from_datetime, converted_to_datetime, is_active, location,query
+        converted_from_datetime, converted_to_datetime, is_active, location, query
     )
     date_range = [
         (converted_from_datetime + timedelta(days=day))
@@ -139,7 +139,7 @@ from django.db.models import Q
 
 
 def generate_monthly_presence_data_detailed(
-    converted_from_datetime, converted_to_datetime, is_active, location,query
+    converted_from_datetime, converted_to_datetime, is_active, location, query
 ):
     monthly_presence_data = defaultdict(lambda: defaultdict(dict))
     employees = (
@@ -181,14 +181,9 @@ def generate_monthly_presence_data_detailed(
 
     logs = AttendanceLog.objects.filter(
         Q(start_date__date__range=[converted_from_datetime, converted_to_datetime])
-        | Q(end_date__date__range=[converted_from_datetime, converted_to_datetime]),
-        Q(
-            start_date__date__lte=converted_from_datetime,
-            end_date__date__gte=converted_to_datetime,
-        ),
-        applied_by__in=employees.values_list("id", flat=True),
-    ).select_related("applied_by__personal_detail")
-
+        |Q(end_date__date__range=[converted_from_datetime, converted_to_datetime]),
+    ).filter(applied_by__in=employees.values_list("id", flat=True)).select_related("applied_by__personal_detail")
+    print(logs)
     # User Tours
     all_tours = UserTour.objects.filter(
         Q(start_date__range=[converted_from_datetime, converted_to_datetime])
