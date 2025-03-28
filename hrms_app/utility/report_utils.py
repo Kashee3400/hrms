@@ -239,12 +239,9 @@ def process_logs(logs, monthly_presence_data):
                 if parsed_out_time.tzinfo is None
                 else parsed_out_time
             )
-
             # Convert to local timezone and format
             in_time = localtime(parsed_in_time).strftime("%I:%M")
-            out_time = localtime(parsed_out_time).strftime("%I:%M")
-
-            # Other fields from history
+            out_time = localtime(parsed_out_time).strftime("%I:%M")  if history.previous_data["reg_status"] != "mis punching" else ""
             status = history.previous_data["att_status_short_code"]
             duration = history.previous_data["duration"]
         else:

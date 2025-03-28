@@ -768,3 +768,22 @@ class CorrespondingAddressAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "user__first_name", "user__last_name", "address_line_1", "state", "zipcode")
     list_filter = ("state",)
     ordering = ("user",)
+
+
+class LeaveDayAdmin(admin.ModelAdmin):
+    list_display = ['leave_application','date','is_full_day']
+    search_fields =  ['leave_application__appliedBy__username']
+
+admin.site.register(LeaveDay,LeaveDayAdmin)
+
+
+@admin.register(AttendanceLogAction)
+class AttendanceLogActionAdmin(admin.ModelAdmin):
+    list_display = ("log", "action_by", "action", "timestamp")
+    list_filter = ("action", "timestamp")
+    search_fields = ("action_by_name", "action_by_email", "action")
+    readonly_fields = ("timestamp",)
+
+    def get_queryset(self, request):
+        """Optimize queryset by selecting related fields"""
+        return super().get_queryset(request).select_related("log", "action_by")
