@@ -9,7 +9,7 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import transaction, IntegrityError
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta,time
 import uuid
 from django.core.validators import MinValueValidator
 from django.contrib.auth import get_user_model
@@ -83,6 +83,7 @@ class CustomUser(AbstractUser):
             "Specify the location where this device is located. Example: MCC or Cluster office location."
         ),
     )
+    is_personal_email_verified = models.BooleanField(default=False)
 
     def __str__(self):
         return self.get_full_name()
@@ -808,7 +809,7 @@ class ShiftTiming(models.Model):
 
     def __str__(self):
         return (
-            f"{self.start_time.strftime('%H:%M')} - {self.end_time.strftime('%H:%M')}"
+            f'{self.start_time.strftime("%I:%M %p")} - {self.end_time.strftime("%I:%M %p")}'
         )
 
     def save(self, *args, **kwargs):
@@ -893,7 +894,7 @@ class EmployeeShift(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.employee.username}: {self.shift_timing}"
+        return f"{self.shift_timing}"
 
     def clean(self):
         if self.employee.shifts.filter(shift_timing=self.shift_timing).exists():
@@ -2950,3 +2951,234 @@ class WishingCard(models.Model):
         db_table = 'tbl_wishing_card'
         verbose_name = _('Wishing Card')
         verbose_name_plural = _('Wishing Cards')
+
+
+class HRAnnouncement(models.Model):
+    class AnnouncementType(models.TextChoices):
+        GENERAL = 'general', _('General')
+        POLICY = 'policy', _('Policy Update')
+        EVENT = 'event', _('Event')
+        HOLIDAY = 'holiday', _('Holiday Notice')
+        ALERT = 'alert', _('Urgent/Alert')
+
+    title = models.CharField(
+        max_length=255,
+        verbose_name=_("Title"),
+        help_text=_("Short and clear title of the announcement.")
+    )
+
+    content = models.TextField(
+        verbose_name=_("Content"),
+        help_text=_("Full description or body of the announcement.")
+    )
+
+    type = models.CharField(
+        max_length=20,
+        choices=AnnouncementType.choices,
+        default=AnnouncementType.GENERAL,
+        verbose_name=_("Type"),
+        help_text=_("Category/type of the announcement for filtering.")
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At")
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name=_("Last Updated")
+    )
+
+    start_date = models.DateField(
+        default=timezone.now,
+        verbose_name=_("Start Date"),
+        help_text=_("Date from which the announcement becomes visible.")
+    )
+
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name=_("End Date"),
+        help_text=_("Date after which the announcement is no longer shown. Leave blank for indefinite.")
+    )
+
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Only active announcements will be shown to users.")
+    )
+
+    audience_roles = models.ManyToManyField(
+        'auth.Group',
+        blank=True,
+        verbose_name=_("Audience Roles"),
+        help_text=_("Limit visibility to specific user groups/roles.")
+    )
+
+    pinned = models.BooleanField(
+        default=False,
+        verbose_name=_("Pin Announcement"),
+        help_text=_("Pinned announcements appear at the top.")
+    )
+
+    def clean(self):
+        if self.end_date and self.end_date < self.start_date:
+            raise ValidationError({'end_date': _("End date cannot be earlier than start date.")})
+
+    def is_visible(self):
+        """Return True if the announcement is active and within the date range."""
+        today = timezone.now().date()
+        return (
+            self.is_active and
+            self.start_date <= today and
+            (self.end_date is None or today <= self.end_date)
+        )
+
+    def short_content(self, length=100):
+        """Return a shortened version of content for previews."""
+        return (self.content[:length] + '...') if len(self.content) > length else self.content
+
+    def __str__(self):
+        return f"{self.title} ({self.get_type_display()})"
+
+    class Meta:
+        db_table = "tbl_announcement"
+        verbose_name = _("HR Announcement")
+        verbose_name_plural = _("HR Announcements")
+        ordering = ['-pinned', '-start_date', '-created_at']
+
+
+from django.core.validators import RegexValidator
+class EmailOTP(models.Model):
+    """
+    Stores OTPs for email verification purposes.
+    """
+
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="email_otps",
+        verbose_name=_("User"),
+        help_text=_("The user this OTP is associated with.")
+    )
+
+    email = models.EmailField(
+        verbose_name=_("Email Address"),
+        help_text=_("The email address to which the OTP was sent.")
+    )
+
+    otp = models.CharField(
+        max_length=6,
+        verbose_name=_("OTP"),
+        validators=[
+            RegexValidator(r'^\d{6}$', message=_("OTP must be a 6-digit number."))
+        ],
+        help_text=_("The one-time password sent to the email.")
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name=_("Created At"),
+        help_text=_("The timestamp when the OTP was generated.")
+    )
+
+    verified = models.BooleanField(
+        default=False,
+        verbose_name=_("Is Verified"),
+        help_text=_("Indicates whether the OTP was successfully verified.")
+    )
+
+    class Meta:
+        verbose_name = _("Email OTP")
+        verbose_name_plural = _("Email OTPs")
+        indexes = [
+            models.Index(fields=["user", "email"]),
+            models.Index(fields=["otp"]),
+            models.Index(fields=["created_at"]),
+        ]
+        ordering = ["-created_at"]
+        unique_together = ("email", "otp")
+
+    def __str__(self):
+        return f"OTP for {self.email} ({'verified' if self.verified else 'pending'})"
+
+    def is_expired(self, expiry_minutes=10):
+        """
+        Check if the OTP is expired based on the expiry time.
+        """
+        return timezone.now() > self.created_at + timezone.timedelta(minutes=expiry_minutes)
+class OfficeClosure(models.Model):
+    """
+    Represents days when the office is closed (full day or partial).
+    """
+    FULL_DAY = 'full'
+    HALF_DAY = 'half'
+    CUSTOM = 'custom'
+
+    CLOSURE_TYPE_CHOICES = [
+        (FULL_DAY, 'Full Day'),
+        (HALF_DAY, 'Half Day'),
+        (CUSTOM, 'Custom'),
+    ]
+
+    date = models.DateField(
+        unique=True,
+        verbose_name="Closure Date",
+        help_text="Date when the office was closed"
+    )
+    closure_type = models.CharField(
+        max_length=10,
+        choices=CLOSURE_TYPE_CHOICES,
+        verbose_name="Type of Closure",
+        help_text="Was it a full-day, half-day (e.g., post-lunch), or custom closure?"
+    )
+    short_code = models.CharField(
+        max_length=10,
+        verbose_name="Short Cde",
+        help_text="Used to denote the attendance",
+        default="SR"
+    )
+    reason = models.TextField(
+        verbose_name="Reason for Closure",
+        help_text="Provide a short explanation for the closure"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Created At",
+        help_text="Timestamp when this entry was created"
+    )
+
+    class Meta:
+        db_table = 'tbl_office_closer'
+        verbose_name = "Office Closure"
+        verbose_name_plural = "Office Closures"
+        ordering = ['-date']
+        indexes = [
+            models.Index(fields=['date']),
+        ]
+
+    def __str__(self):
+        return f"{self.date} - {self.get_closure_type_display()} - {self.reason[:30]}"
+
+    def is_closed_after_time(self, check_time: time = time(13, 0)) -> bool:
+        """
+        Check if the office is considered closed after a given time.
+        """
+        if self.closure_type == self.FULL_DAY:
+            return True
+        elif self.closure_type == self.HALF_DAY and check_time >= time(13, 0):
+            return True
+        return False
+
+    @classmethod
+    def is_office_closed(cls, date: 'datetime.date', current_time: time = None) -> bool:
+        """
+        Class-level method to determine if office was closed on a date,
+        and optionally if it was closed after a specific time.
+        """
+        try:
+            closure = cls.objects.get(date=date)
+            return closure.is_closed_after_time(current_time) if current_time else True
+        except cls.DoesNotExist:
+            return False

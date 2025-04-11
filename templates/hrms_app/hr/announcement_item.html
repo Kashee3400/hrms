@@ -1,0 +1,23 @@
+<li class="list-group-item d-flex align-items-start flex-column {{ type_class }}">
+  <div class="fw-bold d-flex w-100 justify-content-between">
+    <span class="text-truncate">{{ type_icon }} {{ announcement.title }}</span>
+    <div class="d-flex align-items-center gap-2">
+      {% if announcement.pinned %}
+        <span class="badge bg-light text-dark">📌</span>
+      {% endif %}
+
+      {% if user.is_superuser or user.is_staff %}
+        <a href="{% url 'announcement-update' announcement.id %}" class="text-primary" title="Edit">✏️</a>
+        <a href="{% url 'generic_delete' model_name='HRAnnouncement' pk=announcement.pk %}?next={{ request.path }}" class="text-danger" title="Delete">🗑️</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="text-muted small">
+    {{ announcement.start_date }}
+    {% if announcement.end_date %}
+      &ndash; {{ announcement.end_date }}
+    {% endif %}
+  </div>
+  <div class="text-truncate mt-1">{{ announcement.short_content|default:announcement.content|truncatechars:100|safe }}</div>
+</li>

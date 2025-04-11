@@ -27,10 +27,8 @@
                 <span class="text-danger">*</span> <!-- Red asterisk for required fields -->
               {% endif %}
             </label>
-            
             <!-- Add ID for jQuery to target fields -->
             {{ field}}
-            
             {% if field.help_text %}
               <small class="form-text text-muted">{{ field.help_text }}</small>
             {% endif %}
@@ -43,7 +41,6 @@
             {% endif %}
           </div>
         {% endfor %}        
-
       </div>
     </div>
   </div>

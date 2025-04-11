@@ -7,6 +7,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
+from hrms_app.utility.leave_utils import LeavePolicyManager,LeaveStatsManager
 from django.template import loader
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -725,7 +726,7 @@ class TourForm(forms.ModelForm):
         start_time = cleaned_data.get("start_time")
         end_time = cleaned_data.get("end_time")
         approval_type = cleaned_data.get("approval_type")
-
+        
         if start_date and end_date:
             if start_date > end_date:
                 raise ValidationError(_("End date must be after start date."))
@@ -735,13 +736,21 @@ class TourForm(forms.ModelForm):
                 and end_time
                 and start_time >= end_time
             ):
-                raise ValidationError(_("End time must be after start time on the same day."))
+                raise ValidationError(
+                    _("End time must be after start time on the same day.")
+                )
         today = now().date()
         if approval_type == settings.PRE_APPROVAL and start_date < today:
-            raise ValidationError(_("For Pre Approval, the start date must be today or a future date."))
+            raise ValidationError(
+                _("For Pre Approval, the start date must be today or a future date.")
+            )
         if approval_type == settings.POST_APPROVAL and start_date >= today:
-            raise ValidationError(_("For Post Approval, the start date must be in the past."))
+            raise ValidationError(
+                _("For Post Approval, the start date must be in the past.")
+            )
         return cleaned_data
+
+
 class BillForm(forms.ModelForm):
     class Meta:
         model = Bill
@@ -773,9 +782,6 @@ class LeaveTypeForm(forms.ModelForm):
         }
 
 
-from hrms_app.utility.leave_utils import LeavePolicyManager
-
-
 class CustomFileInput(forms.ClearableFileInput):
     template_name = "widgets/custom_file_input.html"  # Path to your custom template
 
@@ -803,11 +809,24 @@ class LeaveApplicationForm(forms.ModelForm):
             "reason",
         ]
         widgets = {
-            "startDate": forms.TextInput(
-                attrs={"class": "form-control datepicker"},
+            "startDate": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
             ),
-            "endDate": forms.TextInput(
-                attrs={"class": "form-control datepicker"},
+            "endDate": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                range_from="startDate",
+                attrs={"class": "form-control"},
             ),
             "startDayChoice": forms.Select(
                 attrs={"class": "leaveOption id_startDayChoice"}
@@ -838,14 +857,8 @@ class LeaveApplicationForm(forms.ModelForm):
         leave_type = kwargs.pop("leave_type", None)
         super(LeaveApplicationForm, self).__init__(*args, **kwargs)
         leave_type_obj = LeaveType.objects.filter(id=leave_type).first()
-        if self.user:
-            leave_balance = LeaveBalanceOpenings.objects.filter(
-                user=self.user, leave_type_id=leave_type
-            ).first()
-            if leave_balance:
-                self.fields["balanceLeave"].initial = (
-                    leave_balance.remaining_leave_balances
-                )
+        stats = LeaveStatsManager(self.user, leave_type_obj)
+        self.fields["balanceLeave"].initial = stats.get_remaining_balance(year=timezone.now().year)
         if leave_type_obj.leave_type_short_code == "SL":
             self.fields["attachment"] = forms.FileField(
                 required=False,  # Initially not required
@@ -855,13 +868,13 @@ class LeaveApplicationForm(forms.ModelForm):
                 ),
                 widget=forms.ClearableFileInput(
                     attrs={
-                        "class": "form-control-file",  # Bootstrap class
-                        "accept": ".pdf,.jpg,.jpeg,.png",  # Restrict file types
+                        "class": "form-control-file",
+                        "accept": ".pdf,.jpg,.jpeg,.png",
                     }
                 ),
             )
         self.fields["leave_type"].initial = leave_type
-
+        
     def clean(self):
         cleaned_data = super().clean()
         startDate = cleaned_data.get("startDate")
@@ -871,17 +884,24 @@ class LeaveApplicationForm(forms.ModelForm):
         startDayChoice = cleaned_data.get("startDayChoice")
         endDayChoice = cleaned_data.get("endDayChoice")
         attachment = cleaned_data.get("attachment")
+        print(cleaned_data)
+
         if not startDate or not endDate:
-            raise ValidationError(_("Start Date and End Date are required."))
+            if not startDate:
+                self.add_error("startDate", _("Start Date is required."))
+            if not endDate:
+                self.add_error("endDate", _("End Date is required."))
+            return cleaned_data
+
         if startDate > endDate:
-            raise ValidationError(_("End Date must be after Start Date."))
-        if leaveTypeId.leave_type_short_code == "SL" and usedLeave > 3:
+            self.add_error("endDate", _("End Date must be after Start Date."))
+            return cleaned_data
+
+        if leaveTypeId and leaveTypeId.leave_type_short_code == "SL" and usedLeave and int(usedLeave) > 3:
             if not attachment:
-                raise ValidationError(
-                    _(
-                        "Attachment is required for Sick Leave applications exceeding 3 days."
-                    )
-                )
+                self.add_error("attachment", _("Attachment is required for Sick Leave applications exceeding 3 days."))
+        
+        exclude_application_id=self.instance.id if self.instance and self.instance.pk else None
         try:
             policy_manager = LeavePolicyManager(
                 user=self.user,
@@ -890,11 +910,12 @@ class LeaveApplicationForm(forms.ModelForm):
                 end_date=endDate,
                 start_day_choice=startDayChoice,
                 end_day_choice=endDayChoice,
+                bookedLeave=usedLeave,
+                exclude_application_id=exclude_application_id
             )
             policy_manager.validate_policies()
         except ValidationError as e:
-            raise ValidationError(f"{str(e)}")
-
+            self.add_error(None, str(e))
         return cleaned_data
 
 
@@ -935,41 +956,23 @@ class AttendanceLogFilterForm(forms.ModelForm):
 
 
 class AttendanceLogForm(forms.ModelForm):
-
     class Meta:
         model = AttendanceLog
         fields = [
             "reg_status",
-            "status",
-            "start_date",
-            "end_date",
-            "duration",
             "from_date",
             "to_date",
+            "status",
             "reg_duration",
             "reason",
         ]
         widgets = {
-            "reg_status": forms.Select(attrs={"class": "form-control"}),
+            "reg_status": forms.RadioSelect(attrs={"class": "form-input"}),
             "duration": TimePickerInput(
                 attrs={"class": "form-control", "readonly": "readonly"}
             ),
             "reg_duration": forms.TextInput(
                 attrs={"class": "form-control", "readonly": "readonly"}
-            ),
-            "start_date": DateTimePickerInput(
-                options={
-                    "showClear": True,
-                    "showClose": True,
-                    "useCurrent": False,
-                },
-                format="%Y-%m-%d %H:%M",
-                attrs={"class": "form-control ", "readonly": "readonly"},
-            ),
-            "end_date": DateTimePickerInput(
-                range_from="start_date",
-                format="%Y-%m-%d %H:%M",
-                attrs={"class": "form-control", "readonly": "readonly"},
             ),
             "from_date": DateTimePickerInput(
                 options={
@@ -993,19 +996,30 @@ class AttendanceLogForm(forms.ModelForm):
             "reason": forms.Textarea(attrs={"class": "form-control"}),
             "status": forms.Select(attrs={"class": "form-control"}),
         }
-
+        
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         self.is_manager = kwargs.pop("is_manager", False)
         super(AttendanceLogForm, self).__init__(*args, **kwargs)
+        self.fields["reg_status"].required = True
 
+        current_value = None
+        if self.instance and self.instance.pk:
+            current_value = self.instance.reg_status
+            if current_value == settings.MIS_PUNCHING:
+                self.fields["reg_status"].choices = [
+                    (settings.MIS_PUNCHING, _("Mis Punching")),
+                ]
+            else:
+                    self.fields["reg_status"].choices = [
+                        (settings.EARLY_GOING, _("Early Going")),
+                        (settings.LATE_COMING, _("Late Coming")),
+                    ]
+                    
         if not self.is_manager:
-            # Employee: render only the reason field and make it editable
             self.fields.pop("status", None)
             self.fields["reason"].required = True
-
         else:
-            # Manager: make reason read-only and status editable
             self.fields["status"].required = True
             self.make_field_readonly("reason")
 
@@ -1141,7 +1155,6 @@ class TourStatusUpdateForm(forms.ModelForm):
                         if choice[0]
                         in [
                             settings.EXTENDED,
-                            settings.COMPLETED,
                             settings.PENDING_CANCELLATION,
                         ]
                     ]
@@ -1233,6 +1246,7 @@ class CustomUserForm(forms.ModelForm):
             "last_name",
             "email",
             "official_email",
+            "is_active",
             "is_rm",
             "reports_to",
             "device_location",
@@ -1277,19 +1291,11 @@ class CustomUserForm(forms.ModelForm):
         }
 
     def save(self, commit=True):
-        # If an instance exists, update the existing user.
         user = super().save(commit=False)
-
-        # Ensure that we are saving the existing user if one exists.
         if commit:
-            user.save()  # This saves the existing user or creates a new one if not present
-
-            # Set the permissions for the user
+            user.save()
             user.user_permissions.set(self.cleaned_data["permissions"])
-
-            # Set the groups for the user
             user.groups.set(self.cleaned_data["groups"])
-
         return user
 
 
@@ -1319,7 +1325,7 @@ class PersonalDetailsForm(forms.ModelForm):
             "employee_code": _("Employee Code"),
             "avatar": _("Avatar"),
             "mobile_number": _("Mobile Number"),
-            "alt_mobile_number": _("Alternate Mobile Number"),
+            "alt_mobile_number": _("Emergency Contact Number"),
             "gender": _("Gender"),
             "designation": _("Designation"),
             "official_mobile_number": _("Official Mobile Number"),
@@ -1334,7 +1340,7 @@ class PersonalDetailsForm(forms.ModelForm):
 
         # Define widgets with placeholders
         widgets = {
-            "avatar": forms.FileInput(
+            "avatar": forms.ClearableFileInput(
                 attrs={
                     "class": "form-control",
                     "type": "file",
@@ -1386,43 +1392,132 @@ class PersonalDetailsForm(forms.ModelForm):
                     "placeholder": _("Enter CTC"),
                 }
             ),
-            "birthday": forms.DateInput(
-                attrs={
-                    "class": "form-control datepicker",
-                    "placeholder": _("Select Birthday"),
-                }
+            "birthday": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
             ),
-            "ann_date": forms.DateInput(
-                attrs={
-                    "class": "form-control datepicker",
-                    "placeholder": _("Select Anniversary Date"),
-                }
+            "marriage_ann": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
             ),
-            "doj": forms.DateInput(
-                attrs={
-                    "class": "form-control datepicker",
-                    "placeholder": _("Select Date of Joining"),
-                }
+            "doj": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
             ),
-            "dol": forms.DateInput(
-                attrs={
-                    "class": "form-control datepicker",
-                    "placeholder": _("Select Date of Leaving"),
-                }
+            "dol": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
             ),
-            "dor": forms.DateInput(
-                attrs={
-                    "class": "form-control datepicker",
-                    "placeholder": _("Select Date of Resignation"),
-                }
+            "dor": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
             ),
-            "dof": forms.DateInput(
-                attrs={
-                    "class": "form-control datepicker",
-                    "placeholder": _("Select Date of Final Settlement"),
-                }
+            "dof": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
             ),
         }
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        if not avatar and self.instance.pk:
+            return self.instance.avatar
+        return avatar
+
+class EmployeePersonalDetailForm(forms.ModelForm):
+    class Meta:
+        model = PersonalDetails
+        fields = [
+            "avatar",
+            "mobile_number",
+            "alt_mobile_number",
+            "official_mobile_number",
+            "gender",
+            "designation",
+            "religion",
+            "marital_status",
+            "marriage_ann",
+        ]
+        
+        labels = {
+            "avatar": _("Avatar"),
+            "mobile_number": _("Mobile Number"),
+            "alt_mobile_number": _("Emergency Contact Number"),
+            "gender": _("Gender"),
+            "designation": _("Designation"),
+            "official_mobile_number": _("Official Mobile Number"),
+            "religion": _("Religion"),
+            "marital_status": _("Marital Status"),
+            "marriage_ann": _("Marriage Anniversary Date")
+        }
+
+        widgets = {
+            "avatar": forms.ClearableFileInput(
+                attrs={
+                    "class": "form-control",
+                    "type": "file",
+                    "data-role": "file",
+                    "data-mode": "drop",
+                }
+            ),
+            "mobile_number": forms.TextInput(attrs={"class": "form-control", "placeholder": _("Enter Mobile Number")}),
+            "alt_mobile_number": forms.TextInput(attrs={"class": "form-control", "placeholder": _("Enter Emergency Contact Number")}),
+            "gender": forms.Select(attrs={"class": "form-control"}),
+            "designation": forms.Select(attrs={"class": "form-control"}),
+            "official_mobile_number": forms.TextInput(attrs={"class": "form-control", "placeholder": _("Enter Official Mobile Number")}),
+            "religion": forms.Select(attrs={"class": "form-control", "data-role": "select"}),
+            "marital_status": forms.Select(attrs={"class": "form-control"}),
+            "marriage_ann": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # This makes the avatar field optional even if it's required on the model
+        self.fields['avatar'].required = False
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get("avatar")
+        if not avatar and self.instance.pk:
+            return self.instance.avatar
+        return avatar
 
 
 class PermanentAddressForm(forms.ModelForm):
@@ -1591,7 +1686,6 @@ class AttendanceReportFilterForm(forms.Form):
 
 
 class LeaveReportFilterForm(forms.Form):
-    # Define the form fields
     location = forms.ModelMultipleChoiceField(
         queryset=OfficeLocation.objects.all(),
         required=False,
@@ -1601,8 +1695,8 @@ class LeaveReportFilterForm(forms.Form):
     year = forms.DateField(
         widget=DatePickerInput(
             options={
-                "format": "YYYY",  # Only show the year
-                "viewMode": "years",  # Restrict the view to years
+                "format": "YYYY",
+                "viewMode": "years",
                 "showClear": True,
                 "showClose": True,
                 "useCurrent": False,
@@ -1795,7 +1889,10 @@ class LeaveTransactionForm(forms.Form):
         else:
             raise ValueError("Either leave_balance or leave_type must be provided.")
 
+
 from PIL import Image
+
+
 class AvatarUpdateForm(forms.ModelForm):
     class Meta:
         model = PersonalDetails
@@ -1813,24 +1910,25 @@ class AvatarUpdateForm(forms.ModelForm):
 
     def clean_avatar(self):
         avatar = self.cleaned_data.get("avatar")
-
         if avatar:
             try:
                 # Open the image file using PIL (Pillow)
                 image = Image.open(avatar)
                 # Check if the image is square
                 if image.width != image.height:
-                    raise ValidationError("The avatar must be a square image (equal width and height).")
+                    raise ValidationError(
+                        "The avatar must be a square image (equal width and height)."
+                    )
 
                 # Check minimum size requirement
                 # if image.width < 512 or image.height < 512:
                 #     raise ValidationError("The avatar must be at least 512x512 pixels.")
 
             except Exception:
-                raise ValidationError("Invalid image file. Please upload a valid image.")
-
+                raise ValidationError(
+                    "Invalid image file. Please upload a valid image."
+                )
         return avatar
-
 class LeaveBalanceForm(forms.Form):
     user = forms.ModelChoiceField(
         queryset=User.objects.all(),
@@ -1935,3 +2033,69 @@ class LeaveBalanceForm(forms.Form):
                 )
             )
         return cleaned_data
+
+
+from django import forms
+
+
+class HRAnnouncementAdminForm(forms.ModelForm):
+
+    class Meta:
+        model = HRAnnouncement
+        fields = [
+            "title",
+            "type",
+            "start_date",
+            "end_date",
+            "is_active",
+            "pinned",
+            "audience_roles",
+            "content",
+        ]
+        widgets = {
+            "title": forms.TextInput(
+                attrs={"class": "form-control"},
+            ),
+            "is_active": forms.CheckboxInput(
+                attrs={
+                    "class": "form-check-input",
+                    "type": "checkbox",
+                }
+            ),
+            "pinned": forms.CheckboxInput(
+                attrs={
+                    "class": "form-check-input",
+                    "type": "checkbox",
+                }
+            ),
+            "start_date": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                attrs={"class": "form-control"},
+            ),
+            "end_date": DatePickerInput(
+                options={
+                    "format": "YYYY-MM-DD",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
+                range_from="start_date",
+                attrs={"class": "form-control"},
+            ),
+            "to_destination": forms.TextInput(
+                attrs={"class": "form-control"},
+            ),
+            "content": CKEditor5Widget(config_name="extends"),
+        }
+        labels = {
+            "title": _("Title"),
+            "start_date": _("Start Date"),
+            "end_date": _("End Date"),
+            "content": _("Content"),
+            "pinned":_("Pinned")
+        }

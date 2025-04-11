@@ -17,11 +17,6 @@ urlpatterns = [
         views.LeaveApplicationListView.as_view(),
         name="leave-application-list",
     ),
-    path(
-        "save-column-preferences/",
-        views.save_column_preferences,
-        name="save_column_preferences",
-    ),
     path("", include(site.get_urls())),
     path("ckeditor5/", include("django_ckeditor_5.urls")),
     path("schedule/", include("schedule.urls")),

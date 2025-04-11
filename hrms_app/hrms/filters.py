@@ -1,8 +1,9 @@
 import django_filters
-from hrms_app.models import AttendanceLog
+from hrms_app.models import AttendanceLog,UserTour
 from django.db.models import Q
 from django.contrib.auth import get_user_model
-
+from django.conf import settings
+from django import forms
 User = get_user_model()
 
 
@@ -11,26 +12,42 @@ class AttendanceLogFilter(django_filters.FilterSet):
     class Meta:
         model = AttendanceLog
         fields = {
-            'status': ['exact'],
-            'reg_status': ['exact'],
             'applied_by': ['exact'],
-            'is_regularisation': ['exact'],
+            'reg_status': ['exact'],
             'is_submitted': ['exact']
         }
 
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
 
-        if not (user and (user.is_superuser or user.is_staff)):
-            self.filters.pop('is_regularisation', None)
-            # self.filters.pop('is_submitted', None)
-        if user:
-            if user.is_superuser or user.is_staff:
-                self.filters['applied_by'].queryset = User.objects.all()
-            elif hasattr(user, 'employees'):
-                self.filters['applied_by'].queryset = User.objects.filter(
-                    Q(id=user.id) | Q(id__in=user.employees.all())
-                )
-            else:
-                self.filters['applied_by'].queryset = User.objects.filter(id=user.id)
+class UserTourFilter(django_filters.FilterSet):
+    status = django_filters.ChoiceFilter(
+        choices=settings.TOUR_STATUS_CHOICES,
+        empty_label="All",
+        default=settings.PENDING,
+        label="Status",
+    )
+    from_date = django_filters.DateFilter(
+        field_name="start_date",
+        lookup_expr="gte",
+        label="From Date",
+        widget=forms.DateInput(attrs={"type": "date"})
+    )
+    to_date = django_filters.DateFilter(
+        field_name="end_date",
+        lookup_expr="lte",
+        label="To Date",
+        widget=forms.DateInput(attrs={"type": "date"})
+    )
+    search = django_filters.CharFilter(method="filter_search", label="Search")
+
+    class Meta:
+        model = UserTour
+        fields = ["status", "from_date", "to_date", "search"]
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(applied_by__username__icontains=value)
+            | Q(applied_by__first_name__icontains=value)
+            | Q(applied_by__last_name__icontains=value)
+            | Q(from_destination__icontains=value)
+            | Q(to_destination__icontains=value)
+        )

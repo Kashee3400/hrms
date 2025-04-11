@@ -604,3 +604,10 @@ class LogASerializer(serializers.ModelSerializer):
         pandas_index = ['start_date']
         pandas_scatter_coord = ['duration']
         pandas_scatter_header = ['applied_by']
+
+class SendOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class VerifyOTPSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    otp = serializers.CharField(max_length=6)

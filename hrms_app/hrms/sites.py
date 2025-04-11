@@ -1,6 +1,6 @@
 from django.urls import path
 from django.shortcuts import render
-from hrms_app.views import views,api_views,auth_views,report_view
+from hrms_app.views import views,api_views,auth_views,report_view,announcement
 
 
 class CustomSite:
@@ -49,11 +49,11 @@ site.register_view('reset-password-confirm/<uidb64>/<token>/', auth_views.Passwo
 site.register_view('password-change/', views.ChangePasswordView, name='password_change')
 site.register_view('password-change-done/', auth_views.PasswordChangeDoneView, name='password_change_done')
 site.register_view('leave-tracker/', views.LeaveTrackerView, name='leave_tracker')
-site.register_view('', views.EventPageView, name='calendar')
+site.register_view('calendar/', views.EventPageView, name='calendar')
+site.register_view('', views.DashboardView, name='home')
 site.register_view('attendance/<slug:slug>/', views.EventDetailPageView, name='event_detail')
 site.register_view('attendance-log/<slug:slug>/', views.AttendanceLogActionView, name='attendance_log_action')
 site.register_view('attendance-regularization/', views.AttendanceLogListView, name='regularization')
-site.register_view('profile/', views.ProfilePageView, name='profile')
 site.register_view('leave/apply/<int:leave_type>/', views.ApplyOrUpdateLeaveView, name='apply_leave_with_id')
 site.register_view('leave/edit/<slug:slug>/', views.ApplyOrUpdateLeaveView, name='update_leave')
 site.register_view('leave/<slug:slug>/', views.LeaveApplicationDetailView, name='leave_application_detail')
@@ -69,6 +69,7 @@ site.register_view('tour/<slug:slug>/pdf', views.GenerateTourPDFView, name='gene
 # site.register_view('tour/<slug:slug>/pdf/', views.UploadBillView, name='upload_bill')
 site.register_view('employees/', views.EmployeeListView, name='employees')
 site.register_view('employee-profile/<int:pk>/', views.EmployeeProfileView, name='employee_profile')
+site.register_view('personal-detail-update/<int:pk>/', views.PersonalDetailUpdateView, name='personal_detail_update')
 
 ###############################################################################################
 ######                                Reports URLS                                        #####
@@ -76,3 +77,6 @@ site.register_view('employee-profile/<int:pk>/', views.EmployeeProfileView, name
 site.register_view('attendance-report/', report_view.MonthAttendanceReportView, name='attendance_report')
 site.register_view('detailed-attendance-report/', report_view.DetailedMonthlyPresenceView, name='detailed_attendance_report')
 site.register_view('leave-balance-report/', report_view.LeaveBalanceReportView, name='leave_balance_report')
+site.register_view('announcements/', announcement.AnnouncementView, name='announcements')
+site.register_view('announcements/<int:pk>', announcement.AnnouncementView, name='announcement-update')
+

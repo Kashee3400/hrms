@@ -20,145 +20,13 @@ from django.utils.timezone import make_aware, localtime, utc
 from datetime import datetime, timedelta
 from itertools import chain
 from hrms_app.utility.report_utils import *
-
+from hrms_app.utility import attendanceutils as at
 
 class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/present_absent_report.html"
     permission_denied_message = _("U are not authorized to access the page")
     title = _("Attendance Report")
 
-    def _map_attendance_data(
-        self,
-        attendance_logs,
-        leave_logs,
-        holidays,
-        tour_logs,
-        start_date_object,
-        end_date_object,
-    ):
-        attendance_data = defaultdict(lambda: defaultdict(list))
-        total_days = (end_date_object - start_date_object).days + 1
-        sundays = {
-            start_date_object + timedelta(days=i)
-            for i in range(total_days)
-            if (start_date_object + timedelta(days=i)).weekday() == 6
-        }
-
-        # Map holidays by date
-        holiday_days = {
-            holiday.start_date: {
-                "status": holiday.short_code,
-                "color": holiday.color_hex,
-            }
-            for holiday in holidays
-        }
-
-        # Process attendance logs
-        for log in attendance_logs:
-            employee_id = log.applied_by.id
-            log_date = localtime(log.start_date).date()
-            attendance_data[employee_id][log_date] = [
-                {
-                    "status": log.att_status_short_code,
-                    "color": log.color_hex or "#000000",
-                }
-            ]
-
-        # Process tour logs
-        for log in tour_logs:
-            daily_durations = calculate_daily_tour_durations(
-                log.start_date, log.start_time, log.end_date, log.end_time
-            )
-            for date, short_code, _ in daily_durations:
-                employee_id = log.applied_by.id
-                attendance_data[employee_id][date] = [
-                    {
-                        "status": short_code,
-                        "color": "#06c1c4",
-                    }
-                ]
-                holiday_days.pop(date, None)
-
-        # Add holidays to attendance data
-        for employee_id, employee_data in attendance_data.items():
-            for holiday_date, holiday_info in holiday_days.items():
-                employee_data[holiday_date] = [holiday_info]
-
-        # Process leave logs
-        for log in leave_logs:
-            employee_id = log.leave_application.appliedBy.id
-            log_date = log.date
-            leave_type = log.leave_application.leave_type
-            leave_status = leave_type.leave_type_short_code
-            half_status = leave_type.half_day_short_code
-
-            # Handle "CL" leave type
-            # Handle "CL" leave type 
-            if leave_status == "CL":
-                if log_date in holiday_days:
-                    # If FL already exists, retain it
-                    existing_status = attendance_data[employee_id].get(log_date, [])
-                    if any(entry.get("status") == "FL" for entry in existing_status):
-                        attendance_data[employee_id][log_date] = existing_status  # Retain FL
-                    else:
-                        attendance_data[employee_id][log_date] = [
-                            {
-                                "status": "",
-                                "color": holiday_days[log_date]["color"],
-                            }
-                        ]
-                elif log_date.weekday() == 6:  # Sunday
-                    # If OFF is already set, retain it
-                    existing_status = attendance_data[employee_id].get(log_date, [])
-                    if any(entry.get("status") == "OFF" for entry in existing_status):
-                        attendance_data[employee_id][log_date] = existing_status  # Retain OFF
-                    else:
-                        attendance_data[employee_id][log_date] = [
-                            {
-                                "status": "OFF",
-                                "color": "#CCCCCC",
-                            }
-                        ]
-                else:
-                    attendance_data[employee_id][log_date] = [
-                        {
-                            "status": leave_status if log.is_full_day else half_status,
-                            "color": leave_type.color_hex or "#FF0000",
-                        }
-                    ]
-            else:
-                # Handle other leave types
-                if any(
-                    entry.get("status") == "FL"
-                    for entry in attendance_data[employee_id].get(log_date, [])
-                ):
-                    attendance_data[employee_id][log_date] = []  # Clear the list
-
-                attendance_data[employee_id][log_date] = [
-                    {
-                        "status": leave_status if log.is_full_day else half_status,
-                        "color": leave_type.color_hex or "#FF0000",
-                    }
-                ]
-
-        # Add "OFF" status for Sundays without any entries
-        for employee_id in attendance_data.keys():
-            for sunday in sundays:
-                if not attendance_data[employee_id][sunday.date()]:
-                    attendance_data[employee_id][sunday.date()] = [
-                        {
-                            "status": "OFF",
-                            "color": "#CCCCCC",  # Default color for "OFF"
-                        }
-                    ]
-
-        return attendance_data
-
-    def _get_days_in_month(self, start_date, end_date):
-        return [
-            start_date + timedelta(days=i)
-            for i in range((end_date - start_date).days + 1)
-        ]
 
     def _get_filtered_employees(self, location, active):
         employees = CustomUser.objects.filter(is_active=active)
@@ -185,21 +53,21 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
 
             active = True if active == "on" else False
             employees = self._get_filtered_employees(location, active)
-
-            attendance_logs = self._get_attendance_logs(
-                employees, converted_from_datetime, converted_to_datetime
+            employee_ids = employees.values_list("id",flat=True)
+            attendance_logs = at.get_attendance_logs(
+                employee_ids, converted_from_datetime, converted_to_datetime
             )
-            leave_logs = self._get_leave_logs(
-                employees, converted_from_datetime, converted_to_datetime
+            leave_logs = at.get_leave_logs(
+                employee_ids, converted_from_datetime, converted_to_datetime
             )
-            tour_logs = self._get_tour_logs(
-                employees, converted_from_datetime, converted_to_datetime
+            tour_logs = at.get_tour_logs(
+                employee_ids, converted_from_datetime, converted_to_datetime
             )
-            holidays = self._get_holiday_logs(
+            holidays = at.get_holiday_logs(
                 converted_from_datetime, converted_to_datetime
             )
 
-            attendance_data = self._map_attendance_data(
+            attendance_data = at.map_attendance_data(
                 attendance_logs=attendance_logs,
                 leave_logs=leave_logs,
                 holidays=holidays,
@@ -208,18 +76,16 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
                 end_date_object=converted_to_datetime,
             )
 
-            context["days_in_month"] = self._get_days_in_month(
+            context["days_in_month"] = at.get_days_in_month(
                 converted_from_datetime, converted_to_datetime
             )
             context["attendance_data"] = attendance_data
             context["employees"] = employees
         else:
             context["error"] = "Please select a location and date range."
-
         context["form"] = form
         context["title"] = self.title
         context["urls"] = self._get_breadcrumb_urls()
-
         return context
 
     def _get_breadcrumb_urls(self):
@@ -234,27 +100,7 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
         converted_to_datetime = make_aware(datetime.strptime(to_date, "%Y-%m-%d"))
         return converted_from_datetime, converted_to_datetime
 
-    def _get_holiday_logs(self, start_date, end_date):
-        return Holiday.objects.filter(start_date__range=[start_date, end_date])
 
-    def _get_attendance_logs(self, employees, start_date, end_date):
-        return AttendanceLog.objects.filter(
-            applied_by__in=employees, start_date__date__range=[start_date, end_date]
-        )
-
-    def _get_leave_logs(self, employees, start_date, end_date):
-        return LeaveDay.objects.filter(
-            leave_application__appliedBy__in=employees,
-            date__range=[start_date, end_date],
-            leave_application__status=settings.APPROVED,
-        )
-
-    def _get_tour_logs(self, employees, start_date, end_date):
-        return UserTour.objects.filter(
-            applied_by__in=employees,
-            start_date__range=[start_date, end_date],
-            status=settings.APPROVED,
-        )
 class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/present_absent_detailed_report.html"
     permission_denied_message = _("You are not authorized to access this page.")
@@ -328,7 +174,7 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
             response["Content-Disposition"] = f"attachment; filename={filename}"
             return response
 
-import os
+from django.core.cache import cache
 
 class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/leave_balance_report.html"
@@ -338,22 +184,20 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         date = timezone.now()
-        table = self.leave_balance_html_table(date.year)
-        # month_table= self.monthly_leave_report(date.month),
         form = LeaveReportFilterForm(self.request.GET)
         if form.is_valid():
             context.update(
                 {
                     "table": self._get_filtered_table_data(form_data=form.cleaned_data),
                     "form": form,
+                    "search_query" : self.request.GET.get("q", "").strip()
                 }
             )
-
+        else:
+            print(form.errors)
         context.update(
             {
                 "date": date,
-                "table": table,
-                # "month_table":month_table,
                 "urls": self._get_breadcrumb_urls(),
                 "form": form,
                 "title": self.title,
@@ -376,115 +220,93 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
                 return self._export_table_data(form.cleaned_data)
 
         return self.render_to_response(context)
-    
-    def _export_table_data(self, form_data):
-        """Export filtered table data to an Excel file."""
-        try:
-            table_data = self._get_filtered_table_data(form_data)
-            # Convert HTML table to DataFrame
-            df = pd.read_html(table_data)[0]  # Assuming only one table in HTML content
-            # Flatten MultiIndex columns if they exist
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = [" ".join(col).strip() for col in df.columns.values]
-            # Generate filename
-            filename = f"employee_leave_balance_report_{form_data['year']}.xlsx"
-            # Create an Excel writer object
-            with pd.ExcelWriter(filename, engine="xlsxwriter") as excel_writer:
-                df.to_excel(excel_writer, index=False, sheet_name="Leave Balance")
-            # Prepare the response with the Excel file
-            with open(filename, "rb") as excel_file:
-                response = HttpResponse(
-                    excel_file.read(),
-                    content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
-                response["Content-Disposition"] = f"attachment; filename={filename}"
-            # Clean up the temporary file
-            os.remove(filename)
-            return response
-        except Exception as e:
-            return HttpResponse("An error occurred while exporting the report.", status=500)
 
     def _get_filtered_table_data(self, form_data):
         """Generate HTML table data based on form filters."""
-        year=form_data.get("year") if form_data.get("year") is not None else now().year
-        
+        year=form_data.get("year") if form_data.get("year") is not None else now()
         return self.leave_balance_html_table(
-            year=year
+            year=year.year
         )
-
-    def _get_filtered_month_table_data(self, form_data):
-        """Generate HTML table data based on form filters."""
-        return self.monthly_leave_report(
-            year=form_data.get("year").year,
-            month=form_data.get("year").month,
-        )
-
 
     def leave_balance_html_table(self, year=None):
-        year = year if year else timezone.now().year
-        current_month = timezone.now().month  # Get the current month
+        year = year or timezone.now().year
+        current_month = timezone.now().month
         months = settings.MONTHS
         columns = ["Employee Code", "Employee Name"]
         annual_headers = ["EL", "SL", "CL"]
         monthly_headers = ["EL", "SL", "CL", "LWP", "Closing EL", "Closing SL", "Closing CL"]
+        
+        cache_key = f"leave_balance_{year}_{current_month}"
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return cached_data
+        
+        table_html = self.generate_table_header(columns, annual_headers, months, monthly_headers,year)
+        employees,el_credits = self.get_leave_data(year, monthly_headers)
+        table_html += self.generate_table_rows(employees, annual_headers, monthly_headers, el_credits)
+        table_html += "</tbody></table></div>"
+        
+        cache.set(cache_key, table_html, timeout=3600)
+        return table_html
+    
 
-        # HTML Table Header
-        table_html = """
+    def generate_table_header(self, columns, annual_headers, months, monthly_headers, year):
+        # Get leave transactions for the given year and extract unique months where EL credits exist
+        el_credit_months = set(
+            LeaveTransaction.objects.filter(
+                transaction_date__year=year,
+                leave_balance__leave_type__leave_type_short_code="EL"
+            ).values_list("transaction_date__month", flat=True)
+        )
+
+        header_html = f"""
         <div class="table-wrapper">
         <table border="1">
         <thead>
             <tr>
-                <th>{}</th>
+                <th>{"</th><th>".join(columns)}</th>
                 <th colspan="3">Annual Balance</th>
-        """.format("</th>\n<th>".join(columns))
+        """
 
-        # Add monthly columns up to the current month
-        for month in months[:current_month]:
-            table_html += f'    <th colspan="7">{month}</th>\n'
+        # Add all 12 months with EL Credit where applicable
+        for i, month in enumerate(months, start=1):  # Start indexing from 1 for month comparison
+            colspan = 8 if i in el_credit_months else 7  # Extra column if EL Credit exists
+            header_html += f'<th colspan="{colspan}">{month}</th>'
 
-        # Add "EL Credit" column after March
-        if current_month >= 3:
-            table_html += '    <th style="background-color:#FFD700;">EL Credit</th>\n'
+        header_html += "</tr><tr><th></th><th></th>"
 
-        table_html += "    </tr>\n    <tr>\n<th></th>\n<th></th>\n"
+        # Add annual leave balance headers
+        header_html += ''.join(f'<th>{header}</th>' for header in annual_headers)
 
-        # Add headers for annual balance and monthly data
-        table_html += "".join(f"<th>{header}</th>" for header in annual_headers)
-        for month in months[:current_month]:
-            table_html += "".join(f"<th>{header}</th>" for header in monthly_headers)
+        # Add monthly headers dynamically
+        for i, month in enumerate(months, start=1):
+            header_html += ''.join(f'<th>{header}</th>' for header in monthly_headers)
+            if i in el_credit_months:
+                header_html += '<th style="background-color:#FFD700;">EL Credit</th>'  # Add EL Credit column
 
-        if current_month >= 3:
-            table_html += "    <th></th>\n"  # Empty header for EL Credit
+        header_html += "</tr></thead><tbody>"
 
-        table_html += "    </tr>\n</thead>\n<tbody>\n"
+        return header_html
 
-        # Fetch leave balances
+
+    def get_leave_data(self, year, monthly_headers):
+        # Fetch opening leave balances
+        print(year)
         leave_balance_openings = LeaveBalanceOpenings.objects.filter(
-            leave_type__leave_type_short_code__in=["EL", "SL", "CL"]
-        ).values(
-            "user_id",
-            "leave_type__leave_type_short_code",
-            "opening_balance",
-            "no_of_leaves",
-        )
+            leave_type__leave_type_short_code__in=["EL", "SL", "CL"],year=year,
+        ).values("user_id", "leave_type__leave_type_short_code", "opening_balance", "no_of_leaves")
 
-        # Store leave balances in a structured dictionary
-        leave_opening_dict = defaultdict(lambda: {"EL": {"opening_balance": 0, "no_of_leaves": 0},
-                                                "SL": {"opening_balance": 0, "no_of_leaves": 0},
-                                                "CL": {"opening_balance": 0, "no_of_leaves": 0}})
-        
+        # Structure leave opening balances
+        leave_opening_dict = defaultdict(lambda: {lt: {"opening_balance": 0, "no_of_leaves": 0} for lt in ["EL", "SL", "CL"]})
         for balance in leave_balance_openings:
-            user_id = balance["user_id"]
-            leave_type = balance["leave_type__leave_type_short_code"]
-            leave_opening_dict[user_id][leave_type] = {
+            leave_opening_dict[balance["user_id"]][balance["leave_type__leave_type_short_code"]] = {
                 "opening_balance": float(balance["opening_balance"] or 0),
                 "no_of_leaves": float(balance["no_of_leaves"] or 0)
             }
 
         # Search filter for employees
         search_query = self.request.GET.get("q", "").strip()
-        leave_summary = LeaveApplication.objects.filter(endDate__year=year,status=settings.APPROVED)
-
+        leave_summary = LeaveApplication.objects.filter(endDate__year=year, status=settings.APPROVED)
         if search_query:
             leave_summary = leave_summary.filter(
                 Q(appliedBy__first_name__icontains=search_query) |
@@ -492,100 +314,60 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
                 Q(appliedBy__username__icontains=search_query)
             )
 
-        # Aggregate leave usage and balance
-        leave_summary = (
-            leave_summary.values(
-                "endDate__month",
-                "leave_type__leave_type",
-                "appliedBy__id",
-                "appliedBy__username",
-                "appliedBy__first_name",
-                "appliedBy__last_name",
-            )
-            .annotate(total_used=Sum("usedLeave"), total_closing=Sum("balanceLeave"))
-            .order_by("endDate__month")
-        )
+        # Aggregate leave data
+        leave_summary = leave_summary.values(
+            "endDate__month", "leave_type__leave_type_short_code", "appliedBy__id", "appliedBy__username",
+            "appliedBy__first_name", "appliedBy__last_name"
+        ).annotate(total_used=Sum("usedLeave"), total_closing=Sum("balanceLeave"))
+
+        # Fetch EL Credit transactions & store in a dictionary (for fast lookup)
+        el_credit_transactions = LeaveTransaction.objects.filter(
+            transaction_date__year=year,
+            leave_balance__leave_type__leave_type_short_code="EL"
+        ).values("leave_balance__user_id", "transaction_date__month", "no_of_days_approved")
+        # Store EL Credit transactions by (user_id, month)
+        el_credit_dict = defaultdict(lambda: defaultdict(int))
+        for transaction in el_credit_transactions:
+            el_credit_dict[transaction["leave_balance__user_id"]][transaction["transaction_date__month"]] = transaction["no_of_days_approved"]
 
         employees = {}
-
         for leave in leave_summary:
             emp_id = leave["appliedBy__id"]
-            transaction = LeaveTransaction.objects.filter(
-                leave_balance__user_id=emp_id, transaction_date__month=current_month
-            ).last()
-
             if emp_id not in employees:
                 employees[emp_id] = {
                     "emp_code": leave["appliedBy__username"],
                     "emp_name": f"{leave['appliedBy__first_name']} {leave['appliedBy__last_name']}",
                     "annual_balance": leave_opening_dict[emp_id],
                     "monthly_data": {m: {key: 0 for key in monthly_headers} for m in range(1, 13)},
-                    "el_credit": transaction.no_of_days_approved if transaction is not None else 0,
+                    "el_credit": el_credit_dict[emp_id],  # Store EL Credit by month
                 }
-
             month = leave["endDate__month"]
-            leave_type = leave["leave_type__leave_type"]
-            total_used = leave["total_used"] or 0
-            total_closing = leave["total_closing"] or 0
+            leave_type = leave["leave_type__leave_type_short_code"]
+            employees[emp_id]["monthly_data"][month][leave_type] += leave["total_used"] or 0
+            employees[emp_id]["monthly_data"][month][f"Closing {leave_type}"] = leave["total_closing"] or 0
+        return employees, el_credit_dict
 
-            # Update employee monthly data
-            if "EL" in leave_type:
-                employees[emp_id]["monthly_data"][month]["EL"] += total_used
-                employees[emp_id]["monthly_data"][month]["Closing EL"] = total_closing
-            elif "SL" in leave_type:
-                employees[emp_id]["monthly_data"][month]["SL"] += total_used
-                employees[emp_id]["monthly_data"][month]["Closing SL"] = total_closing
-            elif "CL" in leave_type:
-                employees[emp_id]["monthly_data"][month]["CL"] += total_used
-                employees[emp_id]["monthly_data"][month]["Closing CL"] = total_closing
-            else:
-                employees[emp_id]["monthly_data"][month]["LWP"] += total_used
 
-        # Generate table rows
-        for emp in employees.values():
-            table_html += "    <tr>\n"
-            table_html += f'        <td>{emp["emp_code"]}</td>\n'
-            table_html += f'        <td>{emp["emp_name"]}</td>\n'
+    def generate_table_rows(self, employees, annual_headers, monthly_headers, el_credit_dict):
+        row_html = ""
+        for emp_id, emp in employees.items():
+            row_html += f'<tr><td>{emp["emp_code"]}</td><td>{emp["emp_name"]}</td>'
+            row_html += ''.join(f'<td style="background-color:#80008042">{emp["annual_balance"][bal]["opening_balance"]}</td>' for bal in annual_headers)
 
-            # Annual leave balance
-            table_html += "".join(
-                f'<td style="background-color:#80008042">{emp["annual_balance"][bal]["opening_balance"]}</td>'
-                for bal in ["EL", "SL", "CL"]
-            )
-
-            # Initialize opening balance for January
-            opening_balance = {key: emp["annual_balance"][key]["no_of_leaves"] for key in ["EL", "SL", "CL"]}
+            opening_balance = {key: emp["annual_balance"][key]["no_of_leaves"] for key in annual_headers}
 
             for month in range(1, 13):
-                if month > current_month:
-                    continue  # Skip future months
-
-                # Calculate closing balance
-                closing_balance = {
-                    "EL": opening_balance["EL"] - emp["monthly_data"][month]["EL"],
-                    "SL": opening_balance["SL"] - emp["monthly_data"][month]["SL"],
-                    "CL": opening_balance["CL"] - emp["monthly_data"][month]["CL"],
-                }
-
-                # Update monthly data with closing balance
-                emp["monthly_data"][month]["Closing EL"] = round(closing_balance["EL"], 2)
-                emp["monthly_data"][month]["Closing SL"] = round(closing_balance["SL"], 2)
-                emp["monthly_data"][month]["Closing CL"] = round(closing_balance["CL"], 2)
-
-                # Update opening balance for next month
+                closing_balance = {key: opening_balance[key] - emp["monthly_data"][month][key] for key in annual_headers}
+                for key in annual_headers:
+                    emp["monthly_data"][month][f"Closing {key}"] = round(closing_balance[key], 2)
                 opening_balance = closing_balance
 
-                # Add monthly data to the table
-                table_html += "".join(
-                    f"<td>{emp['monthly_data'][month][key]}</td>"
-                    for key in monthly_headers
-                )
+                row_html += ''.join(f'<td>{emp["monthly_data"][month][key]}</td>' for key in monthly_headers)
 
-            # Add "EL Credit" column if applicable
-            if current_month >= 3:
-                table_html += f'<td style="background-color:#FFD700;">{emp["el_credit"]}</td>\n'
+                # Dynamically add "EL Credit" column **only for months that have EL credit**
+                if month in el_credit_dict.get(emp_id, {}):
+                    row_html += f'<td style="background-color:#FFD700;">{el_credit_dict[emp_id][month]}</td>'
 
-            table_html += "    </tr>\n"
+            row_html += '</tr>'
 
-        table_html += "    </tbody>\n</table>\n</div>\n"
-        return table_html
+        return row_html

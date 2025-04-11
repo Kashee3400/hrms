@@ -5,6 +5,7 @@ from hrms_app.models import (
     AttendanceLog,
     UserTour,
     LeaveDayChoiceAdjustment,
+    LeaveBalanceOpenings,
 )
 from hrms_app.hrms.utils import get_non_working_days
 from django.conf import settings
@@ -107,11 +108,7 @@ def format_date(date):
     return formatted_date
 
 
-from django.core.exceptions import ValidationError
-from django.utils import timezone
-
 logger = logging.getLogger(__name__)
-from django.db.models import Q
 
 
 def filter_leaves(queryset, form):
@@ -146,7 +143,15 @@ def get_filtered_leaves(self, user, form):
 
 class LeavePolicyManager:
     def __init__(
-        self, user, leave_type, start_date, end_date, start_day_choice, end_day_choice
+        self,
+        user,
+        leave_type,
+        start_date,
+        end_date,
+        start_day_choice,
+        end_day_choice,
+        bookedLeave,
+        exclude_application_id=None
     ):
         self.user = user
         self.leave_type = leave_type
@@ -155,17 +160,13 @@ class LeavePolicyManager:
         self.end_date = end_date
         self.start_day_choice = start_day_choice
         self.end_day_choice = end_day_choice
-
-        # Calculate booked leave using the new function
-        self.booked_leave = calculate_total_leave_days(
-            start_date, end_date, start_day_choice, end_day_choice
-        )
+        self.booked_leave = bookedLeave
+        self.exclude_application_id = exclude_application_id
 
     def validate_policies(self):
         """
         Validates all leave policies applicable to the leave application.
         """
-
         self.validate_overlapping_leaves()
         self.validate_consecutive_leave_restrictions()
 
@@ -174,23 +175,20 @@ class LeavePolicyManager:
         elif self.leave_type.leave_type_short_code == "EL":
             self.apply_el_policy()
 
-    def validate_min_days(self):
-        if self.booked_leave < self.leave_type.min_days_limit:  # 1<0.5
-            raise ValidationError("Booked leave is less than the minimum days limit.")
-
     def validate_overlapping_leaves(self):
         """
         Checks for overlapping leave applications for the user.
         """
         overlapping_leaves = LeaveApplication.objects.filter(
             appliedBy=self.user,
-            endDate__date__range=(self.start_date.date(), self.end_date.date()),
+            startDate__lte=self.start_date, 
+            endDate__gte=self.start_date,
             status__in=[
                 settings.APPROVED,
                 settings.PENDING,
                 settings.PENDING_CANCELLATION,
             ],
-        )
+        ).exclude(id=self.exclude_application_id)
         if overlapping_leaves.exists():
             raise ValidationError(
                 "There is an overlapping leave application in the selected date range."
@@ -200,43 +198,42 @@ class LeavePolicyManager:
         """
         Applies Casual Leave specific policies.
         """
-        self.apply_min_notice_days_policy()
-        self.validate_min_days()
-        self.apply_max_days_limit_policy()
+        self.apply_min_notice_days_policy()  # this function checks the minimum notice day for that particular leave type
+        self.validate_min_days()  # this function checks the minimum days allowed for that particular leave type
+        self.apply_max_days_limit_policy()  # this function checks the maximum notice day for that particular leave type
+
+    def validate_min_days(self):
+        if float(self.booked_leave) < float(self.leave_type.min_days_limit):
+            raise ValidationError(
+                "Total day(s) leave is less than the minimum allowed days limit."
+            )
 
     def apply_el_policy(self):
         """
         Applies Earned Leave specific policies.
         """
         el_allowed_days = self.leave_type.allowed_days_per_year
-        el_min_days = self.leave_type.min_days_limit
-        el_max_days = self.leave_type.max_days_limit
         self.apply_min_notice_days_policy()
         if (
             not isinstance(self.booked_leave, (int, float))
             or self.booked_leave % 1 != 0
         ):
             raise ValidationError(
-                f"EL can only be applied for whole days. Fractional days like {self.booked_leave} are not allowed."
+                f"EL can only be applied for whole days. Half days like {self.booked_leave} are not allowed."
             )
-
-        if el_min_days and self.booked_leave < el_min_days:
-            raise ValidationError(
-                f"EL can be applied for a minimum of {el_min_days} days."
-            )
-        if el_max_days and self.booked_leave > el_max_days:
-            raise ValidationError(
-                f"EL can be applied for a maximum of {el_max_days} days."
-            )
-
-        current_fy_start, current_fy_end = get_current_financial_year()
+        self.validate_min_days()  # this function checks the minimum days allowed for that particular leave type
+        self.apply_max_days_limit_policy()  # this function checks the maximum notice day for that particular leave type
         el_application_count = LeaveApplication.objects.filter(
             leave_type__leave_type_short_code="EL",
             appliedBy=self.user,
-            startDate__gte=current_fy_start,
-            startDate__lte=current_fy_end,
-            status__in=[settings.APPROVED, settings.PENDING_CANCELLATION],
-        ).count()
+            startDate__gte=self.leave_type.leave_fy_start,
+            startDate__lte=self.leave_type.leave_fy_end,
+            status__in=[
+                settings.PENDING,
+                settings.APPROVED,
+                settings.PENDING_CANCELLATION,
+            ],
+        ).exclude(id=self.exclude_application_id).count()
 
         if el_application_count >= el_allowed_days:
             raise ValidationError(
@@ -248,12 +245,9 @@ class LeavePolicyManager:
         Applies minimum notice days policy for Casual Leave.
         """
         min_notice_days = self.leave_type.min_notice_days
-
-        # Skip the check if min_notice_days is None
         if min_notice_days is None:
             return
-
-        if (self.start_date.date() - timezone.now().date()).days < min_notice_days:
+        if (self.start_date.date() - timezone.now().date()).days < int(min_notice_days):
             raise ValidationError(
                 f"{self.leave_type.leave_type_short_code} should be applied at least {min_notice_days} days in advance."
             )
@@ -263,7 +257,9 @@ class LeavePolicyManager:
         Applies maximum days limit policy for Casual Leave.
         """
         max_days = self.leave_type.max_days_limit
-        if max_days is not None and self.booked_leave > max_days:
+        if max_days is None:
+            return
+        if float(self.booked_leave) > int(max_days):
             raise ValidationError(
                 f"{self.leave_type.leave_type_short_code} can be applied for a maximum of {max_days} days."
             )
@@ -280,14 +276,14 @@ class LeavePolicyManager:
                     settings.PENDING,
                     settings.PENDING_CANCELLATION,
                 ],
-                endDate__lt=self.start_date  # Only consider leaves that ended before new leave
-            )
-            .order_by("-endDate")  # Get the most recent leave before the new leave date
+                endDate__lt=self.start_date,
+            ).exclude(id=self.exclude_application_id)
+            .order_by("-endDate")
             .first()
         )
 
         if not last_leave:
-            return 
+            return
         last_leave_type = last_leave.leave_type
         last_end_date = (
             timezone.localtime(last_leave.endDate).date()
@@ -311,15 +307,12 @@ class LeavePolicyManager:
             days_between -= non_work_days
         if (
             self.leave_type in last_leave_type.restricted_after_leave_types.all()
-            and days_between <= 1
+            and days_between <= 0
         ):
             raise ValidationError(
                 f"You cannot apply for {self.leave_type} immediately after {last_leave_type}. "
                 f"Please choose a different leave type or wait a few days."
             )
-
-
-from django.utils import timezone
 
 
 def calculate_day_difference_btn_last_current_leave(
@@ -330,15 +323,13 @@ def calculate_day_difference_btn_last_current_leave(
     Uses database-stored adjustment values for flexibility.
     Ensures the result is always positive and handles timezone-aware dates.
     """
-    # Debugging: Log the initial inputs
     if last_leave_date > current_leave_date:
         last_leave_date, current_leave_date = current_leave_date, last_leave_date
-    # Calculate the total number of days between the dates
     total_days = (current_leave_date - last_leave_date).days
-    if last_end_day_choice == settings.FIRST_HALF:
+    if last_end_day_choice == settings.FIRST_HALF or current_start_day_choice == settings.SECOND_HALF:
         total_days -= 0.5
-    if current_start_day_choice == settings.SECOND_HALF:
-        total_days -= 0.5
+    elif current_start_day_choice == settings.FULL_DAY or last_end_day_choice == settings.FULL_DAY :
+        total_days -= 1
     final_days = max(float(total_days), 0.0)
     return final_days
 
@@ -366,7 +357,6 @@ def calculate_total_leave_days(start_date, end_date, start_day_choice, end_day_c
             ).adjustment_value
         except LeaveDayChoiceAdjustment.DoesNotExist:
             adjustment = 0
-
         total_days -= adjustment
         return float(total_days)
 
@@ -381,3 +371,71 @@ def get_current_financial_year():
         fy_start = datetime(current_year, 4, 1)
         fy_end = datetime(current_year + 1, 3, 31)
     return fy_start, fy_end
+
+
+from django.db.models import Sum
+from django.db.models.functions import TruncMonth
+
+
+class LeaveStatsManager:
+    def __init__(self, user, leave_type):
+        self.user = user
+        self.leave_type = leave_type
+
+    def get_on_hold_leave(self):
+        return (
+            LeaveApplication.objects.filter(
+                appliedBy=self.user, status="PENDING", leave_type=self.leave_type
+            ).aggregate(total=Sum("usedLeave"))["total"]
+            or 0
+        )
+
+    def get_approved_leave_total(self):
+        return (
+            LeaveApplication.objects.filter(
+                appliedBy=self.user, status="pending", leave_type=self.leave_type
+            ).aggregate(total=Sum("usedLeave"))["total"]
+            or 0
+        )
+
+    def get_el_applied_times(self):
+        el_application_count = LeaveApplication.objects.filter(
+            leave_type__leave_type_short_code=self.leave_type.leave_type_short_code,
+            appliedBy=self.user,
+            startDate__gte=self.leave_type.leave_fy_start,
+            startDate__lte=self.leave_type.leave_fy_end,
+            status__in=[
+                settings.PENDING,
+                settings.APPROVED,
+                settings.PENDING_CANCELLATION,
+            ],
+        ).count()
+        return el_application_count
+
+    def get_opening_balance(self, year):
+        record = LeaveBalanceOpenings.objects.filter(
+            user=self.user, leave_type=self.leave_type, year=year
+        ).first()
+        return record.remaining_leave_balances if record else 0
+
+    def get_remaining_balance(self, year):
+        return self.get_opening_balance(year=year) - self.get_approved_leave_total()
+
+    def get_monthly_report(self, year):
+        qs = (
+            LeaveApplication.objects.filter(
+                appliedBy=self.user,
+                status="APPROVED",
+                leave_type=self.leave_type,
+                startDate__year=year,
+            )
+            .annotate(month=TruncMonth("startDate"))
+            .values("month")
+            .annotate(total=Sum("usedLeave"))
+            .order_by("month")
+        )
+
+        report = defaultdict(lambda: 0)
+        for item in qs:
+            report[item["month"].strftime("%B")] = item["total"]
+        return dict(report)

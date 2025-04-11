@@ -1,0 +1,74 @@
+<div class="leave-grid">
+  {% for leave_balance in leave_balances %}
+    <div class="card leave-card shadow-sm border-0">
+      <div class="leave-header mb-3" style="border-left: 6px solid {{ leave_balance.color }}; padding-left: 10px;">
+        <div class="d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center">
+            <div class="icon-circle me-2" style="background-color: {{ leave_balance.color }};">
+              <i class="bi bi-calendar-check text-white"></i>
+            </div>
+            <span class="leave-title">{{ leave_balance.leave_type }}</span>
+          </div>
+          {% if leave_balance.total_balance == 0 %}
+            <span class="badge bg-danger pulse">No Balance</span>
+          {% elif leave_balance.total_balance <= 1 %}
+            <span class="badge bg-warning text-dark pulse">Low Balance</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Leave stats -->
+      <div class="leave-detail">
+        <p><i class="fas fa-list-check me-2 text-muted"></i>{% trans "Total Balance:" %}<strong>{{ leave_balance.balance }}</strong></p>
+        <p><i class="fas fa-hourglass-half me-2 text-muted"></i> {% trans "Remaining:" %} <strong>{{ leave_balance.total_balance }}</strong></p>
+        <p><i class="fas fa-pause-circle me-2 text-muted"></i> {% trans "On Hold:" %} <strong>{{ leave_balance.on_hold }}</strong></p>
+        <p><i class="fas fa-check-circle me-2 text-muted"></i> {% trans "Used Leave:" %} <strong>{{ leave_balance.used_leave }}</strong></p>
+      </div>
+
+      <!-- Pie Chart for Leave Balance -->
+      <div class="leave-chart text-center my-3">
+        <canvas id="leaveChart{{ leave_balance.pk }}" class="chartjs-render-monitor"></canvas>
+      </div>
+      
+      <!-- Apply Leave Button -->
+      <div class="leave-action text-center">
+        <a href="{{ leave_balance.url }}?next={{ request.path }}" class="btn btn-outline-primary btn-sm" style="border-color: {{ leave_balance.color }}; color: {{ leave_balance.color }};">Apply Leave <i class="fas fa-arrow-right ms-1"></i></a>
+      </div>
+    </div>
+  {% endfor %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    {% for leave_balance in leave_balances %}
+      var ctx = document.getElementById('leaveChart{{ leave_balance.pk }}');
+      if (ctx) {
+        // Prepare data for chart: used, remaining, and on hold
+        var usedBalance = {{ leave_balance.used_leave }};
+        var remainingBalance = {{ leave_balance.total_balance }};
+        var onHoldBalance = {{ leave_balance.on_hold }};
+        
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: ['Used', 'Remaining', 'On Hold'],
+            datasets: [{
+              data: [usedBalance, remainingBalance, onHoldBalance],
+              backgroundColor: ['#ff6666', '#66cc66', '#f0ad4e'], // Red, Green, and Yellow
+              borderWidth: 0
+            }]
+          },
+          options: {
+            cutout: '70%', // To make it a donut chart
+            plugins: {
+              legend: { display: false }
+            },
+            responsive: true, // Make the chart responsive
+            maintainAspectRatio: false // Allow resizing based on container
+          }
+        });
+      }
+    {% endfor %}
+  });
+</script>

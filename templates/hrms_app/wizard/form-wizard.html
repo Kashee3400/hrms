@@ -100,20 +100,21 @@
       $("#copyAddressCheckbox").change(function () {
         if ($(this).is(":checked")) {
           let userId = "{{ employee_obj.id }}";
-  
+          console.log(userId)
           $.ajax({
             url: `/get_corresponding_address/${userId}/`,
             type: "GET",
             dataType: "json",
             success: function (data) {
+              console.log(data)
               if (!data.error) {
                 // Populate form fields with fetched address data
-                $("#id_paddress-address_line_1").val(data.address_line_1);
-                $("#id_paddress-address_line_2").val(data.address_line_2);
-                $("#id_paddress-country").val(data.country);
-                $("#id_paddress-district").val(data.district);
-                $("#id_paddress-state").val(data.state);
-                $("#id_paddress-zipcode").val(data.zipcode);
+                $("#id_permanent-address-address_line_1").val(data.address_line_1);
+                $("#id_permanent-address-address_line_2").val(data.address_line_2);
+                $("#id_permanent-address-country").val(data.country);
+                $("#id_permanent-address-district").val(data.district);
+                $("#id_permanent-address-state").val(data.state);
+                $("#id_permanent-address-zipcode").val(data.zipcode);
               }
             },
             error: function () {
@@ -122,12 +123,12 @@
           });
         } else {
           // Clear the permanent address fields if unchecked
-          $("#id_paddress-address_line_1").val("");
-          $("#id_paddress-address_line_2").val("");
-          $("#id_paddress-country").val("");
-          $("#id_paddress-district").val("");
-          $("#id_paddress-state").val("");
-          $("#id_paddress-zipcode").val("");
+          $("#id_permanent-address-address_line_1").val("");
+          $("#id_permanent-address-address_line_2").val("");
+          $("#id_permanent-address-country").val("");
+          $("#id_permanent-address-district").val("");
+          $("#id_permanent-address-state").val("");
+          $("#id_permanent-address-zipcode").val("");
         }
       });
     });

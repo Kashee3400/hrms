@@ -9,8 +9,10 @@ SECRET_KEY = config("SECRET_KEY")
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="").split(",")
 DEBUG = config("DEBUG")
 
-INSTALLED_APPS = [
+my_apps = [
     "hrms_app",
+]
+third_party_apps = [
     "formtools",
     "fontawesomefree",
     "bootstrap_datepicker_plus",
@@ -19,12 +21,21 @@ INSTALLED_APPS = [
     "django_filters",
     "colorfield",
     "timezone_field",
-    'django_tables2',
-    'webpush',
-    'django_extensions',
+    "django_tables2",
+    "webpush",
+    "django_extensions",
     "django_ckeditor_5",
     "django_celery_beat",
-    "django.contrib.humanize",
+    "djangobower",
+    "crispy_forms",
+    "crispy_bootstrap5",
+    "schedule",
+    "channels",
+    "rest_framework",
+    "django_weasyprint",
+    "widget_tweaks",
+]
+django_builtin_apps = [
     "admin_star.apps.AdminStarConfig",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -34,13 +45,9 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.admindocs",
     "django.contrib.sites",
-    "djangobower",
-    "crispy_forms",
-    "schedule",
-    "channels",
-    "rest_framework",
-    "django_weasyprint",
+    "django.contrib.humanize",
 ]
+INSTALLED_APPS = my_apps + third_party_apps + django_builtin_apps
 
 SITE_ID = 1  # or the ID of the site in your database
 
@@ -146,3 +153,7 @@ WEBPUSH_SETTINGS = {
     "VAPID_PRIVATE_KEY":VAPID_PRIVATE_KEY,
     "VAPID_ADMIN_EMAIL": VAPID_ADMIN_EMAIL
 }
+
+
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"

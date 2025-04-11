@@ -5,68 +5,65 @@
 {% endblock %}
 
 {% block extrastyle %}
-
+  <style>
+    .scrollable-form-fields {
+      max-height: 200px; /* Max height of the scrollable area */
+      overflow-y: auto; /* Adds vertical scroll if content exceeds max-height */
+      padding-right: 15px; /* Optional: Adds space for the scrollbar */
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
-  {% render_breadcrumb 'Employees' urls %}
-  <div class="row">
+  <div class="row mt-5">
     <div class="col-lg-4 col-md-6">
       <div class="bg-white p-4 shadow-sm rounded">
         <div class="skill-box mt-n4">
           <div class="header border-top border-bottom border-secondary py-2 d-flex align-items-center">
-            <img data-bs-toggle="modal" data-bs-target="#avatarModal" src="{{ employee.personal_detail.avatar.url }}" class="rounded-circle me-2" width="50" height="50" />
+            <img src="{{ employee.personal_detail.avatar.url }}" class="rounded-circle me-2" width="50" height="50" />
             <div>
               <div class="fw-bold">{{ employee.get_full_name }}</div>
               <div class="text-muted">{{ employee.personal_detail.designation }}</div>
             </div>
           </div>
-          {% comment %} <ul class="list-group list-group-flush mt-3">
-            <li class="list-group-item d-flex justify-content-between">
-              <span>{% trans "Projects" %}</span>
-              <span class="badge bg-warning text-white">25</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between">
-              <span>{% trans "Tasks" %}</span>
-              <span class="badge bg-info text-white">5</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between">
-              <span>Completed Projects</span>
-              <span class="badge bg-success text-white">21</span>
-            </li>
-            <li class="list-group-item d-flex justify-content-between">
-              <span>Followers</span>
-              <span class="badge bg-danger text-white">1024</span>
-            </li>
-          </ul> {% endcomment %}
           <div class="d-flex align-items-center gap-2 p-3">
             {% if request.user.is_superuser or request.user.is_staff %}
-            <a href="{% url 'edit_user_wizard' employee.pk %}" class="btn btn-info btn-sm"><i class="fa-solid fa-edit"></i>{% trans "Edit" %}</a>
+              <a href="{% url 'edit_user_wizard' employee.pk %}" class="btn btn-info btn-sm"><i class="fa-solid fa-edit"></i>{% trans 'Edit' %}</a>
             {% endif %}
             {% if request.user != employee %}
-            <button class="btn btn-dark btn-sm"><i class="fa-solid fa-message"></i>{% trans "Message" %}</button>
+              <button class="btn btn-dark btn-sm"><i class="fa-solid fa-message"></i>{% trans 'Message' %}</button>
             {% endif %}
+            <a href="{% url 'personal_detail_update' pk=employee.personal_detail.pk %}" class="btn btn-info btn-sm"><i class="fa-solid fa-pencil"></i> {% trans 'Update Personal Details' %}</a>
           </div>
         </div>
       </div>
       <br />
       {% if employee.employees.all %}
-      <div class="bg-white p-1 shadow-sm rounded">
-        <div class="card shadow-sm">
-          <div class="card-header fw-bold">
-            {% trans "Assigned Employees" %}
-          </div>
-          <ul class="list-group list-group-flush">
-            
+        <div id="assignedEmployeesSection" class="bg-white p-1 shadow-sm rounded">
+          <div class="card shadow-sm">
+            <div class="card-header fw-bold">
+              {% trans 'Assigned Employees' %}
+            </div>
+            <ul class="list-group list-group-flush">
               {% for user in employee.employees.all %}
                 <li class="list-group-item d-flex align-items-center">
-                  <img src="{% if user.personal_detail.avatar %}{{ user.personal_detail.avatar.url }}{% else %}{% static 'source/images/user1-128x128.jpg' %}{% endif %}" class="rounded-circle me-2" width="40" height="40" />
-                  <div class="text-truncate">{{ user.get_full_name }}</div>
+                  <img src="{% if user.personal_detail.avatar %}
+                      {{ user.personal_detail.avatar.url }}
+                    {% else %}
+                      {% static 'source/images/user1-128x128.jpg' %}
+                    {% endif %}"
+                    class="rounded-circle me-2"
+                    width="40"
+                    height="40" />
+                  <div class="user-info d-flex flex-column">
+                    <div class="fw-bold text-truncate">{{ user.get_full_name }}&nbsp;&nbsp; ({{ user.personal_detail.designation }})</div>
+                    <div class="email text-truncate">{{ user.username }}</div>
+                  </div>
                 </li>
               {% endfor %}
-          </ul>
+            </ul>
+          </div>
         </div>
-      </div>
       {% endif %}
       <br />
     </div>
@@ -74,170 +71,310 @@
       <div class="bg-white p-1 shadow-sm rounded">
         <ul class="nav nav-tabs" id="userProfileTabs" role="tablist">
           <li class="nav-item">
-            <a class="nav-link active" id="user-detail-tab" data-bs-toggle="tab" href="#user-detail" role="tab">{% trans "Leave Balances" %}</a>
+            <a class="nav-link active" id="personal-detail-tab" data-bs-toggle="tab" href="#personal-detail" role="tab">{% trans 'Personal Detail' %}</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" id="personal-detail-tab" data-bs-toggle="tab" href="#personal-detail" role="tab">{% trans "Personal Detail" %}</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" id="address-tab" data-bs-toggle="tab" href="#employee-address" role="tab">{% trans "Address" %}</a>
+            <a class="nav-link" id="address-tab" data-bs-toggle="tab" href="#employee-address" role="tab">{% trans 'Address' %}</a>
           </li>
         </ul>
-      
-        <div class="tab-content" id="userProfileTabsContent">
-          <div class="tab-pane fade show active" id="user-detail" role="tabpanel">
-            <br />
-            <div class="row">
-              {% get_leave_balances employee %}
-            </div>
-          </div>
-      
-          <div class="tab-pane fade" id="personal-detail" role="tabpanel">
+        <div class="tab-content py-0" id="userProfileTabsContent">
+          <div class="tab-pane fade show active" id="personal-detail" role="tabpanel">
             <br />
             <div class="card shadow-sm">
-              <div class="card-header fw-bold">{{ employee.personal_detail.salutation }} {{ employee.get_full_name }}</div>
-              <div class="card-body">
-                <div class="d-flex flex-wrap gap-3">
-                  <div class="flex-grow-1"><strong>{% trans "Employee Code:" %}</strong> {% format_emp_code employee.personal_detail.employee_code %}</div>
-                  <div class="flex-grow-1"><strong>{% trans "Gender:" %}</strong> {{ employee.personal_detail.gender }}</div>
-                  <div class="flex-grow-1"><strong>{% trans "Birthday:" %}</strong> {{ employee.personal_detail.birthday|date:'F j, Y' }}</div>
-                </div>
-                <div class="d-flex flex-wrap gap-3 mt-3">
-                  <div class="flex-grow-1"><strong>{% trans "Marital Status:" %}</strong> {{ employee.personal_detail.marital_status }}</div>
-                  <div class="flex-grow-1"><strong>{% trans "Marriage Anniversary:" %}</strong> {{ employee.personal_detail.marriage_ann }}</div>
-                  <div class="flex-grow-1"><strong>{% trans "Religion:" %}</strong> {{ employee.personal_detail.religion }}</div>
-                  <div class="flex-grow-1"><strong>{% trans "Mobile Number:" %}</strong> +91 {{ employee.personal_detail.mobile_number }}</div>
+              <div class="card-header fw-bold">
+                <div class="d-flex justify-content-between align-items-center">
+                  <p>{{ employee.personal_detail.salutation|default:'' }} {{ employee.get_full_name|default:'Unnamed Employee' }}</p>
                 </div>
               </div>
-            </div>
-            
-            <br />
-            <div class="card shadow-sm">
-              <div class="card-header fw-bold">{% trans "Work Info" %}</div>
               <div class="card-body">
                 <div class="d-flex flex-wrap gap-3">
-                  <div class="flex-grow-1"><strong>{% trans "Official Mobile:" %}</strong> +91 {{ employee.personal_detail.official_mobile_number }}</div>
-                  <div class="flex-grow-1"><strong>{% trans "Official Email:" %}</strong> {{ employee.official_email }}</div>
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Employee Code:' %}</strong>
+                    {{ employee.username|default:_('Not provided') }}
+                  </div>
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Gender:' %}</strong>
+                    {{ employee.personal_detail.gender|default:_('Not specified') }}
+                  </div>
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Birthday:' %}</strong>
+                    {{ employee.personal_detail.birthday|date:'F j, Y'|default:_('Not provided') }}
+                  </div>
                 </div>
-                <div class="d-flex flex-wrap gap-3 mt-3">
-                  <div class="col-md-4"><strong>{% trans "Designation:" %}</strong> {{ employee.personal_detail.designation }}</div>
-                  {% if employee.personal_detail.ctc %}
-                    <div class="col-md-4"><strong>CTC:</strong> {{ employee.personal_detail.ctc|floatformat:2 }}</div>
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-          </div>
 
-          <div class="tab-pane fade" id="employee-address" role="tabpanel">
-              <br />
-          
-              <!-- Corresponding Address Section -->
-              {% if employee.corres_addresses.all %}
-              <div class="card shadow-sm">
-                  <div class="card-header fw-bold">{% trans "Corresponding Address" %}</div>
-                  <div class="card-body">
-                      {% for address in employee.corres_addresses.all %}
-                      <div class="d-flex flex-wrap gap-3">
-                          <div class="flex-grow-1">
-                              {{ address.address_line_1 }}{% if address.address_line_2 %}, {{ address.address_line_2 }}{% endif %}, 
-                              {{ address.district }}, {{ address.state }}, {{ address.country }} - {{ address.zipcode }}
-                          </div>
-                      </div>
-                      <button class="btn btn-info btn-sm mt-3" data-bs-toggle="collapse" data-bs-target="#editCorrespondingForm{{ address.pk }}">
-                          <i class="fa-solid fa-edit"></i> {% trans "Edit" %}
-                      </button>
-          
-                      <!-- Accordion for Corresponding Address Form -->
-                      <div id="editCorrespondingForm{{ address.pk }}" class="accordion-collapse collapse mt-3">
-                          <div class="card-body">
-                              {% include "hrms_app/components/change_form.html" with form=cform form_name="cform" %}
-                          </div>
-                      </div>
-                      {% empty %}
-                      <p>{% trans "No corresponding address available." %}</p>
-                      {% endfor %}
+                <div class="d-flex flex-wrap gap-3 mt-3">
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Marital Status:' %}</strong>
+                    {{ employee.personal_detail.marital_status|default:_('Not specified') }}
                   </div>
-              </div>
-              <br />
-              {% endif %}
-          
-              <!-- Permanent Address Section -->
-              {% if employee.permanent_addresses.all %}
-              <div class="card shadow-sm">
-                  <div class="card-header fw-bold">{% trans "Permanent Address" %}</div>
-                  <div class="card-body">
-                      {% for address in employee.permanent_addresses.all %}
-                      <div class="d-flex flex-wrap gap-3">
-                          <div class="flex-grow-1">
-                              {{ address.address_line_1 }}{% if address.address_line_2 %}, {{ address.address_line_2 }}{% endif %}, 
-                              {{ address.district }}, {{ address.state }}, {{ address.country }} - {{ address.zipcode }}
-                          </div>
-                      </div>
-                      <button class="btn btn-info btn-sm mt-3" data-bs-toggle="collapse" data-bs-target="#editPermanentForm{{ address.pk }}">
-                          <i class="fa-solid fa-edit"></i> {% trans "Edit" %}
-                      </button>
-          
-                      <!-- Accordion for Permanent Address Form -->
-                      <div id="editPermanentForm{{ address.pk }}" class="accordion-collapse collapse mt-3">
-                          <div class="card-body">
-                              {% include "hrms_app/components/change_form.html" with form=pform form_name="pform" %}
-                          </div>
-                      </div>
-                      {% empty %}
-                      <p>{% trans "No permanent address available." %}</p>
-                      {% endfor %}
-                  </div>
-              </div>
-              {% endif %}
-          </div>
-          
-      </div>
-      
-    </div>
-  </div>
-    <!-- Modal -->
-    <div class="modal fade" id="avatarModal" tabindex="-1" aria-labelledby="avatarModalLabel" aria-hidden="true">
-      <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header bg-primary text-white">
-            <h5 class="modal-title" id="avatarModalLabel">{% trans "Update Avatar" %}</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-                {% csrf_token %}                
-                {# Display non-field errors #}
-                {% if avatar_form.non_field_errors %}
-                <div class="alert alert-danger">
-                    {% for error in avatar_form.non_field_errors %}
-                    <p class="mb-0">{{ error }}</p>
-                    {% endfor %}
-                </div>
-                {% endif %}
-                <div class="mb-3">
-                    {{ avatar_form.avatar }}                    
-                    {% if avatar_form.avatar.help_text %}
-                    <small class="form-text text-muted">{{ avatar_form.avatar.help_text }}</small>
-                    {% endif %}
-                    {% if avatar_form.avatar.errors %}
-                    <div class="text-danger">
-                        {% for error in avatar_form.avatar.errors %}
-                        <p class="mb-0">{{ error }}</p>
-                        {% endfor %}
+                  {% if employee.personal_detail.marital_status and not employee.personal_detail.marital_status.marital_status == 'Single' %}
+                    <div class="flex-grow-1">
+                      <strong>{% trans 'Marriage Anniversary:' %}</strong>
+                      {{ employee.personal_detail.marriage_ann|date:'F j, Y'|default:_('Not provided') }}
                     </div>
-                    {% endif %}
+                  {% endif %}
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Religion:' %}</strong>
+                    {{ employee.personal_detail.religion|default:_('Not specified') }}
+                  </div>
+
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Mobile Number:' %}</strong>
+                    {{ employee.personal_detail.mobile_number|default:_('No number available') }}
+                  </div>
+
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Emergency Contact Number:' %}</strong>
+                    {{ employee.personal_detail.alt_mobile_number|default:_('No contact available') }}
+                  </div>
                 </div>
+              </div>
+            </div>
+            <br />
+            <div class="card shadow-sm">
+              <div class="card-header fw-bold">
+                {% trans 'Work Info' %}
+              </div>
+              <div class="card-body">
+                <div class="d-flex flex-wrap gap-3">
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Official Mobile:' %}</strong>
+                    +91 {{ employee.personal_detail.official_mobile_number|default:_('xxxxx-xxxxx') }}
+                  </div>
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Official Email:' %}</strong>
+                    {{ employee.official_email|default:_('Not provided') }}
+                  </div>
+                  <div class="flex-grow-1">
+                    <strong>{% trans 'Personal Email:' %}</strong>
+                    <div id="email-display-section">
+                      {{ employee.email|default:_('Not provided') }}
+                      {% if not employee.is_personal_email_verified %}
+                        <span id="email-verification-badge" class="badge bg-warning text-dark ms-2">{% trans 'Not Verified' %}</span>
+                        <button id="start-verification-btn" class="btn btn-sm btn-link p-0 ms-2" style="font-size: 0.85rem;">{% trans 'Verify Now' %}</button>
+                      {% else %}
+                        <span class="badge bg-success ms-2">{% trans 'Verified' %}</span>
+                      {% endif %}
+                    </div>
+
+                    {% if not employee.is_personal_email_verified %}
+                      <div id="email-verification-section" style="display: none;">
+                        <div class="d-flex gap-2 align-items-center mb-2 mt-2">
+                          <input type="email" id="email-input" class="form-control form-control-sm w-auto" value="{{ employee.email }}" placeholder="{% trans 'Enter email' %}" required />
+                          <button id="send-otp-btn" class="btn btn-sm btn-outline-primary">{% trans 'Send OTP' %}</button>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center mt-2" id="otp-section" style="display: none;">
+                          <input type="text" id="otp-input" class="form-control form-control-sm w-auto" placeholder="{% trans 'Enter OTP' %}" required />
+                          <button id="verify-otp-btn" class="btn btn-sm btn-success">{% trans 'Verify OTP' %}</button>
+                        </div>
+                        <small class="text-muted d-block mt-1" id="email-msg">{% trans 'We’ll verify this email using a one-time password.' %}</small>
+                      </div>
+                    {% endif %}
+                  </div>
+                </div>
+
+                <div class="d-flex flex-wrap gap-3 mt-3">
+                  <div class="col-md-4">
+                    <strong>{% trans 'Designation:' %}</strong>
+                    {{ employee.personal_detail.designation|default:_('Not assigned') }}
+                  </div>
+                  <div class="col-md-4">
+                    <strong>{% trans 'CTC:' %}</strong>
+                    ₹ {{ employee.personal_detail.ctc|floatformat:2|default:'Not Disclosed' }}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
-            <button type="submit" name="form_submit" value="avatar_form" class="btn btn-primary btn-sm">{% trans "Update Avatar" %}</button>
+          <div class="tab-pane fade" id="employee-address" role="tabpanel">
+            <br />
+            {% if employee.corres_addresses.last %}
+              <div class="card shadow-sm">
+                <div class="card-header fw-bold">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <p>{% trans 'Corresponding Address' %}</p>
+                  <button class="btn btn-info btn-sm mt-3" data-bs-toggle="collapse" data-bs-target="#editCorrespondingForm{{ employee.corres_addresses.last.pk }}"><i class="fa-solid fa-edit"></i> {% trans 'Edit' %}</button>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="d-flex flex-wrap gap-3">
+                    <div class="flex-grow-1">
+                      {% with addr=employee.corres_addresses.last %}
+                        {% if addr.address_line_1 %}
+                          {{ addr.address_line_1 }}
+                        {% endif %}
+                        {% if addr.address_line_2 %}
+                          , {{ addr.address_line_2 }}
+                        {% endif %}
+                        {% if addr.district %}
+                          , {{ addr.district }}
+                        {% endif %}
+                        {% if addr.state %}
+                          , {{ addr.state }}
+                        {% endif %}
+                        {% if addr.country %}
+                          , {{ addr.country }}
+                        {% endif %}
+                        {% if addr.zipcode %}
+                          - {{ addr.zipcode }}
+                        {% endif %}
+                      {% endwith %}
+                    </div>
+                  </div>
+                  <!-- Accordion for Corresponding Address Form -->
+                  <div id="editCorrespondingForm{{ employee.corres_addresses.last.pk }}" class="accordion-collapse collapse mt-3">
+                    <div class="card-body">
+                      {% include 'hrms_app/components/change_form.html' with form=cform form_name='cform' %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <br />
+            {% endif %}
+
+            <!-- Permanent Address Section -->
+            {% if employee.permanent_addresses.all %}
+              <div class="card shadow-sm">
+                <div class="card-header fw-bold">
+                  {% trans 'Permanent Address' %}
+                </div>
+                <div class="card-body">
+                  {% for address in employee.permanent_addresses.all %}
+                    <div class="d-flex flex-wrap gap-3">
+                      <div class="flex-grow-1">
+                        {{ address.address_line_1 }}{% if address.address_line_2 %}
+                          , {{ address.address_line_2 }}
+                        {% endif %},
+                        {{ address.district }}, {{ address.state }}, {{ address.country }} - {{ address.zipcode }}
+                      </div>
+                    </div>
+                    {% if request.user.is_staff or request.user.is_superuser %}
+                      <button class="btn btn-info btn-sm mt-3" data-bs-toggle="collapse" data-bs-target="#editPermanentForm{{ address.pk }}"><i class="fa-solid fa-edit"></i> {% trans 'Edit' %}</button>
+                    {% endif %}
+                    <div id="editPermanentForm{{ address.pk }}" class="accordion-collapse collapse mt-3">
+                      <div class="card-body">
+                        {% include 'hrms_app/components/change_form.html' with form=pform form_name='pform' %}
+                      </div>
+                    </div>
+                  {% empty %}
+                    <p>
+                      {% trans 'No permanent address available.' %}
+                    </p>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
           </div>
         </div>
       </div>
-    </form>
     </div>
+  </div>
 {% endblock %}
 
 {% block extra_js %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const startBtn = document.getElementById('start-verification-btn')
+      const emailSection = document.getElementById('email-verification-section')
+      const emailInput = document.getElementById('email-input')
+      const sendOtpBtn = document.getElementById('send-otp-btn')
+      const otpSection = document.getElementById('otp-section')
+      const otpInput = document.getElementById('otp-input')
+      const verifyOtpBtn = document.getElementById('verify-otp-btn')
+      const emailMsg = document.getElementById('email-msg')
+    
+      if (startBtn) {
+        startBtn.addEventListener('click', function () {
+          startBtn.style.display = 'none'
+          emailSection.style.display = 'block'
+        })
+      }
+    
+      function getCSRFToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value
+      }
+    
+      if (sendOtpBtn) {
+        sendOtpBtn.addEventListener('click', function (e) {
+          e.preventDefault()
+          const email = emailInput.value
+          if (!email) return alert('Please enter an email.')
+    
+          fetch("{% url 'send_otp' %}", {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({ email })
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.message) {
+                emailMsg.innerHTML = `<span class="text-success">${data.message}</span>`
+                otpSection.style.display = 'flex'
+                emailInput.classList.remove('is-invalid')
+              } else {
+                emailMsg.innerHTML = `<span class="text-danger">${data.error || 'Something went wrong. Please try again.'}</span>`
+                emailInput.classList.add('is-invalid')
+                otpSection.style.display = 'none'
+              }
+            })
+            .catch((error) => {
+              console.error('Error:', error)
+              emailMsg.innerHTML = `<span class="text-danger">Server error. Please try again later.</span>`
+              emailInput.classList.add('is-invalid')
+              otpSection.style.display = 'none'
+            })
+        })
+      }
+    
+      if (verifyOtpBtn) {
+        verifyOtpBtn.addEventListener('click', function (e) {
+          e.preventDefault()
+          const email = emailInput.value
+          const otp = otpInput.value
+          if (!otp) return alert('Please enter the OTP.')
+    
+          fetch("{% url 'verify_otp' %}", {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': getCSRFToken()
+            },
+            body: JSON.stringify({ email, otp })
+          })
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.message) {
+                emailMsg.innerHTML = `<span class="text-success">${data.message}</span>`
+                otpSection.style.display = 'none'
+    
+                sendOtpBtn.disabled = true
+                verifyOtpBtn.disabled = true
+                emailInput.disabled = true
+                otpInput.disabled = true
+    
+                // ✅ Update the badge
+                const badge = document.getElementById('email-verification-badge')
+                if (badge) {
+                  badge.textContent = 'Verified'
+                  badge.classList.remove('bg-warning', 'text-dark')
+                  badge.classList.add('bg-success', 'text-white')
+                }
+                badge.innerHTML = `<i class="bi bi-check-circle me-1"></i> Verified`
+              } else {
+                emailMsg.innerHTML = `<span class="text-danger">${data.error || 'Invalid OTP. Please try again.'}</span>`
+                otpInput.classList.add('is-invalid')
+              }
+            })
+            .catch((error) => {
+              console.error('Error:', error)
+              emailMsg.innerHTML = `<span class="text-danger">Server error. Please try again later.</span>`
+              otpInput.classList.add('is-invalid')
+            })
+        })
+      }
+    })
+  </script>
 {% endblock %}

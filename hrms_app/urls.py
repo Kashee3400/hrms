@@ -34,5 +34,6 @@ urlpatterns = [
     path("execute-populate-attendance/", ExecutePopulateAttendanceView.as_view(), name="execute_populate_attendance"),
     path('attendance-aggregation/', Top5EmployeesDurationAPIView.as_view(), name='attendance-aggregation'),
     path('get_top_5_employees/<int:year>/', Top5EmployeesView.as_view(), name='get_top_5_employees'),
-
+    path("send_otp/", SendOTPView.as_view(), name="send_otp"),
+    path("verify_otp/", VerifyOTPView.as_view(), name="verify_otp"),
 ]

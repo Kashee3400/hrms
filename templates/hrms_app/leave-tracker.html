@@ -13,197 +13,175 @@
   {% render_breadcrumb 'Leave Tracker' urls %}
 
   <!-- Grouping rows -->
-<div class="bg-light p-2">
-  <div class="row">
-    {% get_leave_balances request.user %}
-  </div>
-</div>
-
-<div class="bg-light p-2">
-  <form method="get" action="{% url 'leave_tracker' %}">
-    <div class="row">
-      <div class="col-md-4">{{ form.status.label_tag }} {{ form.status }}</div>
-      <div class="col-md-3">{{ form.from_date.label_tag }} {{ form.from_date }}</div>
-      <div class="col-md-3">{{ form.to_date.label_tag }} {{ form.to_date }}</div>
-      <div class="col-md-2 d-flex align-items-end">
-        <button type="submit" class="btn btn-primary btn-sm"><span class="bi bi-funnel"></span>{% trans "Filter" %}</button>
-        <a class="btn btn-secondary btn-sm ms-2" href="{% url 'leave_tracker' %}">{% trans "Clear Filter" %}</a>
-      </div>
+  <div class="bg-light p-2">
+    <div class="row g-3">
+      {% get_leave_balances request.user request %}
     </div>
-  </form>
-</div>
+  </div>
 
-<div class="bg-light p-2">
-  <div class="row">
-    {% if table.data %}
-      <!-- Applied Leaves Table -->
-      <div class="col-md-10">
-        <div class="card">
-          <div class="card-header">
-            <h5 class="mb-0"><span class="bi bi-table"></span> {% trans "Applied Leaves" %}</h5>
-          </div>
-          <div class="card-body">
-            <div class="table-responsive">
-              {% render_table table %}
-            </div>
-          </div>
+  <div class="bg-light p-2">
+    <form method="get" action="{% url 'leave_tracker' %}">
+      <div class="row">
+        <div class="col-md-4">{{ form.status.label_tag }} {{ form.status }}</div>
+        <div class="col-md-3">{{ form.from_date.label_tag }} {{ form.from_date }}</div>
+        <div class="col-md-3">{{ form.to_date.label_tag }} {{ form.to_date }}</div>
+        <div class="col-md-2 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary btn-sm"><span class="bi bi-funnel"></span>{% trans 'Filter' %}</button>
+          <a class="btn btn-secondary btn-sm ms-2" href="{% url 'leave_tracker' %}">{% trans 'Clear Filter' %}</a>
         </div>
       </div>
-
-      <!-- Column Visibility Controls -->
-      <div class="col-md-2">
-        <div id="column-visibility-controls" class="bg-white border rounded p-3" style="max-height: 300px; overflow-y: auto;">
-          <h5>{% trans "Select Columns" %}</h5>
-          {% for column in all_columns %}
-            <label class="d-block">
-              <input
-                type="checkbox"
-                class="column-toggle"
-                data-column="{{ column }}"
-                {% if column in selected_columns %}checked{% endif %}
-              >
-              {{ column|capfirst }}
-            </label>
-          {% endfor %}
-        </div>        
-      </div>
-    {% else %}
-      <!-- If no leaves are available, show a message -->
-      <div class="col-12 text-center p-4">
-        <p class="text-muted">{% trans "No leave applications found." %}</p>
-      </div>
-    {% endif %}
+    </form>
   </div>
-</div>
-{% comment %} {% if user.is_rm %} {% endcomment %}
+
   <div class="bg-light p-2">
-    {% if employee_leaves.leaves %}
-      <div class="row">
-        <div class="col-12">
-          <div class="card mt-4">
-            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-              <h5 class="mb-0">{% trans "Requested Leaves" %}</h5>
-              
-              <!-- Search Input -->
-              <div class="col-12 col-md-4 col-lg-3">
-                <form method="get">
-                  <div class="input-group">
-                    <span class="input-group-text bg-primary text-white">
-                      <i class="fa-solid fa-magnifying-glass"></i>
-                    </span>
-                    <input 
-                      type="text" 
-                      class="form-control px-3 py-2" 
-                      name="q" 
-                      value="{{ search_query }}" 
-                      placeholder="Search users leave..."
-                    />
-                  </div>
-                </form>
-              </div>
-            </div>            
+    <div class="row">
+      {% if table.data %}
+        <div class="col-md-12">
+          <div class="card">
+            <div class="card-header">
+              <h5 class="mb-0"><span class="bi bi-table"></span> {% trans 'Applied Leaves' %}</h5>
             </div>
             <div class="card-body">
-              <div class="row">
-                {% for leave in employee_leaves.leaves %}
-                <div class="col-md-3 mb-4">
-                  <div class="card shadow-sm">
-                      <div class="card-header bg-info text-white d-flex align-items-center">
-                          {% if leave.appliedBy.personal_detail.avatar %}
-                              <img style="height: 60px; width: 60px;" src="{{ leave.appliedBy.personal_detail.avatar.url }}" class="avatar rounded-circle mr-3" alt="Avatar" />
-                          {% endif %}
-                          <div>
-                              <h6 class="mb-0">{{ leave.appliedBy }}</h6>
-                              <a href="{% url 'leave_application_detail' leave.slug %}" class="text-white">
-                                  <p class="mb-0">Application No: {{ leave.applicationNo }}</p>
-                              </a>
-                          </div>
-                      </div>
-                      <div class="card-body p-1">
-                          <ul class="list-group">
-                              <li class="list-group-item">
-                                  <strong>{{ leave.leave_type.leave_type_short_code }} Leave Balance:</strong>
-                                  <span class="float-end fw-bold">{{ leave.balanceLeave }}</span>
-                              </li>
-                              <li class="list-group-item">
-                                  <strong>{% trans "Day(s)" %}:</strong>
-                                  <span class="float-end fw-bold">{{ leave.usedLeave }}</span>
-                              </li>
-                              <li class="list-group-item">
-                                  <strong>Status:</strong>
-                                  <span class="float-end fw-bold text-uppercase {{ leave.status }}">{{ leave.status|upper }}</span>
-                              </li>
-                              <li class="list-group-item">
-                                  <strong>From:</strong>
-                                  <span class="float-end">{{ leave.startDate|localtime_filter|date:'d-M-Y' }} - {% leave_start_end_status leave.startDayChoice %}</span>
-                              </li>
-                              <li class="list-group-item">
-                                  <strong>To:</strong>
-                                  <span class="float-end">{{ leave.endDate|localtime_filter|date:'d-M-Y' }} - {% leave_start_end_status leave.endDayChoice %}</span>
-                              </li>
-                          </ul>
-                      </div>
-                      <div class="card-footer">
-                        <a href="{% url 'leave_application_detail' leave.slug %}" class="btn btn-primary btn-sm btn-block mt-3">
-                          <i class="fas fa-eye"></i> View Details
-                        </a>
-                      </div>
-                  </div>
-              </div>
-              
-                {% endfor %}
+              <div class="table-responsive">
+                {% render_table table %}
               </div>
             </div>
           </div>
         </div>
-      </div>
-      
-      <!-- Pagination -->
-      <div class="container mt-3">
-        <nav>
-          <ul class="pagination justify-content-center">
-            {% if employee_leaves.leaves.has_previous %}
-              <li class="page-item">
-                <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page=1">&laquo; First</a>
-              </li>
-              <li class="page-item">
-                <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.previous_page_number }}">Previous</a>
-              </li>
-            {% endif %}
-
-            <li class="page-item active">
-              <span class="page-link">Page {{ employee_leaves.leaves.number }} of {{ employee_leaves.leaves.paginator.num_pages }}.</span>
-            </li>
-
-            {% if employee_leaves.leaves.has_next %}
-              <li class="page-item">
-                <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.next_page_number }}">Next</a>
-              </li>
-              <li class="page-item">
-                <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.paginator.num_pages }}">Last &raquo;</a>
-              </li>
-            {% endif %}
-          </ul>
-        </nav>
-      </div>
-    {% else %}
-      <div class="row">
-        <div class="col-12 alert alert-warning">{% blocktrans with status=selected_status %}No requested {{ status}} leaves found.{% endblocktrans %}</div>
-      </div>
-    {% endif %}
+      {% else %}
+        <div class="col-12 text-center p-4">
+          <p class="text-muted">
+            {% trans 'No leave applications found.' %}
+          </p>
+        </div>
+      {% endif %}
+    </div>
   </div>
-{% comment %} {% endif %} {% endcomment %}
-
+  {% if request.user.is_rm %}
+    <div class="bg-light p-2">
+      {% if employee_leaves.leaves %}
+        <div class="row">
+          <div class="col-12">
+            <div class="card mt-4">
+              <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{% trans 'Requested Leaves' %}</h5>
+                <div class="col-12 col-md-4 col-lg-3">
+                  <form method="get">
+                    <div class="input-group">
+                      <span class="input-group-text bg-primary text-white"><i class="fa-solid fa-magnifying-glass"></i></span>
+                      <input type="text" class="form-control px-3 py-2" name="q" value="{{ search_query }}" placeholder="Search users leave..." />
+                    </div>
+                  </form>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="col-12">
+                  <div class="dt-responsive table-responsive mt-1">
+                    <table class="table table-striped">
+                      <thead>
+                        <tr>
+                          <th>
+                            {% trans 'Requested By' %}
+                          </th>
+                          <th>
+                            {% trans 'Leave Type' %}
+                          </th>
+                          <th>
+                            {% trans 'Start Date' %}
+                          </th>
+                          <th>
+                            {% trans 'End Date' %}
+                          </th>
+                          <th>
+                            {% trans 'Total Days' %}
+                          </th>
+                          <th>
+                            {% trans 'Status' %}
+                          </th>
+                          <th>
+                            {% trans 'Action' %}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for leave in employee_leaves.leaves %}
+                          <tr>
+                            <td>
+                              <div class="d-flex">
+                                <img style="height: 50px; width: auto;"
+                                {% if leave.appliedBy.personal_detail.avatar %} 
+                                  src="{{leave.appliedBy.personal_detail.avatar.url}}" 
+                                {% else %} src="{% static 'images/faces/face1.jpg' %}"{% endif %} alt="{{ leave.appliedBy }}" />
+                                <div>
+                                  <h6>{{ leave.appliedBy }}</h6>
+                                  <p>{{ leave.appliedBy.username}}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td>
+                              <h6>{{leave.leave_type}}</h6>
+                            </td>
+                            <td>{{ leave.startDate.date }}</td>
+                            <td>{{leave.endDate.date}}</td>
+                            <td>{{leave.usedLeave}}</td>
+                            <td>{{leave.status}}</td>
+                            <td>
+                              <a href="{% url 'leave_application_detail' leave.slug %}">{% trans "Approve/Reject/Cancel" %}</a>
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="container mt-3">
+          <nav>
+            <ul class="pagination justify-content-center">
+              {% if employee_leaves.leaves.has_previous %}
+                <li class="page-item">
+                  <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page=1">&laquo; First</a>
+                </li>
+                <li class="page-item">
+                  <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.previous_page_number }}">Previous</a>
+                </li>
+              {% endif %}
+              <li class="page-item active">
+                <span class="page-link">Page {{ employee_leaves.leaves.number }} of {{ employee_leaves.leaves.paginator.num_pages }}.</span>
+              </li>
+              {% if employee_leaves.leaves.has_next %}
+                <li class="page-item">
+                  <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.next_page_number }}">Next</a>
+                </li>
+                <li class="page-item">
+                  <a class="page-link" href="?q={{ search_query }}&is_active={{ is_active }}&page={{ employee_leaves.leaves.paginator.num_pages }}">Last &raquo;</a>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      {% else %}
+        <div class="row">
+          <div class="col-12 mx-3 alert alert-warning">
+            {% blocktrans with status=selected_status %}No requested {{ status }} leaves found.{% endblocktrans %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
 {% endblock %}
 
 {% block extra_js %}
   <script>
     function clearForm() {
       const url = window.location.href.split('?')[0]
-      window.location.href = url 
+      window.location.href = url
     }
   </script>
-<script>
+  <script>
     $(document).ready(function () {
       $('.table').DataTable({
         paging: true,
@@ -211,38 +189,15 @@
         ordering: false,
         dom: 'Bfrtip',
         buttons: ['copy', 'csv', 'excel']
-      });
-        $(".column-toggle").on("change", function () {
-            const selectedColumns = $(".column-toggle:checked")
-                .map(function () {
-                    return $(this).data("column");
-                })
-                .get();
-
-            // Save preferences via AJAX
-            $.ajax({
-                url: "{% url 'save_column_preferences' %}",
-                method: "POST",
-                data: JSON.stringify({ selected_columns: selectedColumns }),
-                contentType: "application/json",
-                headers: { "X-CSRFToken": getCSRFToken() },
-                success: function (response) {
-                    location.reload();
-                },
-                error: function () {
-                    alert("Failed to save column preferences.");
-                },
-            });
-        });
-
-        function getCSRFToken() {
-            const cookieValue = document.cookie
-                .split("; ")
-                .find((row) => row.startsWith("csrftoken="))
-                ?.split("=")[1];
-            return cookieValue || "";
-        }
-    });
-</script>
-
+      })
+    
+      function getCSRFToken() {
+        const cookieValue = document.cookie
+          .split('; ')
+          .find((row) => row.startsWith('csrftoken='))
+          ?.split('=')[1]
+        return cookieValue || ''
+      }
+    })
+  </script>
 {% endblock %}

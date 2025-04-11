@@ -5,7 +5,8 @@ class HrmsAppConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'hrms_app'
     label = 'hrms_app'
-    verbose_name = _('hrms')
+    icon = 'mdi-security'
+    verbose_name = _('HR Admin')
 
     def ready(self):
         import hrms_app.signals

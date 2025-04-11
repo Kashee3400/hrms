@@ -18,7 +18,7 @@ class AttendanceStatusHandler:
         logout_date_time,  # this is the user's logged out date and time
         total_duration, # this is the user's total working duration
         user_expected_logout_time,
-        user_expected_logout_date_time,  # this is the user's  user expected logout date time
+        user_expected_logout_date_time,
     ):
         total_hours = total_duration.total_seconds() / 3600
         color_hex_code = self.absent_color.color_hex
@@ -29,8 +29,14 @@ class AttendanceStatusHandler:
         rfrom_date = rto_date = reg_duration = None
         if total_hours == 0:
             
-            return self._handle_absent(
+            return self._handle_mispunching(
                 login_date_time, user_expected_logout_date_time, self.absent_color
+            )
+
+        if 0 < total_hours < 4:
+            
+            return self._handle_absent(
+                rfrom_date=logout_date_time,rto_date=user_expected_logout_date_time, reg_duration=reg_duration, absent_color=self.absent_color
             )
 
         if self._is_full_day(login_date_time, logout_date_time, total_hours, user_expected_logout_date_time):
@@ -64,7 +70,7 @@ class AttendanceStatusHandler:
     def _is_late_coming(self, login_date_time, logout_date_time):
         return login_date_time.time() > self.user_shift.grace_start_time and (   #  10:00 > 9:45  
             logout_date_time.time() <= self.user_shift.grace_end_time             # 5:50 < 5:45
-            or logout_date_time.time() >= self.user_shift.end_time                # 5:50 > 5:45
+            or logout_date_time.time() >= self.user_shift.end_time                # 5:50 > 5:30
         )
 
     def _is_early_going(self, login_date_time, logout_date_time, user_expected_logout_time):
@@ -82,13 +88,25 @@ class AttendanceStatusHandler:
         )
 
     def _is_half_day(self, login_date_time, logout_date_time):
-
         return (
             login_date_time.time() >= self.user_shift.grace_start_time
             and logout_date_time.time() < self.user_shift.end_time
         )
 
-    def _handle_absent(self, login_date_time, user_expected_logout_date_time, absent_color):
+    def _handle_absent(self, rfrom_date, rto_date,reg_duration, absent_color):
+        return (
+            settings.ABSENT,
+            absent_color.color_hex,
+            settings.EARLY_GOING,
+            True,
+            rfrom_date,
+            rto_date,
+            reg_duration,
+            settings.PENDING,
+            "H",
+        )
+
+    def _handle_mispunching(self, login_date_time, user_expected_logout_date_time, absent_color):
         return (
             settings.ABSENT,
             absent_color.color_hex,

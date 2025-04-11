@@ -1,0 +1,13 @@
+{% for item in items %}
+  <div class="col-lg-3 col-md-4 col-sm-6 mb-3 pending-data px-2">
+    <a href="{{ item.link }}" class="text-decoration-none h-100">
+      <div class="card count-card shadow-sm h-100 d-flex flex-column">
+        <div class="card-body text-center d-flex flex-column justify-content-center">
+          <i class="{{ item.icon }} icon"></i>
+          <h5 class="card-title mt-2 text-dark text-truncate">{{ item.title }}</h5>
+          <h2 class="count-number">{{ item.count }}</h2>
+        </div>
+      </div>
+    </a>
+  </div>
+{% endfor %}

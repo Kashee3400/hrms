@@ -1,0 +1,10 @@
+<ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
+  {% for holiday in holidays %}
+    <li class="list-group-item d-flex align-items-center">
+      <div class="user-info d-flex flex-column">
+        <div class="fw-bold text-truncate">{{holiday.title}}</div>
+        <div class="email text-truncate">{{holiday.start_date}}</div>
+      </div>
+    </li>
+  {% endfor %}
+</ul>

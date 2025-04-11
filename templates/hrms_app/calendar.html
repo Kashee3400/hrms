@@ -1,11 +1,20 @@
 {% extends 'hrms_app/base.html' %}
-{% load static hrms_tag %}
+{% load static hrms_tag i18n %}
 {% block title %}
-  {{ user }} | Attendance Logs
+  {{ user }} |{% trans 'Attendance Logs' %}
 {% endblock %}
 
 {% block extrastyle %}
   <link rel="stylesheet" type="text/css" href="{% static 'vendors/fullcalendar/dist/fullcalendar.css' %}" />
+  <style>
+    .dot {
+      height: 10px;
+      width: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 5px;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -15,21 +24,36 @@
   <div id="loader-overlay" style="display: none;">
     <div class="d-flex justify-content-center align-items-center position-fixed top-0 start-0 w-100 h-100 bg-white opacity-75 loader-overlay" style="display: none; z-index: 1050;">
       <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
+        <span class="visually-hidden">{% trans 'Loading...' %}</span>
       </div>
     </div>
   </div>
 
-  {% if user.is_staff or user.is_superuser %}
-    <!-- Filter Form -->
-    <div class="bg-white p-3 mb-3 rounded">
-      <form method="get" action="{% url 'calendar' %}">
-        <div class="row g-3">
-          <div class="col-lg-3 col-md-6 col-sm-12">{{ form.employee }}</div>
+  <!-- Filter Form -->
+  <div class="bg-white p-3 mb-3 rounded">
+    <div class="row text-center text-black mt-3 mb-3">
+      {% if user.is_staff or user.is_superuser %}
+        <div class="col-2">
+          <form method="get" action="{% url 'calendar' %}">{{ form.employee }}</form>
         </div>
-      </form>
+      {% endif %}
+      <div class="col">
+        <span class="dot" style="background-color: #6AD02A;"></span> {% trans 'Present' %}
+      </div>
+      <div class="col">
+        <span class="dot" style="background-color: #afb3b0;"></span> {% trans 'Half-Day/Pending' %}
+      </div>
+      <div class="col">
+        <span class="dot" style="background-color: orange;"></span> {% trans 'Holidays' %}
+      </div>
+      <div class="col">
+        <span class="dot" style="background-color: #3a87ad;"></span> {% trans 'Tour' %}
+      </div>
+      <div class="col">
+        <span class="dot" style="background-color: red;"></span> {% trans 'Absent' %}
+      </div>
     </div>
-  {% endif %}
+  </div>
 
   <!-- Calendar Container -->
   <div class="bg-white p-3 rounded">
@@ -46,37 +70,60 @@
 
   <script>
     $(document).ready(function () {
-      var loader = $('#loader-overlay')
-      loadCalendar()
+      const loader = $('#loader-overlay')
+      let currentUserId = $('#option').val() // initial selected user
+      let lastLoadedMonth = null
     
-      function loadCalendar(userId) {
-        loader.css('display', 'flex')
-        var url = '{% url "event_list" %}'
-        if (userId) {
-          url += '?employee=' + userId
-        }
-        $('#calendar').fullCalendar('destroy') // Clear previous calendar
-        $('#calendar').fullCalendar({
-          events: url,
-          editable: true,
-          header: {
-            left: 'prev,next today',
-            center: 'title',
-            right: 'month,agendaWeek,agendaDay'
-          },
-          eventRender: function(event, element) {
-            if (event.url) {
-              element.attr('href', event.url);
-            }
-          }
-        });
-        
-        loader.css('display', 'none')
+      function getMonthRange(date) {
+        const start = moment(date).startOf('month').format('YYYY-MM-DD')
+        const end = moment(date).add(1, 'month').startOf('month').format('YYYY-MM-DD')
+        return { start, end }
       }
     
+      $('#calendar').fullCalendar({
+        editable: true,
+        header: {
+          left: 'prev,next today',
+          center: 'title',
+          right: 'month,agendaWeek,agendaDay'
+        },
+        events: function (start, end, timezone, callback) {
+          const calendarDate = $('#calendar').fullCalendar('getDate')
+          const { start: monthStart, end: nextMonthStart } = getMonthRange(calendarDate)
+    
+          // Prevent infinite reload by checking if month already loaded
+          if (lastLoadedMonth === monthStart) {
+            return
+          }
+          lastLoadedMonth = monthStart
+    
+          loader.css('display', 'flex')
+          let url = `{% url "event_list" %}?start=${monthStart}&end=${nextMonthStart}`
+          if (currentUserId) {
+            url += `&employee=${currentUserId}`
+          }
+    
+          $.getJSON(url, function (events) {
+            callback(events)
+            loader.css('display', 'none')
+          })
+        },
+        eventRender: function (event, element) {
+          if (event.url) {
+            element.attr('href', event.url)
+          }
+        },
+        viewRender: function () {
+          // triggers new fetch by resetting loaded month
+          lastLoadedMonth = null
+          $('#calendar').fullCalendar('refetchEvents')
+        }
+      })
+    
       $('#option').change(function () {
-        var selectedUserId = $(this).val()
-        loadCalendar(selectedUserId)
+        currentUserId = $(this).val()
+        lastLoadedMonth = null
+        $('#calendar').fullCalendar('refetchEvents')
       })
     })
   </script>

@@ -7,12 +7,23 @@ from hrms_app.utility.leave_utils import (
     get_employee_requested_tour,
     get_regularization_requests,
 )
-
-register = template.Library()
+from hrms_app.utility.attendanceutils import get_from_to_datetime
 from hrms_app.models import PersonalDetails
 from django.utils.timezone import now, localdate, localtime
 from django.db import models
+from datetime import timedelta
 import random
+from ..models import (
+    LeaveType,
+    LeaveBalanceOpenings,
+    LeaveApplication,
+    Holiday,
+    HRAnnouncement,
+    AttendanceLog,
+    UserTour,
+)
+
+register = template.Library()
 
 
 @register.simple_tag
@@ -24,7 +35,7 @@ def render_breadcrumb(title, urls):
     :param urls: List of tuples containing URL name and URL kwargs.
     :return: Rendered breadcrumb HTML.
     """
-    dashboard = reverse("dashboard")
+    home = reverse("home")
     breadcrumb_html = f"""
     <div class="row border-bottom py-3 mb-3">
       <div class="col-md-4 d-flex align-items-center">
@@ -35,7 +46,7 @@ def render_breadcrumb(title, urls):
         <nav aria-label="breadcrumb">
           <ol class="breadcrumb mb-0 bg-transparent">
             <li class="breadcrumb-item">
-              <a href="{dashboard}">
+              <a href="{home}">
                 <i class="mdi mdi-home"></i>
               </a>
             </li>
@@ -99,6 +110,7 @@ def load_notifications(user):
         "count": total_counts,
     }
 
+
 @register.inclusion_tag("notifications/notification.html")
 def load_side_notifications(user):
     pending_leaves = get_employee_requested_leave(user=user)
@@ -135,73 +147,99 @@ def render_employee_navigation(context):
     }
 
 
-from ..models import LeaveType, LeaveBalanceOpenings, LeaveApplication
+from django.db.models import Sum
 
 
 @register.inclusion_tag("leave_balances/leave_balance_list.html")
-def get_leave_balances(user):
-    """Fetch leave balances for the user."""
+def get_leave_balances(user, request):
+    """Fetch leave balances for the user, including used leave."""
     try:
         leave_types = LeaveType.objects.all()
         leave_balances = LeaveBalanceOpenings.objects.filter(
             user=user, leave_type__in=leave_types
         )
         leave_balances_dict = {lb.leave_type: lb for lb in leave_balances}
-
         user_pending_leaves = LeaveApplication.objects.filter(
             appliedBy=user, status=settings.PENDING
         )
 
         leave_balances_list = []
         for lb in leave_balances:
+            # Calculate used leave for this leave type
+            used_leave = (
+                LeaveApplication.objects.filter(
+                    appliedBy=user, leave_type=lb.leave_type, status=settings.APPROVED
+                ).aggregate(Sum("usedLeave"))["usedLeave__sum"]
+                or 0
+            )  # Default to 0 if None
+
             # Calculate on hold used leave
             on_hold_leave = sum(
                 leave.usedLeave
                 for leave in user_pending_leaves
                 if leave.leave_type == lb.leave_type
             )
+
+            # Calculate remaining balance (total_balance = remaining_balance - used_leave)
+            total_balance = lb.remaining_leave_balances - on_hold_leave
+
             leave_balances_list.append(
                 {
+                    "pk": lb.pk,
                     "balance": lb.remaining_leave_balances,
+                    "used_leave": used_leave,
                     "on_hold": on_hold_leave,
-                    "total_balance": lb.remaining_leave_balances - on_hold_leave,
+                    "total_balance": total_balance,
                     "leave_type": lb.leave_type,
                     "url": reverse("apply_leave_with_id", args=[lb.leave_type.pk]),
                     "color": lb.leave_type.color_hex,
                 }
             )
 
-        # Include maternity leave if applicable
+        # Additional logic for Female users to fetch ML leave balances
         if user.personal_detail and user.personal_detail.gender.gender == "Female":
             ml_balance = leave_balances_dict.get(settings.ML)
             if ml_balance:
+                used_leave = (
+                    LeaveApplication.objects.filter(
+                        appliedBy=user,
+                        leave_type=ml_balance.leave_type,
+                        status=settings.APPROVED,
+                    ).aggregate(Sum("usedLeave"))["usedLeave__sum"]
+                    or 0
+                )  # Default to 0 if None
+
                 on_hold_leave = sum(
                     leave.usedLeave
                     for leave in user_pending_leaves
                     if leave.leave_type == ml_balance.leave_type
                 )
+
                 leave_balances_list.append(
                     {
+                        "pk": ml_balance.pk,
                         "balance": ml_balance.remaining_leave_balances,
+                        "used_leave": used_leave,
                         "on_hold": on_hold_leave,
                         "total_balance": ml_balance.remaining_leave_balances
+                        - used_leave
                         - on_hold_leave,
                         "leave_type": ml_balance.leave_type.leave_type,
                         "url": reverse(
                             "apply_leave_with_id", args=[ml_balance.leave_type.id]
                         ),
-                        "color": "#ff9447",
+                        "color": "#ff9447",  # Special color for ML leave
                     }
                 )
 
-        return {"leave_balances": leave_balances_list}
+        return {"leave_balances": leave_balances_list, "request": request}
+
     except LeaveBalanceOpenings.DoesNotExist:
         return {"leave_balances": []}
     except Exception as e:
+        # Log the error if necessary
         return {"leave_balances": []}
 
-
-from hrms_app.models import AttendanceLog
 
 @register.simple_tag
 def format_emp_code(emp_code):
@@ -214,7 +252,85 @@ def format_emp_code(emp_code):
         return f"KMPCL-{emp_code}"
 
 
-from datetime import timedelta
+from django.utils.translation import gettext as _
+
+
+@register.inclusion_tag(
+    "hrms_app/components/user_summary_counts.html", takes_context=True
+)
+def user_summary_counts(context):
+    request = context["request"]
+    user = request.user
+    from_datetime, to_datetime = get_from_to_datetime()
+    total_approved_leaves = LeaveApplication.objects.filter(
+        appliedBy=user,
+        startDate__date__gte=from_datetime.date(),
+        endDate__date__lte=to_datetime.date(),
+        status=settings.APPROVED,
+    ).count()
+
+    total_present = AttendanceLog.objects.filter(
+        applied_by=user,
+        att_status_short_code="P",
+        start_date__date__gte=from_datetime.date(),
+        end_date__date__lte=to_datetime.date(),
+        regularized=False,
+    ).count()
+
+    total_regularized = AttendanceLog.objects.filter(
+        applied_by=user,
+        regularized=True,
+        att_status_short_code="P",
+        start_date__date__gte=from_datetime.date(),
+        end_date__date__lte=to_datetime.date(),
+    ).count()
+
+    # Counts dict
+    counts = {
+        "leave": total_approved_leaves,
+        "tour": 0,  # Add real logic if needed
+        "regularization": total_regularized,
+        "present": total_present,
+    }
+    items = [
+        {
+            "key": "present",
+            "title": _("Present"),
+            "icon": "fas fa-hourglass-half",
+            "link": reverse("calendar"),
+        },
+        {
+            "key": "leave",
+            "title": _("Leaves"),
+            "icon": "fas fa-hourglass-half",
+            "link": reverse("leave_tracker"),
+        },
+        {
+            "key": "tour",
+            "title": _("Tours"),
+            "icon": "fas fa-plane-departure",
+            "link": reverse("tour_tracker"),
+        },
+        {
+            "key": "regularization",
+            "title": _("Regularizations"),
+            "icon": "fas fa-check-circle",
+            "link": reverse("regularization"),
+        },
+    ]
+
+    return {
+        "items": [
+            {
+                "count": counts.get(item["key"], 0),
+                "title": item["title"],
+                "icon": item["icon"],
+                "link": request.build_absolute_uri(item["link"]),
+            }
+            for item in items
+        ],
+        "request": request,
+    }
 
 
 @register.simple_tag
@@ -255,7 +371,11 @@ def get_item(attendance_data, employee_id, date):
         return [{"status": "A", "color": "#FF0000"}]
     else:
         # Return the current status or default to "A"
-        return current_entries if current_entries else [{"status": "A", "color": "#FF0000"}]
+        return (
+            current_entries
+            if current_entries
+            else [{"status": "A", "color": "#FF0000"}]
+        )
 
 
 @register.filter
@@ -350,14 +470,49 @@ def get_employee_highlights():
 
     return employees
 
+
 @register.filter
 def add_days(date, days):
     return date + timedelta(days=days)
 
 
-
-
 @register.filter
 def localtime_filter(value):
     from django.utils.timezone import localtime
+
     return localtime(value)
+
+
+@register.filter
+def str_to_date(value):
+    from django.utils.timezone import localtime, make_aware, utc
+
+    date_time = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    # Convert to aware datetime objects if naive
+    date_time = (
+        make_aware(date_time, timezone=utc) if date_time.tzinfo is None else date_time
+    )
+    return date_time
+
+
+@register.inclusion_tag(filename="leave_balances/holidays.html")
+def get_holidays():
+    return {"holidays": Holiday.objects.filter(year=now().year).order_by("start_date")}
+
+
+@register.inclusion_tag(filename="leave_balances/announcement.html")
+def get_announcement(user, request):
+    announcements = (
+        HRAnnouncement.objects.filter(is_active=True)
+        .filter(start_date__lte=now().date())
+        .filter(models.Q(end_date__isnull=True) | models.Q(end_date__gte=now().date()))
+        .order_by("-pinned", "-start_date")
+    )
+
+    return {"announcements": announcements, "user": user, "request": request}
+
+
+@register.filter
+def widget_type(field):
+    """Returns the widget type as lowercase (e.g. 'textinput', 'radioselect')."""
+    return field.field.widget.__class__.__name__.lower()

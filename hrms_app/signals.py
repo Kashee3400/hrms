@@ -1,5 +1,5 @@
 # myapp/signals.py
-from .tasks import send_leave_application_notifications,send_tour_notifications,send_regularization_notification
+from .tasks import send_leave_application_notifications
 from django.contrib.sites.models import Site
 from .models import LeaveApplication, UserTour, Notification,LeaveBalanceOpenings,CustomUser,AttendanceLog
 from django.contrib.contenttypes.models import ContentType
@@ -48,8 +48,6 @@ def create_or_update_leave_log(sender, instance, created, **kwargs):
         if created:
             # Create Leave Log
             LeaveLog.create_log(instance, instance.appliedBy, 'Created')
-        
-        # Prepare notification
         Notification.objects.create(
             sender=instance.appliedBy,
             receiver=instance.appliedBy.reports_to,  # assuming the user who applied is the receiver
@@ -88,15 +86,6 @@ def create_or_update_user_tour(sender, instance, created, **kwargs):
             go_route_mobile = 'tour-detail'
         )
 
-        # Send additional notifications if needed
-        current_site = Site.objects.get_current()
-        protocol = 'http'  # or 'https' if applicable
-        domain = current_site.domain
-        try:
-            send_tour_notifications.delay(instance.id, protocol, domain)
-        except:
-            pass
-
 
 @receiver(pre_save, sender=UserTour)
 def set_user_tour_slug(sender, instance, **kwargs):
@@ -107,21 +96,7 @@ def set_user_tour_slug(sender, instance, **kwargs):
         while UserTour.objects.filter(slug=slug).exists():
             slug = f"{slug_base}-{num}"
             num += 1
-
         instance.slug = slug
-
-
-# @receiver(post_save, sender=AttendanceLog)
-# def create_or_update_regularization(sender, instance, created, **kwargs):
-#     if created:
-#         return
-#     current_site = Site.objects.get_current()
-#     protocol = 'http'  # or 'http' if applicable
-#     domain = current_site.domain
-#     try:
-#         send_regularization_notification.delay(instance.id, protocol, domain)
-#     except:
-#         pass
 
 
 @receiver(post_save, sender=LeaveApplication)

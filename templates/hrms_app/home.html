@@ -1,0 +1,265 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag i18n %}
+{{ form.media }}
+{% block title %}
+  {{ request.user.get_short_name }} | {{ title }}
+{% endblock %}
+{% block extrastyle %}
+  <link rel="stylesheet" href="{% static 'js/select.dataTables.min.css' %}" />
+  <style>
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.1);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+    
+    .flex-head1.pulse {
+      animation: pulse 1.5s infinite;
+    }
+    .separtor {
+      width: 2px;
+      background: repeating-linear-gradient(to bottom, #007bff, #007bff 5px, transparent 5px, transparent 10px);
+      height: 50px;
+      align-self: center;
+      box-shadow: 0px 0px 5px rgba(0, 123, 255, 0.7);
+    }
+    .count-card {
+      transition: all 0.3s ease-in-out;
+      border-radius: 10px;
+    }
+    
+    .count-card:hover {
+      transform: translateY(-5px); /* Lifts the card slightly */
+      box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.2); /* Adds a stronger shadow */
+      background-color: rgb(8, 174, 215); /* Subtle color change */
+    }
+    
+    .count-card:hover .icon {
+      color: rgb(7, 205, 255);
+    }
+    
+    .count-card:hover h5,
+    .count-card:hover h2 {
+      color: #007bff; /* Change text color on hover */
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="my-2">
+    <div class="row">
+      <div class="col-lg-6 d-flex flex-column px-1">
+        <div class="row flex-grow">
+          <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
+            <div class="card card-rounded pt-3 px-0">
+              <div class="d-sm-flex justify-content-between align-items-start">
+                <h4 class="card-title card-title-dash text-success px-3">{% trans "Every great day starts with a single punch. Let's make today count!" %}</h4>
+              </div>
+              <div class="mt-2">
+                <div class="container py-0 px-3">
+                  <div class="sub-flex1">
+                    <div class="flex-head1">{{ current_date }}</div>
+                    <div class="flex-head">
+                      {% trans 'Shift Timing' %}: ({{ request.user.shifts.first }})
+                    </div>
+                  </div>
+                  <hr />
+                  <div class="d-flex flex-row" style="gap: 2.5rem;">
+                    <div class="sub-flex">
+                      <div class="flex-head">
+                        <i class="fas fa-sign-in-alt"></i> {% trans 'Punch In' %}
+                      </div>
+                      <div class="flex-head1 pulse">{{ check_in_time }}</div>
+                    </div>
+                    <div class="separtor"></div>
+                    <div class="sub-flex">
+                      <div class="flex-head">
+                        <i class="fas fa-sign-out-alt"></i> {% trans 'Punch out' %}
+                      </div>
+                      <div class="flex-head1 pulse">{{ check_out_time }}</div>
+                    </div>
+                    <div class="separtor"></div>
+                    <div class="sub-flex">
+                      <div class="flex-head">
+                        {% trans 'Total Hours' %}
+                      </div>
+                      <div class="flex-head1 pulse">{{ total_hours }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6 d-flex flex-column px-1">
+        <div class="row flex-grow">
+          <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
+            <div class="card card-rounded pt-3">
+              {% if request.user.is_rm %}
+              <h4 class="card-title card-title-dash text-danger px-3">
+                {% trans 'Request Pending For Approvals' %}
+              </h4>
+              {% else %}
+              <h4 class="card-title card-title-dash text-info px-3">
+                {% trans "Monthly Attendance Data" %} ({{from_datetime.date}} - {{to_datetime.date}})
+              </h4>
+              {% endif %}
+              <div class="container mt-4 px-3">
+                <div class="scroll-container d-flex flex-row overflow-auto py-2">
+                  {% if request.user.is_rm %}
+                    {% for item in count_list %}
+                      <div class="pending-data flex-shrink-0" style="min-width: 180px;">
+                        <a href="{{ item.link }}" class="text-decoration-none h-100">
+                          <div class="card count-card shadow-sm h-100 d-flex flex-column">
+                            <div class="card-body text-center d-flex flex-column justify-content-center">
+                              <i class="{{ item.icon }} icon"></i>
+                              <h5 class="card-title mt-2 text-dark text-truncate">{{ item.title }}</h5>
+                              <h2 class="count-number">{{ item.count }}</h2>
+                            </div>
+                          </div>
+                        </a>
+                      </div>
+                    {% endfor %}
+                  {% else %}
+                    {% user_summary_counts %}
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {% get_leave_balances request.user request %}
+    </div>
+    <div class="row">
+      {% if request.user.employees.exists %}
+        <div class="col-lg-4 d-flex flex-column px-1">
+          <div class="card card-rounded shadow-sm flex-grow-1">
+            <div class="card-body px-1 py-1">
+              <div class="card shadow-sm">
+                <div class="card-header fw-bold">
+                  {% trans 'Assigned Employees' %}
+                </div>
+                <ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
+                  {% for user in request.user.employees.all %}
+                    <li class="list-group-item d-flex align-items-center">
+                      <img src="{% if user.personal_detail.avatar %}
+                          {{ user.personal_detail.avatar.url }}
+                        {% else %}
+                          {% static 'source/images/user1-128x128.jpg' %}
+                        {% endif %}"
+                        class="rounded-circle me-2"
+                        width="40"
+                        height="40" />
+                      <div class="user-info d-flex flex-column">
+                        <div class="fw-bold text-truncate">{{ user.get_full_name }} ({{ user.personal_detail.designation }})</div>
+                        <div class="email text-truncate">{{ user.official_email }}</div>
+                      </div>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- HR Announcement -->
+      <div class="col-lg-5 d-flex flex-column px-1">
+        <div class="card card-rounded shadow-sm flex-grow-1">
+          <div class="card-body px-1 py-1">
+            <div class="card shadow-sm">
+              <div class="card-header bg-info fw-bold">
+                {% trans 'HR Announcement' %}
+              </div>
+              {% get_announcement user request %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Holidays -->
+      <div class="col-lg-3 d-flex flex-column px-1">
+        <div class="card card-rounded shadow-sm flex-grow-1">
+          <div class="card-body px-1 py-1">
+            <div class="card shadow-sm">
+              <div class="card-header bg-warning fw-bold">
+                {% trans 'Holidays' %}
+              </div>
+              {% get_holidays %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row mt-3">
+      <div class="card card-rounded py-3">
+        <div class="table-responsive">
+          <table class="table table-bordered table-striped table-hover">
+            <thead class="table-primary">
+              <tr>
+                <th>Employee Code</th> <th>Employee Name</th> {% for day in days_in_month %}
+                  <th>{{ day|date:'d-m' }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for employee in employees %}
+                <tr>
+                  <td>
+                    {% format_emp_code employee.personal_detail.employee_code %}
+                  </td>
+                  <td>{{ employee.get_full_name }}</td>
+                  {% for mdate in days_in_month %}
+                    <td>
+                      {% get_item attendance_data employee.id mdate as statuses %}
+                      {% for status in statuses %}
+                        <span style="color: {{ status.color }};">{{ status.status }}</span>
+                        {% if not forloop.last %} {% endif %}
+                      {% endfor %}
+                    </td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script>
+    $(document).ready(function () {
+      $('.table').DataTable({
+        paging: true,
+        searching: true,
+        ordering: false,
+        dom: 'Bfrtip',
+        buttons: [],
+        pageLength: 25,
+        lengthMenu: [10, 25, 50, 100]
+      })
+    })
+  </script>
+{% endblock %}

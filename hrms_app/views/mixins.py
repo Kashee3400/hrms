@@ -73,10 +73,14 @@ class LeaveListViewMixin:
 
 
 from django.core.exceptions import PermissionDenied
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
 
+@method_decorator(login_required, name="dispatch")
 class ModelPermissionRequiredMixin:
     model = None
     permission_action = "view"
+    permission_message = "You do not have the required permissions."
 
     def has_permission(self, user):
         if not self.model:
@@ -87,5 +91,6 @@ class ModelPermissionRequiredMixin:
 
     def dispatch(self, request, *args, **kwargs):
         if not self.has_permission(request.user):
-            raise PermissionDenied("You do not have the required permissions.")
+            raise PermissionDenied(self.permission_message)
         return super().dispatch(request, *args, **kwargs)
+

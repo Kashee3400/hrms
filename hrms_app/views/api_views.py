@@ -634,8 +634,6 @@ class HolidayViewSet(viewsets.ModelViewSet):
         queryset = super().get_queryset()
         start_date_str = self.request.query_params.get("start_date", None)
         end_date_str = self.request.query_params.get("end_date", None)
-
-        # Parse the date strings and handle any errors
         try:
             start_date = self._validate_date_format(start_date_str)
             end_date = self._validate_date_format(end_date_str)
@@ -1467,3 +1465,67 @@ class Top5EmployeesView(View):
                 'fill': False
             })
         return JsonResponse(data)
+
+class SendOTPView(APIView):
+    def post(self, request):
+        serializer = SendOTPSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            user = CustomUser.objects.get(email=email)
+            otp = f"{random.randint(100000, 999999)}"
+            EmailOTP.objects.update_or_create(
+                user=user,
+                email=email,
+                defaults={"otp": otp, "verified": False, "created_at": timezone.now()},
+            )
+            try:
+                send_mail(
+                    subject="Your Email Verification OTP",
+                    message=f"Your OTP is: {otp}",
+                    from_email=settings.HRMS_DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+            except Exception as e:
+                return Response(
+                    {"error": "Failed to send email.", "details": str(e)},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+            return Response({"message": "OTP sent successfully."}, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class VerifyOTPView(APIView):
+    def post(self, request):
+        serializer = VerifyOTPSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            otp = serializer.validated_data["otp"]
+            user = CustomUser.objects.get(email=email)
+            try:
+                otp_entry = EmailOTP.objects.get(user=user, email=email, otp=otp)
+                if user.is_personal_email_verified:
+                    return Response({"message": "This email is already verified."})
+
+                if otp_entry.is_expired():
+                    return Response(
+                        {"error": "OTP has expired. Please request a new one."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+
+                otp_entry.verified = True
+                otp_entry.save()
+                user.email = email
+                user.is_personal_email_verified = True
+                user.save()
+
+                return Response({"message": "OTP verified successfully."})
+
+            except EmailOTP.DoesNotExist:
+                return Response(
+                    {"error": "Invalid OTP or email address."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -6,6 +6,7 @@ from hrms_app.hrms.resources import (
     HolidayResource,
     UserTourResource,
     LeaveTransactionResource,
+    PersonalDetailsResource,
 )
 from .models import *
 from django_ckeditor_5.widgets import CKEditor5Widget
@@ -419,19 +420,9 @@ class LeaveTransactionAdmin(ImportExportModelAdmin, admin.ModelAdmin):
     resource_class = LeaveTransactionResource
 
 
-# @admin.register(LeaveStatusPermission)
-# class LeaveStatusPermissionAdmin(admin.ModelAdmin):
-#     list_display = (
-#         "role",
-#         "user",
-#         "status",
-#     )  # Fields to display in the admin list view
-#     list_filter = ("role", "status")  # Filters for the list view
-#     search_fields = ("role", "user__username", "status")  # Search functionality
-#     # autocomplete_fields = ("user",)
-
-
-class PersonalDetailAdmin(admin.ModelAdmin):
+class PersonalDetailAdmin(ImportExportModelAdmin,admin.ModelAdmin,):
+    resource_class =PersonalDetailsResource
+    
     list_display = (
         "employee_code",
         "user",
@@ -787,3 +778,45 @@ class AttendanceLogActionAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         """Optimize queryset by selecting related fields"""
         return super().get_queryset(request).select_related("log", "action_by")
+
+@admin.register(EmailOTP)
+class EmailOTPAdmin(admin.ModelAdmin):
+    list_display = ("email", "user", "otp", "verified", "created_at")
+    list_filter = ("verified", "created_at")
+    search_fields = ("email", "otp", "user__username", "user__email")
+    ordering = ("-created_at",)
+    date_hierarchy = "created_at"
+    readonly_fields = ("created_at",)
+
+    fieldsets = (
+        (None, {
+            "fields": ("user", "email", "otp", "verified", "created_at")
+        }),
+    )
+
+    def has_add_permission(self, request):
+        # OTPs should only be created via logic, not manually.
+        return False
+
+@admin.register(OfficeClosure)
+class OfficeClosureAdmin(admin.ModelAdmin):
+    list_display = ('date', 'closure_type', 'reason_summary', 'created_at')
+    list_filter = ('closure_type',)
+    search_fields = ('reason',)
+    date_hierarchy = 'date'
+    ordering = ('-date',)
+    readonly_fields = ('created_at',)
+
+    fieldsets = (
+        (None, {
+            'fields': ('date', 'closure_type', 'reason')
+        }),
+        ('Metadata', {
+            'fields': ('created_at',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    def reason_summary(self, obj):
+        return (obj.reason[:50] + '...') if len(obj.reason) > 50 else obj.reason
+    reason_summary.short_description = 'Reason'

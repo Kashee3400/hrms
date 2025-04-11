@@ -8,6 +8,7 @@ from hrms_app.models import (
     AttendanceLogHistory,
     LeaveDay,
     UserTour,
+    OfficeClosure,
 )
 
 User = get_user_model()
@@ -183,7 +184,6 @@ def generate_monthly_presence_data_detailed(
         Q(start_date__date__range=[converted_from_datetime, converted_to_datetime])
         |Q(end_date__date__range=[converted_from_datetime, converted_to_datetime]),
     ).filter(applied_by__in=employees.values_list("id", flat=True)).select_related("applied_by__personal_detail")
-    print(logs)
     # User Tours
     all_tours = UserTour.objects.filter(
         Q(start_date__range=[converted_from_datetime, converted_to_datetime])
@@ -196,6 +196,7 @@ def generate_monthly_presence_data_detailed(
     ).select_related("applied_by__personal_detail")
 
     holidays = get_payroll_date_holidays(converted_from_datetime, converted_to_datetime)
+
     process_sundays_and_holidays(
         employees,
         holidays,
@@ -203,6 +204,7 @@ def generate_monthly_presence_data_detailed(
         converted_from_datetime,
         converted_to_datetime,
     )
+    
     process_logs(logs, monthly_presence_data)
     process_leaves(leaves, monthly_presence_data)
     process_tours(all_tours, monthly_presence_data)
@@ -215,10 +217,9 @@ def process_logs(logs, monthly_presence_data):
         emp_code = log.applied_by.personal_detail.employee_code
         log_date = log.start_date
         history = None
-
+        office_closer = OfficeClosure.objects.filter(date=log.start_date.date()).values("short_code").first()        
         if log.regularized:
             history = AttendanceLogHistory.objects.filter(attendance_log=log).last()
-
         if history:
             # Parse and make `start_date` and `end_date` timezone-aware if they aren't already
             parsed_in_time = datetime.strptime(
@@ -227,7 +228,6 @@ def process_logs(logs, monthly_presence_data):
             parsed_out_time = datetime.strptime(
                 history.previous_data["end_date"], "%Y-%m-%dT%H:%M:%SZ"
             )
-
             # Convert to aware datetime objects if naive
             parsed_in_time = (
                 make_aware(parsed_in_time, timezone=utc)
@@ -239,7 +239,6 @@ def process_logs(logs, monthly_presence_data):
                 if parsed_out_time.tzinfo is None
                 else parsed_out_time
             )
-            # Convert to local timezone and format
             in_time = localtime(parsed_in_time).strftime("%I:%M")
             out_time = localtime(parsed_out_time).strftime("%I:%M")  if history.previous_data["reg_status"] != "mis punching" else ""
             status = history.previous_data["att_status_short_code"]
@@ -250,7 +249,6 @@ def process_logs(logs, monthly_presence_data):
             out_time = localtime(log.end_date).strftime("%I:%M")
             status = log.att_status_short_code
             duration = log.duration
-
         # Update the monthly_presence_data dictionary
         monthly_presence_data[emp_code][log_date.date().strftime("%Y-%m-%d")][
             "present"
@@ -259,7 +257,7 @@ def process_logs(logs, monthly_presence_data):
             "in_time": in_time,
             "out_time": out_time,
             "total_duration": duration,
-            "reg": "R" if log.regularized else "",
+            "reg": "R" if log.regularized else office_closer['short_code'] if office_closer else "",
         }
 
 
@@ -277,7 +275,6 @@ def process_leaves(leaves, monthly_presence_data):
         current_entry = (
             employee_attendance.get(date_key, {}) if employee_attendance else None
         )
-
         # Check if current_entry contains FL or OFF and remove them
         if not code == "CL":
             if current_entry and (
@@ -305,7 +302,6 @@ def process_tours(all_tours, monthly_presence_data):
         daily_durations = calculate_daily_tour_durations(
             tour.start_date, tour.start_time, tour.end_date, tour.end_time
         )
-
         emp_code = tour.applied_by.personal_detail.employee_code
         for date, short_code, duration in daily_durations:
             monthly_presence_data[emp_code][date.strftime("%Y-%m-%d")]["tour"] = {
@@ -323,16 +319,13 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
     # Initialize the current datetime to the start datetime
     current_datetime = start_datetime
     daily_durations = []
-
     while current_datetime.date() <= end_datetime.date():
         # Calculate the end of the current day
         attendance_log = AttendanceLog.objects.filter(
             start_date__date=current_datetime.date()
         ).first()
-
         # Initialize log duration
         log_duration = timedelta(hours=0)  # Default duration is 0
-
         # Add attendance log duration if it exists
         if attendance_log and attendance_log.duration:
             log_duration = timedelta(
@@ -340,29 +333,22 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
                 minutes=attendance_log.duration.minute,
                 seconds=attendance_log.duration.second,
             )
-
         end_of_day = datetime.combine(current_datetime.date(), datetime.max.time())
         # Determine the actual end time for the current day
         actual_end_time = min(end_of_day, end_datetime)
-
         # Calculate the duration for the current day
         duration = actual_end_time - current_datetime
-
         # Combine log duration and calculated duration
         total_duration = duration + log_duration
         total_hours = total_duration.total_seconds() / 3600
-
         # Determine the short code based on the total hours
         short_code = "T" if total_hours >= 8 else "TH"
-
         # Append the result for the current day
         daily_durations.append((current_datetime.date(), short_code, total_duration))
-
         # Move to the next day
         current_datetime = datetime.combine(
             current_datetime.date() + timedelta(days=1), datetime.min.time()
         )
-
     return daily_durations
 
 
@@ -403,6 +389,22 @@ def get_payroll_date_holidays(start_date, end_date):
     holidays = Holiday.objects.filter(start_date__range=[start_date, end_date])
     return list(holidays)
 
+
+def get_office_closers(start_date, end_date):
+    """
+    Fetch office closure records within a date range (inclusive),
+    returning only date and short_code fields as dictionaries.
+    
+    Returns:
+        List[Dict]: [{'date': ..., 'short_code': ...}, ...]
+    """
+    return list(
+        OfficeClosure.objects.filter(
+            date__range=(start_date, end_date)
+        )
+        .order_by('-date')
+        .values('date', 'short_code')
+    )
 
 def mark_leave_attendance(current_date, att, day_entry_start):
     if current_date == att.startDate:

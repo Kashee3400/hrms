@@ -1,17 +1,133 @@
-{% for leave_balance in leave_balances %}
-  <div class="col-md-3 mb-3">
-    <div class="card" style="background-color: {{ leave_balance.color }};">
-      <div class="card-header">
-        <div class="text-white">{{ leave_balance.leave_type }}</div>
+{% load i18n %}
+<style>
+  /* Hide scrollbar but keep functionality */
+  .overflow-auto::-webkit-scrollbar {
+    display: none;
+  }
+  .overflow-auto {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .leave-card {
+    border-radius: 1rem;
+    padding: 1rem;
+    background: radial-gradient(circle at center, #ffffff,rgb(255, 242, 242),rgb(244, 219, 255),rgb(213, 234, 255)) !important;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    min-height: 200px;
+    color: #fff;
+  }
+  
+  .leave-card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  }
+  
+  .leave-header {
+    font-size: 1.2rem;
+    margin-bottom: 15px;
+  }
+  
+  .leave-title {
+    font-size: 1rem; /* Slightly smaller title */
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .leave-detail p {
+    font-size: 1rem;
+    margin-bottom: 6px;
+    color: #555;
+  }
+  
+  .leave-detail strong {
+    font-weight: 600;
+  }
+  
+  .icon-circle {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  
+  .btn-outline-primary {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+  }
+  
+  .badge.mpulse {
+    position: relative;
+    animation: mpulse 1.5s infinite;
+  }
+  
+  .leave-chart canvas {
+    max-width: 60px; /* Smaller chart size */
+    margin: auto;
+  }
+  
+  /* Pulse animation */
+  @keyframes mpulse {
+    0% {
+      box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.5);
+    }
+    70% {
+      box-shadow: 0 0 0 8px rgba(255, 0, 0, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
+    }
+  }
+  
+  /* Adjusting badge placement */
+  .badge {
+    font-size: 0.75rem; /* Smaller text for badge */
+    padding: 0.25rem 0.5rem;
+  }
+</style>
+<div class="container">
+  <div class="d-flex flex-nowrap overflow-auto py-3">
+    {% for leave_balance in leave_balances %}
+      <div class="flex-shrink-0 me-3" style="width: 20%;">
+        <!-- ~4 items per view -->
+        <div class="card leave-card shadow-sm border-0 h-100">
+          <div class="leave-header mb-3" style="border-left: 6px solid {{ leave_balance.color }}; padding-left: 10px;">
+            <div class="d-flex align-items-center justify-content-between">
+              <div class="d-flex align-items-center">
+                <div class="icon-circle me-2" style="background-color: {{ leave_balance.color }};">
+                  <i class="bi bi-calendar-check text-white"></i>
+                </div>
+                <span class="leave-title">{{ leave_balance.leave_type.leave_type }}</span>
+              </div>
+              {% if leave_balance.total_balance == 0 %}
+                <span class="badge bg-danger mpulse">{% trans 'No Balance' %}</span>
+              {% elif leave_balance.total_balance <= 1 %}
+                <span class="badge bg-warning text-dark mpulse">{% trans 'Low Balance' %}</span>
+              {% endif %}
+            </div>
+          </div>
+          <div class="leave-detail">
+            <p>
+              <i class="fas fa-list-check me-2 text-muted"></i>{% trans 'Total Balance:' %}<strong>{{ leave_balance.balance }}</strong>
+            </p>
+            <p>
+              <i class="fas fa-hourglass-half me-2 text-muted"></i> {% trans 'Remaining:' %} <strong>{{ leave_balance.total_balance }}</strong>
+            </p>
+            <p>
+              <i class="fas fa-pause-circle me-2 text-muted"></i> {% trans 'On Hold:' %} <strong>{{ leave_balance.on_hold }}</strong>
+            </p>
+            <p>
+              <i class="fas fa-check-circle me-2 text-muted"></i> {% trans 'Used Leave:' %} <strong>{{ leave_balance.used_leave }}</strong>
+            </p>
+          </div>
+          <div class="leave-action text-center mt-auto">
+            <a href="{{ leave_balance.url }}?next={{ request.path }}" class="btn btn-outline-primary btn-sm" style="border-color: {{ leave_balance.color }}; color: {{ leave_balance.color }};">Apply Leave <i class="fas fa-arrow-right ms-1"></i></a>
+          </div>
+        </div>
       </div>
-      <div class="card-body text-white">
-        <div class="text-white">Total Bal: {{ leave_balance.balance }}</div>
-        <h2 class="card-title mb-0 text-white">Remaining Bal: {{ leave_balance.total_balance }}</h2>
-        <div class="text-white">On Hold: {{ leave_balance.on_hold }}</div>
-      </div>
-      <div class="card-footer text-center">
-        <a href="{{ leave_balance.url }}?next={{ request.path }}" class="btn btn-warning btn-sm">Apply Leave <span class="bi bi-arrow-right"></span></a>
-      </div>
-    </div>
+    {% endfor %}
   </div>
-{% endfor %}
+</div>

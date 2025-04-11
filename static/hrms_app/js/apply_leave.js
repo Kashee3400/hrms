@@ -1,7 +1,9 @@
 $(document).ready(function () {
-    // Hide elements initially
-    $('#balances,#leave_type_div,#choices').hide();
-    // Function to update date-related calculations
+    $('select').select2('destroy');
+    $(document).on('dp.change', function () {
+        updateDateHandling();
+    })
+    updateDateHandling();
     function updateDateHandling() {
         var startDate = $('#id_startDate').val();
         var endDate = $('#id_endDate').val();
@@ -16,39 +18,38 @@ $(document).ready(function () {
             $('#balances').show();
         }
     }
-
-    // Bind the change event to both startDate and endDate
-    $('#id_startDate, #id_endDate').change(function () {
-        updateDateHandling();  // Call the update function when date is changed
-    });
-
-    // Call the same function on page load to handle initial state
-    updateDateHandling();
-
-    // Handle leave option changes
     $(document).on('change', '.leaveOption', function () {
-        var selectId = $(this).attr('id');
-        var selectedValue = $(this).val();
-        var startDate = $('#id_startDate').val();
-        var endDate = $('#id_endDate').val();
-        if (selectId && selectId.startsWith('id_startDayChoice')) {
-            startDay = selectedValue;
-            if (startDate === endDate) {
-                $('#id_endDayChoice').val(selectedValue);
-                endDay = selectedValue;
-            }
-            $('#id_startDayChoice').val(selectedValue);
-            updateTotalDays(startDay, endDay);
-        } else if (selectId && selectId.startsWith('id_endDayChoice')) {
-            endDay = selectedValue;
-            if (startDate === endDate) {
-                $('#id_startDayChoice').val(selectedValue);
+        const $this = $(this);
+        setTimeout(function () {
+            const selectId = $this.attr('id');
+            const selectedValue = $this.val();
+            const startDate = $('#id_startDate').val();
+            const endDate = $('#id_endDate').val();
+            let startDay = $('#id_startDayChoice').val();
+            let endDay = $('#id_endDayChoice').val();
+            if (selectId && selectId.startsWith('id_startDayChoice')) {
                 startDay = selectedValue;
+                $('#id_startDayChoice').val(selectedValue);
+
+                if (startDate === endDate) {
+                    endDay = selectedValue;
+                    $('#id_endDayChoice').val(selectedValue);
+                }
             }
-            $('#id_endDayChoice').val(selectedValue);
+            else if (selectId && selectId.startsWith('id_endDayChoice')) {
+                endDay = selectedValue;
+                $('#id_endDayChoice').val(selectedValue);
+
+                if (startDate === endDate) {
+                    startDay = selectedValue;
+                    $('#id_startDayChoice').val(selectedValue);
+                }
+            }
+            // Call your function to update total days
             updateTotalDays(startDay, endDay);
-        }
+        }, 0);
     });
+
     function updateTotalDays(startDay, endDay) {
         var startDate = $('#id_startDate').val();
         var endDate = $('#id_endDate').val();
@@ -64,10 +65,11 @@ $(document).ready(function () {
             "3-1": -0.5,    // Second Half - Full Day
             "1-2": -0.5,    // Full Day - First Half
         };
-        let adjustment = 0; // Default adjustment
+        let adjustment = 0;
+
         if (startDate === endDate) {
             // Handle same-day logic
-            if (startDay === 1 && totalDays >= 1) {
+            if (startDay === "1" && totalDays >= "1") {
                 adjustment = 0;
             } else if ((totalDays - 0.5) < 0) {
                 alert("Insufficient leave balance for this request.");
@@ -76,17 +78,14 @@ $(document).ready(function () {
                 adjustment = -0.5;
             }
         } else {
-            // Use the lookup table to determine the adjustment
             const key = `${startDay}-${endDay}`;
             adjustment = adjustments[key] || 0; // Default to 0 if key not found
         }
-        // Validate totalDays after adjustment
         const newTotalDays = totalDays + adjustment;
         if (newTotalDays < 0) {
             alert("Insufficient leave balance for this request.");
             return; // Exit the function if validation fails
         }
-        // Update totalDays and balance
         $('#totalDays').text(newTotalDays);
         setBalance(leaveBalance, newTotalDays);
     }
@@ -122,42 +121,45 @@ $(document).ready(function () {
             }
         }
     }
-    function formatDate(dateStr) {
-        var parts = dateStr.split('/');
-        var dateObj = new Date(parts[2], parts[0] - 1, parts[1]);
-        var formattedDate = dateObj.toLocaleDateString('en-CA');
-        return formattedDate;
-    }
-    
 
     function generateDateOptions(startDate, endDate) {
         var currentDate = new Date(startDate);
         var endDateObj = new Date(endDate);
         var tableHTML = '<table class="table">';
         var totalDays = 0;
-        // Fetch holiday data from API
-        var formattedStartDate = formatDate(startDate);
-        var formattedEndDate = formatDate(endDate);
         var holidays = {};
         $.ajax({
-            url: `/api/v1/holidays/?start_date=${formattedStartDate}&end_date=${formattedEndDate}`,
+            url: `/api/v1/holidays/?start_date=${startDate}&end_date=${endDate}`,
             type: "GET",
             async: false,
             success: function (response) {
-                console.log("API Response:", response);
                 if (response.results && response.results.data) {
                     response.results.data.forEach(holiday => {
-                        holidays[holiday.start_date] = holiday.title;  // Store holiday title by date
+                        holidays[holiday.start_date] = holiday.title;
                     });
                 } else {
-                    console.error("Invalid response structure");
                 }
             },
             error: function (xhr, status, error) {
-                console.error("AJAX Error:", status, error);
-                console.error("Response Text:", xhr.responseText);
             }
         });
+        // If startDate === endDate and it's a holiday or Sunday, show alert and return
+        if (startDate === endDate) {
+            const checkDate = new Date(startDate);
+            const isSunday = checkDate.getDay() === 0;
+            const formattedForHoliday = checkDate.toLocaleDateString('en-CA'); // yyyy-mm-dd
+            const isHoliday = holidays.hasOwnProperty(formattedForHoliday);
+
+            if (isSunday || isHoliday) {
+                alert("Selected date is either a Sunday or a Holiday. Leave cannot be applied.");
+                $('#dateOptions').html(""); // Clear table if any
+                $('#totalDays').text("0 Day(s)");
+
+                // Reload the page after a small delay
+                setTimeout(() => location.reload(), 100);
+                return 0;
+            }
+        }
 
         while (currentDate <= endDateObj) {
             var formattedDate = currentDate.toDateString();
@@ -169,9 +171,14 @@ $(document).ready(function () {
             if (leaveTypeShortCode === 'CL' && (isSunday || holidayTitle)) {
                 totalDays--;
             }
-
+            var colorClass = "text-dark"
+            let displayText = formattedDate;
+            if (leaveTypeShortCode === 'CL' && isSunday) {
+                displayText += ' - Weekly Off';
+                colorClass = "text-danger";
+            }
             tableHTML += '<tr>';
-            tableHTML += `<td class="formattedDate text-dark font-weight-bold">${formattedDate} ${holidayTitle ? ` - ${holidayTitle}` : ''}</td>`;
+            tableHTML += `<td class="formattedDate  ${colorClass} font-weight-bold">${displayText} ${holidayTitle ? ` - ${holidayTitle}` : ''}</td>`;
             tableHTML += '<td>';
 
             if (isStart) {
@@ -207,51 +214,3 @@ $(document).ready(function () {
     }
 
 });
-
-
-// function generateDateOptions(startDate, endDate) {
-//     var currentDate = new Date(startDate);
-//     var endDateObj = new Date(endDate);
-//     var tableHTML = '<table class="table">';
-//     var totalDays = 0;
-//     while (currentDate <= endDateObj) {
-//         var formattedDate = currentDate.toDateString();
-//         var isStart = currentDate.toDateString() === new Date(startDate).toDateString();
-//         var isEnd = currentDate.toDateString() === new Date(endDate).toDateString();
-
-//         tableHTML += '<tr>';
-//         tableHTML += '<td class="formattedDate text-dark font-weight-bold">' + formattedDate + '</td>';
-//         tableHTML += '<td>';
-
-//         if (isStart) {
-//             tableHTML += '<select id="id_startDayChoice" class="form-select leaveOption id_startDayChoice">';
-//             tableHTML += '<option value="1">Full Day</option>';
-//             tableHTML += '<option value="2">First Half</option>';
-//             tableHTML += '<option value="3">Second Half</option>';
-//             tableHTML += '</select>';
-//             totalDays++;
-//         } else if (isEnd) {
-//             tableHTML += '<select id="id_endDayChoice" class="form-select leaveOption id_endDayChoice">';
-//             tableHTML += '<option value="1">Full Day</option>';
-//             tableHTML += '<option value="2">First Half</option>';
-//             tableHTML += '</select>';
-//             totalDays++;
-//         } else {
-//             tableHTML += '<select class="form-select leaveOption">';
-//             tableHTML += '<option value="1">Full Day</option>';
-//             tableHTML += '</select>';
-//             totalDays++;
-//         }
-
-//         tableHTML += '</td>';
-//         tableHTML += '</tr>';
-//         // Move to the next date
-//         currentDate.setDate(currentDate.getDate() + 1);
-//     }
-
-//     tableHTML += '</table>';
-//     $('#dateOptions').html(tableHTML)
-//     $('#totalDays').text(totalDays + ' Day(s)')
-//     return totalDays;
-// }
-

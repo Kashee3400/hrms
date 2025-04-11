@@ -1,0 +1,35 @@
+{% load i18n %}
+<ul class="list-group list-group-flush" style="max-height: 250px; overflow-y: auto;">
+  {% for announcement in announcements %}
+    {% if announcement.type == "urgent" %}
+      {% with "list-group-item-danger" as type_class %}
+        {% with "🚨" as type_icon %}
+          {% include "hrms_app/hr/announcement_item.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% elif announcement.type == "info" %}
+      {% with "list-group-item-info" as type_class %}
+        {% with "ℹ️" as type_icon %}
+          {% include "hrms_app/hr/announcement_item.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% elif announcement.type == "holiday" %}
+      {% with "list-group-item-success" as type_class %}
+        {% with "🎉" as type_icon %}
+          {% include "hrms_app/hr/announcement_item.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% else %}
+      {% with "list-group-item-secondary" as type_class %}
+        {% with "📢" as type_icon %}
+          {% include "hrms_app/hr/announcement_item.html" %}
+        {% endwith %}
+      {% endwith %}
+    {% endif %}
+
+  {% empty %}
+    <li class="list-group-item text-muted text-center">
+      {% trans "No announcements available." %}
+    </li>
+  {% endfor %}
+</ul>

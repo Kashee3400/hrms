@@ -1,8 +1,8 @@
 {% extends 'hrms_app/base.html' %}
-{% load static hrms_tag %}
+{% load static hrms_tag i18n %}
 {{ form.media }}
 {% block title %}
-  {{ request.user.first_name }} | Apply Tour
+  {{ request.user.first_name }} | {% trans "Apply Tour" %}
 {% endblock %}
 
 {% block extrastyle %}

@@ -7,16 +7,13 @@
   </div>
 
   <ul class="nav flex-column">
-    {% if request.user.is_superuser or request.user.is_staff %}
-      {% url 'dashboard' as index_url %}
-      <li class="nav-item {% if request.path == index_url %} active {% endif %}">
-        <a class="nav-link" href="{{ index_url }}">
-          <i class="mdi mdi-grid-large menu-icon"></i>
-          <span class="menu-title">{% trans 'Dashboard' %}</span>
-        </a>
-      </li>
-    {% endif %}
-
+    {% url 'home' as home_url %}
+    <li class="nav-item {% if request.path == home_url %} active {% endif %}">
+      <a class="nav-link" href="{{ home_url }}">
+        <i class="mdi mdi-home menu-icon"></i>
+        <span class="menu-title">{% trans 'Home' %}</span>
+      </a>
+    </li>
     <!-- Leave Tracker -->
     {% url 'calendar' as calendar_url %}
     <li class="nav-item {% if request.path == calendar_url %} active {% endif %}">
@@ -27,11 +24,11 @@
     </li>
 
     {% if user.is_superuser or user.is_staff %}
-      <!-- Django dynamic menu items -->
       {% admin_get_menu as app_list %}
       {% if app_list %}
         {% for app in app_list %}
           {% if app.has_perms and not app.pinned %}
+          {% comment %} {% if app.has_perms and not app.pinned and app.app_label in "hrms_app,django_celery_beat" %} {% endcomment %}
             <li class="nav-item {% if app.app_label in request.path %} active {% endif %}">
               <a class="nav-link"
                 data-bs-toggle="collapse"

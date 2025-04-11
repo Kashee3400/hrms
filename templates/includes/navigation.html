@@ -1,4 +1,61 @@
 {% load static i18n hrms_tag %}
+<style>
+  /* Basic Nav Styling */
+  .nested-nav .nav-link {
+    color: #333;
+    font-weight: 500;
+    padding: 6px 12px;
+    position: relative;
+    transition: color 0.3s;
+  }
+  
+  .nested-nav .nav-link:hover {
+    color: #0d6efd;
+    text-decoration: none;
+  }
+  
+  /* Separator styling */
+  .nav-separator {
+    color: #999;
+    margin: 0 8px;
+    font-weight: 500;
+  }
+  
+  /* Dropdown Styles */
+  .nested-nav .dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    min-width: 200px;
+    border-radius: 0.5rem;
+    background-color: #fff;
+    padding: 0.5rem 0;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+  }
+  
+  .nested-nav .dropdown-menu .dropdown-item {
+    font-size: 14px;
+    padding: 8px 16px;
+    color: #333;
+  }
+  
+  .nested-nav .dropdown-menu .dropdown-item:hover {
+    background-color: #f0f0f0;
+    color: #0d6efd;
+  }
+  
+  /* Arrow icon */
+  .toggle-icon {
+    transition: transform 0.3s ease;
+  }
+  
+  .dropdown.show .toggle-icon {
+    transform: rotate(180deg);
+  }
+  </style>
+  
 <nav class="navbar default-layout col-lg-12 col-12 p-0 fixed-top d-flex align-items-top flex-row">
   <div class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-start">
     <div class="me-3">
@@ -10,34 +67,61 @@
     </div>
   </div>
   <div class="navbar-menu-wrapper d-flex align-items-top">
-    <ul class="navbar-nav">
-      <li class="nav-item font-weight-semibold d-none d-lg-block ms-0">
-        <h1 class="welcome-text">{{ GREETING }}, {{user.personal_detail.salutation}} <span class="text-black fw-bold"><strong>{% firstof user.get_short_name user.get_username %}</strong>.</span></h1>
-        <h3 class="welcome-sub-text">
-          {% comment %} {% block nav-breadcrumbs %}
-          <nav aria-label="{% translate 'Breadcrumbs' %}">
-            {% block breadcrumbs %}
-              <div class="breadcrumbs">
-                <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
-                {% if title %}
-                  &rsaquo; {{ title }}
-                {% endif %}
-              </div>
-            {% endblock %}
-          </nav>
-          {% endblock %} {% endcomment %}
-        </h3>
+    <ul class="navbar-nav w-90">
+      <li class="nav-item font-weight-semibold d-none d-lg-block ms-0 w-100">
+        <h1 class="welcome-text">
+          {{ GREETING }}, {{ user.personal_detail.salutation }}
+          <span class="text-black fw-bold"><strong>{% firstof user.get_short_name user.get_username %}</strong>.</span>
+        </h1>
+        <nav class="mt-2" style="background-color: darkblue;" aria-label="{% translate 'Breadcrumbs' %}">
+          <ul class="nav nested-nav align-items-center">
+            <!-- Home -->
+            <li class="nav-item">
+              <a class="nav-link text-white" href="{% url 'home' %}">{% trans "Home" %}</a>
+            </li>
+            <li class="nav-separator">|</li>
+            {% if request.user.is_superuser %}
+            {% url 'dashboard' as index_url %}
+            <li class="nav-item {% if request.path == index_url %} active {% endif %}">
+              <a class="nav-link text-white" href="{{ index_url }}">{% trans 'Admin Dashboard' %}</a>
+            </li>
+            <li class="nav-separator">|</li>
+          {% endif %}
+            <!-- Tours (Dropdown) -->
+            <li class="nav-item dropdown position-relative">
+              <a class="nav-link text-white dropdown-toggle d-flex align-items-center" href="#">
+                {% trans 'Tours' %}
+              </a>
+              <ul class="dropdown-menu custom-dropdown shadow">
+                <li><a class="dropdown-item" href="{% url 'tour_tracker' %}">{% trans 'Tour Tracker' %}</a></li>
+                <li><a class="dropdown-item" href="{% url 'apply_tour' %}">{% trans 'Apply Tour' %}</a></li>
+              </ul>
+            </li>
+            <li class="nav-separator">|</li>
+            <!-- Regularizations -->
+            <li class="nav-item">
+              <a class="nav-link text-white" href="{% url 'regularization' %}">{% trans 'Regularizations' %}</a>
+            </li>
+            {% if request.user.is_superuser or request.user.is_staff %}
+            <li class="nav-separator">|</li>
+            <!-- Announcement -->
+            <li class="nav-item">
+              <a class="nav-link text-white" href="{% url 'announcements' %}">{% trans 'Announcement' %}</a>
+            </li>
+            {% endif %}
+          </ul>
+        </nav>
+        
       </li>
     </ul>
     <ul class="navbar-nav ms-auto">
       <li class="nav-item">
-        <form class="search-form method="get">
+        <form class="search-form" method="get">
           <i class="icon-search"></i>
           <input type="search" name="q" class="form-control" placeholder="Search Here" title="Search here" />
         </form>
       </li>
       {% load_notifications request.user %}
-      
       <li class="nav-item dropdown d-none d-lg-block user-dropdown">
         <a class="nav-link" id="UserDropdown" href="#" data-bs-toggle="dropdown" aria-expanded="false">
           <img class="img-xs rounded-circle" 
@@ -49,14 +133,13 @@
             alt="Profile image" />
         <div class="dropdown-menu dropdown-menu-right navbar-dropdown" aria-labelledby="UserDropdown">
           <div class="dropdown-header text-center">
-            
             <img style="height: 60px;width: 60px;" class="img-md rounded-circle" 
             {% if user.personal_detail.avatar %}src="{{user.personal_detail.avatar.url}}"{% else %}src="{% static 'images/faces/face8.jpg' %}"{% endif %}
             alt="Profile image" />
             <p class="mb-1 mt-3 font-weight-semibold">{% firstof user.get_full_name user.get_username %}</p>
             <p class="fw-light text-muted mb-0">{{user.email}}</p>
           </div>
-          <a class="dropdown-item" href="{% url 'employee_profile' request.user.pk %}"><i class="dropdown-item-icon mdi mdi-account-outline text-primary me-2"></i> {% trans "My Profile" %} <span class="badge badge-pill badge-danger">1</span></a>
+          <a class="dropdown-item" href="{% url 'employee_profile' request.user.pk %}"><i class="dropdown-item-icon mdi mdi-account-outline text-primary me-2"></i> {% trans "My Profile" %}</a>
           <a class="dropdown-item" href="{% url 'password_change' %}"><i class="dropdown-item-icon mdi mdi-pencil text-primary me-2"></i>{% trans "Change Password" %}</a>
           {% if request.user.is_authenticated %}
             <form id="logout-form" method="post" action="{% url 'logout' %}">
@@ -72,3 +155,47 @@
     <button class="navbar-toggler navbar-toggler-right d-lg-none align-self-center" type="button" data-bs-toggle="offcanvas"><span class="mdi mdi-menu"></span></button>
   </div>
 </nav>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const dropdowns = document.querySelectorAll('.nested-nav .dropdown');
+
+    dropdowns.forEach(dropdown => {
+      const toggle = dropdown.querySelector('.dropdown-toggle');
+      const menu = dropdown.querySelector('.dropdown-menu');
+      const icon = dropdown.querySelector('.toggle-icon');
+
+      // Show on hover
+      dropdown.addEventListener('mouseenter', () => {
+        dropdown.classList.add('show');
+        menu.style.display = 'block';
+        if (icon) icon.classList.add('rotate');
+      });
+
+      dropdown.addEventListener('mouseleave', () => {
+        dropdown.classList.remove('show');
+        menu.style.display = 'none';
+        if (icon) icon.classList.remove('rotate');
+      });
+
+      // Toggle on click
+      toggle.addEventListener('click', function (e) {
+        e.preventDefault();
+        const isOpen = dropdown.classList.contains('show');
+        // Close all first
+        document.querySelectorAll('.nested-nav .dropdown').forEach(d => {
+          d.classList.remove('show');
+          d.querySelector('.dropdown-menu').style.display = 'none';
+          const i = d.querySelector('.toggle-icon');
+          if (i) i.classList.remove('rotate');
+        });
+        // Open if not already open
+        if (!isOpen) {
+          dropdown.classList.add('show');
+          menu.style.display = 'block';
+          if (icon) icon.classList.add('rotate');
+        }
+      });
+    });
+  });
+</script>

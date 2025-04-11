@@ -49,15 +49,11 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("Starting to populate AttendanceLog data...")
-
-        # Fetch static data
-        # AttendanceLog.objects.all().delete()
         half_day_color, present_color, absent_color, asettings = self.fetch_static_data()
         users = self.get_users(options["username"])
         from_date, to_date = options["from_date"], options["to_date"]
         attendance_logs_to_create = []
         kolkata_tz = pytz.timezone("Asia/Kolkata")
-        # Iterate over users and match them with API result efficiently
         if users:
             for user in users:
                 office_location = user.device_location

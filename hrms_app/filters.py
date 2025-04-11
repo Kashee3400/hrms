@@ -1,6 +1,9 @@
 import django_filters
 from django.contrib.auth import get_user_model
-from .models import UserTour
+from django.conf import settings
+from django_filters import rest_framework as filters
+from .models import Notification,UserTour
+
 
 class UserTourFilter(django_filters.FilterSet):
     # Define your filter fields here
@@ -11,8 +14,6 @@ class UserTourFilter(django_filters.FilterSet):
         fields = ['applied_by']
 
 
-from django_filters import rest_framework as filters
-from .models import Notification
 
 class NotificationFilter(filters.FilterSet):
     """
@@ -24,3 +25,4 @@ class NotificationFilter(filters.FilterSet):
     class Meta:
         model = Notification
         fields = ["from_date", "to_date"]
+
