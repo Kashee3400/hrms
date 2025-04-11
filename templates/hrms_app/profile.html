@@ -178,10 +178,10 @@
                     <strong>{% trans 'Designation:' %}</strong>
                     {{ employee.personal_detail.designation|default:_('Not assigned') }}
                   </div>
-                  <div class="col-md-4">
+                  {% comment %} <div class="col-md-4">
                     <strong>{% trans 'CTC:' %}</strong>
                     ₹ {{ employee.personal_detail.ctc|floatformat:2|default:'Not Disclosed' }}
-                  </div>
+                  </div> {% endcomment %}
                 </div>
               </div>
             </div>
