@@ -117,7 +117,7 @@
                           </td>
                           <td>{{ reg.start_date.date }}</td>
                           <td>{{ reg.end_date.date }}</td>
-                          <td>{{ reg.reg_durations }}</td>
+                          <td>{{ reg.reg_duration }}</td>
                           <td>{{ reg.status|capfirst }}</td>
                           <td>
                             <a href="{% url 'event_detail' reg.slug %}">{% trans 'Approve/Reject/Cancel' %}</a>
