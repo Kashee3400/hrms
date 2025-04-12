@@ -108,7 +108,7 @@
           </div>
         </div>
       </div>
-      {% if request.user.is_rm %}
+      {% if request.user.is_rm or request.user.is_superuser %}
         <div class="col-lg-4 d-flex flex-column px-1">
           <div class="row flex-grow">
             <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
