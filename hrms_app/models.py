@@ -614,7 +614,7 @@ class PersonalDetails(models.Model):
     alt_mobile_number = models.CharField(
         max_length=15,
         blank=True,
-        verbose_name=_("Alternative Mobile Number"),
+        verbose_name=_("Emergency Contact Number"),
         help_text=_("Enter an alternate mobile number for the employee (optional)."),
     )
     cug_mobile_number = models.CharField(

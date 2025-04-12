@@ -388,10 +388,14 @@ def send_personal_detail_update_email(user_full_name, username, changed_fields):
         return  # Nothing to send
     subject = "Personal Details Updated"
     body = f"User {user_full_name} (username: {username}) has updated their personal details.\n\nChanges:\n"
-
     for field, values in changed_fields.items():
         old, new = values
-        body += f"- {field.replace('_', ' ').title()}: '{old}' → '{new}'\n"
+        try:
+            verbose_name = PersonalDetails._meta.get_field(field).verbose_name.title()
+        except Exception:
+            verbose_name = field.replace('_', ' ').title()
+        body += f"- {verbose_name}: '{old}' → '{new}'\n"
+
     logging.info(f"Sending Personal Detail mail: {body}")
     send_mail(
         subject=subject,

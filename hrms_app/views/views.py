@@ -309,7 +309,6 @@ class PersonalDetailUpdateView(ModelPermissionRequiredMixin, UpdateView):
         return get_object_or_404(PersonalDetails, user=self.request.user)
 
     def form_valid(self, form):
-        instance = form.instance
         old_instance = self.get_object()
         changed_fields = {}
 
