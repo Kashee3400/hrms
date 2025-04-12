@@ -64,7 +64,7 @@
 {% block content %}
   <div class="my-2">
     <div class="row">
-      <div class="col-lg-6 d-flex flex-column px-1">
+      <div class="{% if request.user.is_rm %} col-lg-4 {% else %}col-lg-6 {% endif %} d-flex flex-column px-1">
         <div class="row flex-grow">
           <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
             <div class="card card-rounded pt-3 px-0">
@@ -108,45 +108,48 @@
           </div>
         </div>
       </div>
-      <div class="col-lg-6 d-flex flex-column px-1">
-        <div class="row flex-grow">
-          <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
-            <div class="card card-rounded pt-3">
-              {% if request.user.is_rm %}
-              <h4 class="card-title card-title-dash text-danger px-3">
-                {% trans 'Request Pending For Approvals' %}
-              </h4>
-              {% else %}
-              <h4 class="card-title card-title-dash text-info px-3">
-                {% trans "Monthly Attendance Data" %} ({{from_datetime.date}} - {{to_datetime.date}})
-              </h4>
-              {% endif %}
-              <div class="container mt-4 px-3">
-                <div class="scroll-container d-flex flex-row overflow-auto py-2">
-                  {% if request.user.is_rm %}
+      {% if request.user.is_rm %}
+        <div class="col-lg-4 d-flex flex-column px-1">
+          <div class="row flex-grow">
+            <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
+              <div class="card card-rounded pt-3">
+                <h4 class="card-title card-title-dash text-danger px-3">{% trans 'Request Pending For Approvals' %}</h4>
+                <div class="container mt-4 px-3">
+                  <div class="scroll-container d-flex flex-row overflow-auto py-2">
                     {% for item in count_list %}
-                      <div class="pending-data flex-shrink-0" style="min-width: 180px;">
+                      <div class="pending-data flex-shrink-0" style="min-width: 150px; max-width: 150px;">
                         <a href="{{ item.link }}" class="text-decoration-none h-100">
                           <div class="card count-card shadow-sm h-100 d-flex flex-column">
                             <div class="card-body text-center d-flex flex-column justify-content-center">
                               <i class="{{ item.icon }} icon"></i>
-                              <h5 class="card-title mt-2 text-dark text-truncate">{{ item.title }}</h5>
+                              <p class="card-title mt-2 text-dark text-truncate">{{ item.title }}</p>
                               <h2 class="count-number">{{ item.count }}</h2>
                             </div>
                           </div>
                         </a>
                       </div>
                     {% endfor %}
-                  {% else %}
-                    {% user_summary_counts %}
-                  {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+      <div class="{% if request.user.is_rm %} col-lg-4 {% else %}col-lg-6 {% endif %} d-flex flex-column px-1">
+        <div class="row flex-grow">
+          <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
+            <div class="card card-rounded pt-3">
+              <h4 class="card-title card-title-dash text-info px-3">{% trans 'Waiting for approval...' %}</h4>
+              <div class="container mt-4 px-3">
+                <div class="scroll-container d-flex flex-row overflow-auto py-2">
+                  {% user_summary_counts %}
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-      
       {% get_leave_balances request.user request %}
     </div>
     <div class="row">

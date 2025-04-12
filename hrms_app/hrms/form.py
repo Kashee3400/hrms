@@ -675,7 +675,7 @@ class TourForm(forms.ModelForm):
             ),
             "start_date": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -683,11 +683,18 @@ class TourForm(forms.ModelForm):
                 attrs={"class": "form-control"},
             ),
             "start_time": TimePickerInput(
+                options={
+                    "format": "hh:mm A",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
                 attrs={"class": "form-control"},
             ),
+
             "end_date": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -696,6 +703,12 @@ class TourForm(forms.ModelForm):
                 attrs={"class": "form-control"},
             ),
             "end_time": TimePickerInput(
+                options={
+                    "format": "hh:mm A",
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
                 attrs={"class": "form-control"},
             ),
             "to_destination": forms.TextInput(
@@ -811,7 +824,7 @@ class LeaveApplicationForm(forms.ModelForm):
         widgets = {
             "startDate": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -820,7 +833,7 @@ class LeaveApplicationForm(forms.ModelForm):
             ),
             "endDate": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -884,7 +897,6 @@ class LeaveApplicationForm(forms.ModelForm):
         startDayChoice = cleaned_data.get("startDayChoice")
         endDayChoice = cleaned_data.get("endDayChoice")
         attachment = cleaned_data.get("attachment")
-        print(cleaned_data)
 
         if not startDate or not endDate:
             if not startDate:
@@ -1000,22 +1012,31 @@ class AttendanceLogForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         self.is_manager = kwargs.pop("is_manager", False)
+        self.late_coming = kwargs.pop("late_coming", {})
+        self.early_going = kwargs.pop("early_going", {})
         super(AttendanceLogForm, self).__init__(*args, **kwargs)
+
         self.fields["reg_status"].required = True
 
         current_value = None
         if self.instance and self.instance.pk:
             current_value = self.instance.reg_status
-            if current_value == settings.MIS_PUNCHING:
-                self.fields["reg_status"].choices = [
-                    (settings.MIS_PUNCHING, _("Mis Punching")),
-                ]
-            else:
-                    self.fields["reg_status"].choices = [
-                        (settings.EARLY_GOING, _("Early Going")),
-                        (settings.LATE_COMING, _("Late Coming")),
-                    ]
-                    
+
+        if current_value == settings.MIS_PUNCHING:
+            self.fields["reg_status"].choices = [
+                (settings.MIS_PUNCHING, _("Mis Punching")),
+            ]
+        else:
+            choices = []
+            if self.early_going:
+                choices.append((settings.EARLY_GOING, _("Early Going")))
+            if self.late_coming:
+                choices.append((settings.LATE_COMING, _("Late Coming")))
+            self.fields["reg_status"].choices = choices
+
+            self.initial["reg_status"] = None
+
+        # Manager/non-manager handling
         if not self.is_manager:
             self.fields.pop("status", None)
             self.fields["reason"].required = True
@@ -1107,6 +1128,12 @@ class TourStatusUpdateForm(forms.ModelForm):
                 }
             ),
             "extended_end_time": TimePickerInput(
+                options={
+                    "format": "hh:mm A",  # e.g., 02:30 PM
+                    "showClear": True,
+                    "showClose": True,
+                    "useCurrent": False,
+                },
                 attrs={
                     "class": "form-control",
                 }
@@ -1185,7 +1212,7 @@ class FilterForm(forms.Form):
     from_date = forms.DateField(
         widget=DatePickerInput(
             options={
-                "format": "YYYY-MM-DD",
+                "format": "DD MMM, YYYY",
                 "showClear": True,
                 "showClose": True,
                 "useCurrent": False,
@@ -1197,7 +1224,7 @@ class FilterForm(forms.Form):
     to_date = forms.DateField(
         widget=DatePickerInput(
             options={
-                "format": "YYYY-MM-DD",
+                "format": "DD MMM, YYYY",
                 "showClear": True,
                 "showClose": True,
                 "useCurrent": False,
@@ -1396,7 +1423,7 @@ class PersonalDetailsForm(forms.ModelForm):
             ),
             "birthday": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -1405,7 +1432,7 @@ class PersonalDetailsForm(forms.ModelForm):
             ),
             "marriage_ann": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -1414,7 +1441,7 @@ class PersonalDetailsForm(forms.ModelForm):
             ),
             "doj": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -1423,7 +1450,7 @@ class PersonalDetailsForm(forms.ModelForm):
             ),
             "dol": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -1432,7 +1459,7 @@ class PersonalDetailsForm(forms.ModelForm):
             ),
             "dor": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -1441,7 +1468,7 @@ class PersonalDetailsForm(forms.ModelForm):
             ),
             "dof": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -1501,7 +1528,7 @@ class EmployeePersonalDetailForm(forms.ModelForm):
             "marital_status": forms.Select(attrs={"class": "form-control"}),
             "marriage_ann": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -1652,7 +1679,7 @@ class AttendanceReportFilterForm(forms.Form):
     from_date = forms.DateField(
         widget=DatePickerInput(
             options={
-                "format": "YYYY-MM-DD",
+                "format": "DD MMM, YYYY",
                 "showClear": True,
                 "showClose": True,
                 "useCurrent": False,
@@ -1664,7 +1691,7 @@ class AttendanceReportFilterForm(forms.Form):
     to_date = forms.DateField(
         widget=DatePickerInput(
             options={
-                "format": "YYYY-MM-DD",
+                "format": "DD MMM, YYYY",
                 "showClear": True,
                 "showClose": True,
                 "useCurrent": False,
@@ -2072,7 +2099,7 @@ class HRAnnouncementAdminForm(forms.ModelForm):
             ),
             "start_date": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,
@@ -2081,7 +2108,7 @@ class HRAnnouncementAdminForm(forms.ModelForm):
             ),
             "end_date": DatePickerInput(
                 options={
-                    "format": "YYYY-MM-DD",
+                    "format": "DD MMM, YYYY",
                     "showClear": True,
                     "showClose": True,
                     "useCurrent": False,

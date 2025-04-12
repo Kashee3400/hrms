@@ -27,16 +27,16 @@
             {% endif %}
             <div>
               <h5 class="mb-0">{{ leave_application.appliedBy }}</h5>
-              <small>{% trans "Employee Code" %}: {{ leave_application.appliedBy.username }}</small>
+              <small>{% trans 'Employee Code' %}: {{ leave_application.appliedBy.username }}</small>
             </div>
           </div>
           <div class="card-body">
             <ul class="list-group list-group-flush">
               {% if leave_application.status == 'pending' %}
-              <li class="list-group-item">
-                <strong>Available {{leave_application.leave_type.leave_type_short_code}} Balance:</strong>
-                <span class="float-end text-success fw-bold">{{ leave_balance.remaining_leave_balances}}</span>
-              </li>
+                <li class="list-group-item">
+                  <strong>Available {{ leave_application.leave_type.leave_type_short_code }} Balance:</strong>
+                  <span class="float-end text-success fw-bold">{{ leave_balance.remaining_leave_balances }}</span>
+                </li>
               {% endif %}
               <li class="list-group-item">
                 <strong>From Date:</strong>
@@ -55,13 +55,13 @@
                 <span class="float-end fw-bold text-uppercase {{ leave_application.status }}">{{ leave_application.status }}</span>
               </li>
               <li class="list-group-item">
-                <strong>{% trans "Applied At" %}:</strong>
+                <strong>{% trans 'Applied At' %}:</strong>
                 <span class="float-end fw-bold">{{ leave_application.applyingDate }}</span>
               </li>
             </ul>
             <div class="mt-3">
               {% if leave_application.attachment %}
-                <a href="{{leave_application.attachment.url}}">{% trans "View Attachment" %}</a>
+                <a href="{{ leave_application.attachment.url }}">{% trans 'View Attachment' %}</a>
               {% endif %}
               <p>
                 <strong>Reason:</strong>
@@ -74,7 +74,9 @@
 
       <div class="col-12 col-md-6">
         <div class="card">
-          <div class="card-header">{% trans "Follow Ups" %}</div>
+          <div class="card-header">
+            {% trans 'Follow Ups' %}
+          </div>
           <div class="card-body">
             <ul class="list-group">
               {% for log in leave_application.logs.all %}
@@ -90,57 +92,58 @@
           </div>
         </div>
         {% if not is_locked %}
-        <div class="card mt-4">
-          <div class="card-body">
-            <form id="leave-application-form" method="post" action="{% url 'leave_application_update' leave_application.slug %}">
-              {% csrf_token %}
-              <div class="row g-3">
-                <div class="col-md-6">{{ status_form.status }}</div>
-                <div class="col-md-6">
-                  <button type="button" class="btn btn-primary btn-sm w-100 {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %}" data-bs-toggle="modal" data-bs-target="#updateDialog">
-                    {% if is_manager %}
-                      Update
-                    {% else %}
-                      Request Cancellation
-                    {% endif %}
-                  </button>
+          <div class="card mt-4">
+            <div class="card-body">
+              <form id="leave-application-form" method="post" action="{% url 'leave_application_update' leave_application.slug %}">
+                {% csrf_token %}
+                <div class="row g-3">
+                  {% if not request.user.pk == leave_application.appliedBy.pk and leave_application.status == 'approved' %}
+                    <div class="col-md-6">{{ status_form.status }}</div>
+                    <div class="col-md-6">
+                      <button type="button" class="btn btn-primary btn-sm w-100 {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %}" data-bs-toggle="modal" data-bs-target="#updateDialog">{% trans 'Submit Request' %}</button>
+                    </div>
+                  {% elif is_manager %}
+                    <div class="col-md-6">{{ status_form.status }}</div>
+                    <div class="col-md-6">
+                      <button type="button" class="btn btn-primary btn-sm w-100 {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %}" data-bs-toggle="modal" data-bs-target="#updateDialog">{% trans 'Update' %}</button>
+                    </div>
+                  {% endif %}
                 </div>
-              </div>
 
-              <!-- Update Dialog -->
-              <div class="modal fade" id="updateDialog" tabindex="-1" aria-labelledby="updateDialogLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                  <div class="modal-content">
-                    <div class="modal-header">
-                      <h5 class="modal-title" id="updateDialogLabel">Are you sure?</h5>
-                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                      {% if is_manager %}
-                        You want to update the application {{ leave_application.applicationNo }} of {{ leave_application.appliedBy }}.
-                      {% else %}
-                        You want to cancel your "{{ leave_application.applicationNo }}" leave.
-                      {% endif %}
-                    </div>
-                    <div class="modal-footer">
-                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                      <button type="submit" class="btn btn-primary">Submit</button>
+                <!-- Update Dialog -->
+                <div class="modal fade" id="updateDialog" tabindex="-1" aria-labelledby="updateDialogLabel" aria-hidden="true">
+                  <div class="modal-dialog">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h5 class="modal-title" id="updateDialogLabel">Are you sure?</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                      </div>
+                      <div class="modal-body">
+                        {% if is_manager %}
+                          You want to update the application {{ leave_application.applicationNo }} of {{ leave_application.appliedBy }}.
+                        {% else %}
+                          You want to cancel your "{{ leave_application.applicationNo }}" leave.
+                        {% endif %}
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            </form>
+              </form>
+            </div>
+            <div class="card-footer">
+              <form id="action-form" method="post" action="{% url 'attendance_log_action' slug=object.slug %}">
+                {% csrf_token %}
+                {% if leave_application.appliedBy == user and leave_application.status|in_list:'pending,cancelled,rejected' %}
+                  <a class="btn btn-sm btn-danger" href="{{ delete_url }}">{% trans 'Delete' %}</a>
+                  <a class="btn btn-sm btn-info" href="{{ edit_url }}">{% trans 'Edit' %}</a>
+                {% endif %}
+              </form>
+            </div>
           </div>
-          <div class="card-footer">
-            <form id="action-form" method="post" action="{% url 'attendance_log_action' slug=object.slug %}">
-              {% csrf_token %}
-              {% if leave_application.appliedBy == user and leave_application.status|in_list:'pending,cancelled,rejected' %}
-                <a class="btn btn-sm btn-danger" href="{{ delete_url }}">{% trans 'Delete' %}</a>
-                <a class="btn btn-sm btn-info" href="{{ edit_url }}">{% trans 'Edit' %}</a>
-              {% endif %}
-            </form>
-          </div>
-        </div>
         {% endif %}
       </div>
     </div>

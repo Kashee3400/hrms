@@ -29,6 +29,10 @@ logging.basicConfig(
     ]
 )
 
+from decouple import config  # or use environ
+
+# Add this to settings.py
+HR_EMAIL = config("HR_EMAIL", default="divyanshu.kumar@kasheemilk.com")
 
 @shared_task
 def send_leave_application_notifications(application_id, protocol, domain):
@@ -367,3 +371,33 @@ def create_backup(DB_NAME, backup_dir, mysqldump_cmd, backup_name, error_message
     os.remove(backup_name)
     return backup_zip_name
 
+
+
+@shared_task
+def send_personal_detail_update_email(user_full_name, username, changed_fields):
+    """
+    Sends an email to HR when a user updates their personal details.
+    
+    Parameters:
+    - user_full_name: Full name of the user who made the changes
+    - username: Username of the user
+    - changed_fields: A dictionary of changed fields {field_name: (old_value, new_value)}
+    - hr_email: Optional override email; defaults to settings.HR_EMAIL
+    """
+    if not changed_fields:
+        return  # Nothing to send
+    subject = "Personal Details Updated"
+    body = f"User {user_full_name} (username: {username}) has updated their personal details.\n\nChanges:\n"
+
+    for field, values in changed_fields.items():
+        old, new = values
+        body += f"- {field.replace('_', ' ').title()}: '{old}' → '{new}'\n"
+    print("Sending Mail")
+    print(body)
+    send_mail(
+        subject=subject,
+        message=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=HR_EMAIL,
+        fail_silently=False,
+    )

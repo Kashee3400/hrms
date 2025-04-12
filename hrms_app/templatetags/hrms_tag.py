@@ -7,7 +7,8 @@ from hrms_app.utility.leave_utils import (
     get_employee_requested_tour,
     get_regularization_requests,
 )
-from hrms_app.utility.attendanceutils import get_from_to_datetime
+from django.utils.translation import gettext as _
+from hrms_app.utility.attendanceutils import get_from_to_datetime,get_month_start_end
 from hrms_app.models import PersonalDetails
 from django.utils.timezone import now, localdate, localtime
 from django.db import models
@@ -173,30 +174,24 @@ def get_leave_balances(user, request):
                 or 0
             )  # Default to 0 if None
 
-            # Calculate on hold used leave
             on_hold_leave = sum(
                 leave.usedLeave
                 for leave in user_pending_leaves
                 if leave.leave_type == lb.leave_type
             )
-
-            # Calculate remaining balance (total_balance = remaining_balance - used_leave)
             total_balance = lb.remaining_leave_balances - on_hold_leave
-
             leave_balances_list.append(
                 {
                     "pk": lb.pk,
-                    "balance": lb.remaining_leave_balances,
-                    "used_leave": used_leave,
-                    "on_hold": on_hold_leave,
-                    "total_balance": total_balance,
+                    "balance": int(lb.remaining_leave_balances) if lb.leave_type.leave_type_short_code == 'EL' else lb.remaining_leave_balances,
+                    "used_leave": int(used_leave) if lb.leave_type.leave_type_short_code == 'EL' else used_leave,
+                    "on_hold": int(on_hold_leave) if lb.leave_type.leave_type_short_code == 'EL' else on_hold_leave,
+                    "total_balance": int(total_balance) if lb.leave_type.leave_type_short_code == 'EL' else total_balance,
                     "leave_type": lb.leave_type,
                     "url": reverse("apply_leave_with_id", args=[lb.leave_type.pk]),
                     "color": lb.leave_type.color_hex,
                 }
             )
-
-        # Additional logic for Female users to fetch ML leave balances
         if user.personal_detail and user.personal_detail.gender.gender == "Female":
             ml_balance = leave_balances_dict.get(settings.ML)
             if ml_balance:
@@ -207,14 +202,12 @@ def get_leave_balances(user, request):
                         status=settings.APPROVED,
                     ).aggregate(Sum("usedLeave"))["usedLeave__sum"]
                     or 0
-                )  # Default to 0 if None
-
+                )
                 on_hold_leave = sum(
                     leave.usedLeave
                     for leave in user_pending_leaves
                     if leave.leave_type == ml_balance.leave_type
                 )
-
                 leave_balances_list.append(
                     {
                         "pk": ml_balance.pk,
@@ -252,53 +245,38 @@ def format_emp_code(emp_code):
         return f"KMPCL-{emp_code}"
 
 
-from django.utils.translation import gettext as _
-
-
 @register.inclusion_tag(
     "hrms_app/components/user_summary_counts.html", takes_context=True
 )
 def user_summary_counts(context):
     request = context["request"]
     user = request.user
-    from_datetime, to_datetime = get_from_to_datetime()
-    total_approved_leaves = LeaveApplication.objects.filter(
+    from_datetime, to_datetime = get_month_start_end()
+    total_pending_leaves = LeaveApplication.objects.filter(
         appliedBy=user,
-        startDate__date__gte=from_datetime.date(),
-        endDate__date__lte=to_datetime.date(),
-        status=settings.APPROVED,
+        status=settings.PENDING,
     ).count()
 
-    total_present = AttendanceLog.objects.filter(
+    pending_regularized = AttendanceLog.objects.filter(
         applied_by=user,
-        att_status_short_code="P",
-        start_date__date__gte=from_datetime.date(),
-        end_date__date__lte=to_datetime.date(),
-        regularized=False,
-    ).count()
-
-    total_regularized = AttendanceLog.objects.filter(
-        applied_by=user,
-        regularized=True,
-        att_status_short_code="P",
+        is_regularisation=True,
+        is_submitted=True,
         start_date__date__gte=from_datetime.date(),
         end_date__date__lte=to_datetime.date(),
     ).count()
+    
+    total_pending_tour = UserTour.objects.filter(
+            applied_by=user,
+            status=settings.PENDING,
+        ).count()
 
     # Counts dict
     counts = {
-        "leave": total_approved_leaves,
-        "tour": 0,  # Add real logic if needed
-        "regularization": total_regularized,
-        "present": total_present,
+        "leave": total_pending_leaves,
+        "tour": total_pending_tour,
+        "regularization": pending_regularized,
     }
     items = [
-        {
-            "key": "present",
-            "title": _("Present"),
-            "icon": "fas fa-hourglass-half",
-            "link": reverse("calendar"),
-        },
         {
             "key": "leave",
             "title": _("Leaves"),

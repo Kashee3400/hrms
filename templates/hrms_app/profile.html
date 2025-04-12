@@ -89,9 +89,32 @@
               <div class="card-body">
                 <div class="d-flex flex-wrap gap-3">
                   <div class="flex-grow-1">
-                    <strong>{% trans 'Employee Code:' %}</strong>
-                    {{ employee.username|default:_('Not provided') }}
+                    <strong>{% trans 'Personal Email:' %}</strong>
+                    <div id="email-display-section">
+                      {{ employee.email|default:_('Not provided') }}
+                      {% if not employee.is_personal_email_verified %}
+                        <span id="email-verification-badge" class="badge bg-warning text-dark ms-2">{% trans 'Not Verified' %}</span>
+                        <button id="start-verification-btn" class="btn btn-sm btn-link p-0 ms-2" style="font-size: 0.85rem;">{% trans 'Verify Now' %}</button>
+                      {% else %}
+                        <span class="badge bg-success ms-2">{% trans 'Verified' %}</span>
+                      {% endif %}
+                    </div>
+
+                    {% if not employee.is_personal_email_verified %}
+                      <div id="email-verification-section" style="display: none;">
+                        <div class="d-flex gap-2 align-items-center mb-2 mt-2">
+                          <input type="email" id="email-input" class="form-control form-control-sm w-auto" value="{{ employee.email }}" placeholder="{% trans 'Enter email' %}" required />
+                          <button id="send-otp-btn" class="btn btn-sm btn-outline-primary">{% trans 'Send OTP' %}</button>
+                        </div>
+                        <div class="d-flex gap-2 align-items-center mt-2" id="otp-section" style="display: none;">
+                          <input type="text" id="otp-input" class="form-control form-control-sm w-auto" placeholder="{% trans 'Enter OTP' %}" required />
+                          <button id="verify-otp-btn" class="btn btn-sm btn-success">{% trans 'Verify OTP' %}</button>
+                        </div>
+                        <small class="text-muted d-block mt-1" id="email-msg">{% trans 'We’ll verify this email using a one-time password.' %}</small>
+                      </div>
+                    {% endif %}
                   </div>
+                  
                   <div class="flex-grow-1">
                     <strong>{% trans 'Gender:' %}</strong>
                     {{ employee.personal_detail.gender|default:_('Not specified') }}
@@ -138,6 +161,10 @@
               <div class="card-body">
                 <div class="d-flex flex-wrap gap-3">
                   <div class="flex-grow-1">
+                    <strong>{% trans 'Employee Code:' %}</strong>
+                    {{ employee.username|default:_('Not provided') }}
+                  </div>
+                  <div class="flex-grow-1">
                     <strong>{% trans 'Official Mobile:' %}</strong>
                     +91 {{ employee.personal_detail.official_mobile_number|default:_('xxxxx-xxxxx') }}
                   </div>
@@ -145,34 +172,8 @@
                     <strong>{% trans 'Official Email:' %}</strong>
                     {{ employee.official_email|default:_('Not provided') }}
                   </div>
-                  <div class="flex-grow-1">
-                    <strong>{% trans 'Personal Email:' %}</strong>
-                    <div id="email-display-section">
-                      {{ employee.email|default:_('Not provided') }}
-                      {% if not employee.is_personal_email_verified %}
-                        <span id="email-verification-badge" class="badge bg-warning text-dark ms-2">{% trans 'Not Verified' %}</span>
-                        <button id="start-verification-btn" class="btn btn-sm btn-link p-0 ms-2" style="font-size: 0.85rem;">{% trans 'Verify Now' %}</button>
-                      {% else %}
-                        <span class="badge bg-success ms-2">{% trans 'Verified' %}</span>
-                      {% endif %}
-                    </div>
-
-                    {% if not employee.is_personal_email_verified %}
-                      <div id="email-verification-section" style="display: none;">
-                        <div class="d-flex gap-2 align-items-center mb-2 mt-2">
-                          <input type="email" id="email-input" class="form-control form-control-sm w-auto" value="{{ employee.email }}" placeholder="{% trans 'Enter email' %}" required />
-                          <button id="send-otp-btn" class="btn btn-sm btn-outline-primary">{% trans 'Send OTP' %}</button>
-                        </div>
-                        <div class="d-flex gap-2 align-items-center mt-2" id="otp-section" style="display: none;">
-                          <input type="text" id="otp-input" class="form-control form-control-sm w-auto" placeholder="{% trans 'Enter OTP' %}" required />
-                          <button id="verify-otp-btn" class="btn btn-sm btn-success">{% trans 'Verify OTP' %}</button>
-                        </div>
-                        <small class="text-muted d-block mt-1" id="email-msg">{% trans 'We’ll verify this email using a one-time password.' %}</small>
-                      </div>
-                    {% endif %}
-                  </div>
+                  
                 </div>
-
                 <div class="d-flex flex-wrap gap-3 mt-3">
                   <div class="col-md-4">
                     <strong>{% trans 'Designation:' %}</strong>

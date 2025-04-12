@@ -57,5 +57,5 @@ from django.views.decorators.csrf import csrf_exempt
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
-from hrms_app.tasks import push_notification
+from hrms_app.tasks import push_notification,send_personal_detail_update_email
 from hrms_app.views.mixins import LeaveListViewMixin,ModelPermissionRequiredMixin

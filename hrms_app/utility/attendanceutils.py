@@ -38,16 +38,28 @@ def get_check_in_out_times(user):
 def get_from_to_datetime():
     """Returns from_datetime (21st of previous month) and to_datetime (20th of current month)."""
     today = datetime.today()
-
     # Calculate from_datetime: 21st of previous month
     first_of_this_month = today.replace(day=1)
     from_datetime = (first_of_this_month - timedelta(days=1)).replace(day=21)
-
     # Calculate to_datetime: 20th of current month
     to_datetime = today.replace(day=20)
-
     return from_datetime, to_datetime
 
+def get_month_start_end():
+    today = datetime.today()
+    
+    # Start of the month is always day 1
+    start_date = today.replace(day=1)
+
+    # To get the last day, go to the next month, then subtract a day
+    if today.month == 12:
+        next_month = today.replace(year=today.year + 1, month=1, day=1)
+    else:
+        next_month = today.replace(month=today.month + 1, day=1)
+    
+    end_date = next_month - timedelta(days=1)
+
+    return start_date, end_date
 
 def map_attendance_data(
     attendance_logs,
@@ -82,7 +94,7 @@ def map_attendance_data(
         if office_closer:
             attendance_data[employee_id][log_date] = [
                 {
-                    "status": office_closer['short_code'],
+                    "status": "P",
                     "color": "#000000",
                 }
             ]
@@ -220,3 +232,11 @@ def get_tour_logs(employee_ids, start_date, end_date):
         status=settings.APPROVED,
     )
 
+
+def str_to_date(value):
+    from django.utils.timezone import localtime, make_aware, utc
+    date_time = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    date_time = (
+        make_aware(date_time, timezone=utc) if date_time.tzinfo is None else date_time
+    )
+    return date_time

@@ -309,6 +309,23 @@ class PersonalDetailUpdateView(ModelPermissionRequiredMixin, UpdateView):
         return get_object_or_404(PersonalDetails, user=self.request.user)
 
     def form_valid(self, form):
+        instance = form.instance
+        old_instance = self.get_object()
+        changed_fields = {}
+
+        for field in form.changed_data:
+            old_value = getattr(old_instance, field)
+            new_value = form.cleaned_data.get(field)
+            if old_value != new_value:
+                changed_fields[field] = (old_value, new_value)
+        # Trigger Celery task
+        if changed_fields:
+            send_personal_detail_update_email.delay(
+                user_full_name=self.request.user.get_full_name(),
+                username=self.request.user.username,
+                changed_fields=changed_fields,
+            )
+
         messages.success(self.request, "Your personal details have been updated successfully.")
         return super().form_valid(form)
 
@@ -322,7 +339,6 @@ class PersonalDetailUpdateView(ModelPermissionRequiredMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        employee = self.get_object()
         urls = [
             ("home", {"label": "Home"}),
         ]
@@ -546,7 +562,7 @@ class ApplyOrUpdateLeaveView(
         context.update(
             {
                 "leave_balance": leave_balance,
-                "rem_bal": rem_bal,
+                "rem_bal": int(rem_bal),
                 "object": self.object,
                 "el_count": el_count,
                 "form": kwargs.get(
@@ -883,21 +899,28 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         log = self.get_object()
+        early_going, late_coming = self.check_event(log)
+        
         kwargs.update({
             "user": self.request.user,
             "is_manager": self.request.user == log.applied_by.reports_to,
+            "early_going":early_going,
+            "late_coming":late_coming,
         })
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         log = self.get_object()
+        early_going, late_coming = self.check_event(log)
         context.update({
             "is_manager": self.request.user == log.applied_by.reports_to,
             "urls": self._get_breadcrumb_urls(log),
             "action_form": AttendanceLogActionForm(),
             "title": self.title,
             "subtitle": log.slug,
+            "early_going":early_going,
+            "late_coming":late_coming,
             "reg_count": self._get_regularization_count(log),
         })
         return context
@@ -944,6 +967,49 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
             ("calendar", {"label": "Attendance"}),
             ("event_detail", {"label": log.title, "slug": log.slug}),
         ]
+    def check_event(self, obj):
+        """
+        This function checks the events (Early Going and Late Coming)
+        based on the user check-in and check-out time.
+        """
+        late_coming_case = {}
+        early_going_case = {}
+        
+        user = obj.applied_by
+        user_shift = user.shifts.last().shift_timing
+        
+        if not obj.regularized:
+            check_in_datetime = localtime(obj.start_date)
+            check_out_datetime = localtime(obj.end_date)
+            grace_start_time = user_shift.grace_start_time
+            grace_end_time = user_shift.grace_end_time
+            grace_start_datetime = make_aware(datetime.combine(check_in_datetime.date(), grace_start_time))
+            grace_end_datetime = make_aware(datetime.combine(check_out_datetime.date(), grace_end_time))
+            check_in_plus_8hrs = check_in_datetime + timedelta(hours=8)
+            
+            if check_in_datetime > grace_start_datetime:
+                duration_td = check_in_datetime - grace_start_datetime
+                duration_str = str(duration_td)[:-3]  # Format: 'HH:MM'
+                late_coming_case = {
+                    "case": "late_coming",
+                    "from_date": grace_start_datetime,
+                    "to_date": check_in_datetime,
+                    "duration": duration_str
+                }
+            
+            if check_out_datetime < check_in_plus_8hrs or check_out_datetime < grace_end_datetime:
+                duration_td = grace_end_datetime - check_out_datetime
+                duration_str = str(duration_td)[:-3]
+                early_going_case = {
+                    "case": "early_going",
+                    "from_date": check_out_datetime,
+                    "to_date": grace_end_datetime,
+                    "duration": duration_str
+                }
+        
+        # Return the cases, or empty dictionaries if no event was found
+        return early_going_case or {}, late_coming_case or {}
+
 
     def _process_submission(self, form):
         form.instance.is_submitted = True
@@ -1161,7 +1227,8 @@ class EventListView(View):
         end_date = datetime.fromisoformat(end_param) if end_param else None
         check_in_time, check_out_time = at.get_check_in_out_times(user)
         events_data = []
-        events_data.append({
+        if check_in_time:
+            events_data.append({
                 "id": user.pk,
                 "title": "Punched In",
                 "start": timezone.localtime(timezone.make_aware(check_in_time)).isoformat(),
@@ -1205,18 +1272,61 @@ class EventListView(View):
             office_closers = office_closers.filter(
                 date__gte=start_date.date(), date__lte=end_date.date()
             )
+
+        # Step 1: Collect all office closer dates
+        closed_dates = set()
         for office_closer in office_closers:
+            closed_date = office_closer.date
+            closed_dates.add(closed_date)
+            
             events_data.append({
                 "id": office_closer.pk,
                 "title": office_closer.reason,
                 "start": timezone.localtime(timezone.make_aware(
-                    datetime.combine(office_closer.date, datetime.min.time())
+                    datetime.combine(closed_date, datetime.min.time())
                 )).isoformat(),
                 "end": timezone.localtime(timezone.make_aware(
-                    datetime.combine(office_closer.date, datetime.min.time()) + timedelta(days=1)
+                    datetime.combine(closed_date, datetime.min.time()) + timedelta(days=1)
                 )).isoformat(),
                 "url": "#!",
             })
+            events_data.append({
+                "id": office_closer.pk,
+                "title": "Present",
+                "start": timezone.localtime(timezone.make_aware(
+                    datetime.combine(closed_date, datetime.min.time())
+                )).isoformat(),
+                "end": timezone.localtime(timezone.make_aware(
+                    datetime.combine(closed_date, datetime.min.time()) + timedelta(days=1)
+                )).isoformat(),
+                "color":"#06B900",
+                "url": "#!",
+            })
+
+        # Step 2: Add attendance only if it doesn't fall on closed dates
+        for att in attendances:
+            att_start_date = timezone.localtime(att.start_date).date()
+            att_end_date = timezone.localtime(att.end_date).date()
+
+            # Check if any date in this attendance range overlaps with closed dates
+            current = att_start_date
+            overlaps = False
+            while current <= att_end_date:
+                if current in closed_dates:
+                    overlaps = True
+                    break
+                current += timedelta(days=1)
+
+            if not overlaps:
+                base_event = {
+                    "id": att.slug,
+                    "start": timezone.localtime(att.start_date).isoformat(),
+                    "end": timezone.localtime(att.end_date).isoformat(),
+                    "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
+                }
+                events_data.append({**base_event, "title": att.att_status, "color": att.color_hex})
+                if att.regularized:
+                    events_data.append({**base_event, "title": "Regularized"})
 
         # Tours
         for tour in tour_applications:
@@ -1230,6 +1340,7 @@ class EventListView(View):
                     datetime.combine(tour.end_date, tour.end_time)
                 )).isoformat(),
                 "url": reverse_lazy("tour_application_detail", kwargs={"slug": tour.slug}),
+                "color" : "#B1B1B1" if tour.status == settings.PENDING else "#3a87ad"
             })
 
         # Leaves
@@ -1239,21 +1350,10 @@ class EventListView(View):
                 "title": f"{leave.leave_type.leave_type} {leave.status}",
                 "start": timezone.localdate(leave.startDate).isoformat(),
                 "end": (datetime.combine(timezone.localdate(leave.endDate), datetime.min.time()) + timedelta(days=1)).isoformat(),
-                "color": leave.leave_type.color_hex,
+                "color": leave.leave_type.color_hex if not leave.status == settings.PENDING else "#B1B1B1",
                 "url": reverse_lazy("leave_application_detail", kwargs={"slug": leave.slug}),
             })
 
-        # Attendances
-        for att in attendances:
-            base_event = {
-                "id": att.slug,
-                "start": timezone.localtime(att.start_date).isoformat(),
-                "end": timezone.localtime(att.end_date).isoformat(),
-                "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
-            }
-            events_data.append({**base_event, "title": att.att_status, "color": att.color_hex})
-            if att.regularized:
-                events_data.append({**base_event, "title": "Regularized"})
 
         return JsonResponse(events_data, safe=False)
 
@@ -1467,6 +1567,19 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
     def form_valid(self, form):
         tour = form.save(commit=False)
         user = self.request.user
+        attendance_log = AttendanceLog.objects.filter(applied_by=user,start_date__date=tour.start_date,regularized=True).last()
+        log_history = AttendanceLogHistory.objects.filter(attendance_log=attendance_log).last()
+        if log_history:
+            data = log_history.previous_data
+            from_date = localtime(at.str_to_date(data["from_date"]))
+            to_date = localtime(at.str_to_date(data["to_date"]))
+            status = data['reg_status']
+            if status == "late coming" and tour.end_time > from_date.time():
+                messages.error(self.request, f"Tour end time on {tour.start_date.strftime('%d %b %Y')} conflicts with regularization time.")
+                return self.form_invalid(form)
+            if status == "early going" and tour.start_time < to_date.time():
+                messages.error(self.request, f"Tour start time on {tour.start_date.strftime('%d %b %Y')} conflicts with regularization time.")
+                return self.form_invalid(form)
         overlapping_leaves = LeaveApplication.objects.filter(
             appliedBy=user,
             status__in=[settings.APPROVED, settings.PENDING, settings.PENDING_CANCELLATION],
@@ -1475,11 +1588,6 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
             startDate__lte=tour.end_date,
             endDate__gte=tour.start_date
         )
-
-        print(f"Tour Start Date: {tour.start_date}, Time: {tour.start_time}")
-        print(f"Tour End Date: {tour.end_date}, Time: {tour.end_time}")
-        print(f"Overlapping Leaves: {[str(l) for l in overlapping_leaves]}")
-
         if overlapping_leaves:
             shifts = getattr(user, 'shifts', None)
             if not shifts:
@@ -1488,29 +1596,26 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
             shift = shifts.last().shift_timing
             shift_start = shift.start_time
             shift_end = shift.end_time
-            print(f"Shift Start: {shift_start}, Shift End: {shift_end}")
             for leave in overlapping_leaves:
                 leave_dates = [
                     localtime(leave.startDate)+ timedelta(days=i)
                     for i in range((leave.endDate - leave.startDate).days + 1)
                 ]
                 for leave_date in leave_dates:
-                    print(f"Checking leave date: {leave_date}")
                     if tour.end_date == leave_date.date():
-                        print(f"Tour ends on leave day {leave_date.date()} → Tour End Time: {tour.end_time}, Shift Start: {shift_start}")
                         if tour.end_time >= shift_start:
                             messages.error(self.request, f"Tour end time on {leave_date.date().strftime('%d %b %Y')} conflicts with full-day leave.")
                             return self.form_invalid(form)
                     if tour.start_date == leave_date.date():
-                        print(f"Tour starts on leave day {leave_date.date()} → Tour Start Time: {tour.start_time}, Shift End: {shift_end}")
                         if tour.start_time <= shift_end:
                             messages.error(self.request, f"Tour start time on {leave_date.date().strftime('%d %b %Y')} conflicts with full-day leave.")
                             return self.form_invalid(form)
                         
         tour.applied_by = user
         messages.success(self.request, "Tour Applied Successfully")
-        self.send_tour_notification(obj=tour)
-        return super().form_valid(form)
+        # self.send_tour_notification(obj=tour)
+        # return super().form_valid(form)
+        return redirect("apply_tour")
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))

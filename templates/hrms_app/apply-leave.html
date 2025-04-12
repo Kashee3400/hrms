@@ -237,8 +237,9 @@
 
 {% block extra_js %}
   <script>
-    var leaveBalance = {% if object %} {{ leave_balance.remaining_leave_balances|default:0 }} {% else %}{{ rem_bal }} {% endif %} ;
-    var leaveTypeShortCode = '{{ leave_balance.leave_type.leave_type_short_code }}'
+    var leaveTypeShortCode = '{{ leave_balance.leave_type.leave_type_short_code }}';
+    var leaveBalanceRaw = {% if object %}{{ leave_balance.remaining_leave_balances|default:0 }}{% else %}{{ rem_bal }}{% endif %};
+    var leaveBalance = (leaveTypeShortCode === 'EL') ? Math.floor(leaveBalanceRaw) : leaveBalanceRaw;
     var totalDays = 0
     var bookedBalance = 0
     var endDay = 1

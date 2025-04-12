@@ -193,8 +193,6 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
                     "search_query" : self.request.GET.get("q", "").strip()
                 }
             )
-        else:
-            print(form.errors)
         context.update(
             {
                 "date": date,
@@ -268,43 +266,36 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
                 <th colspan="3">Annual Balance</th>
         """
 
-        # Add all 12 months with EL Credit where applicable
-        for i, month in enumerate(months, start=1):  # Start indexing from 1 for month comparison
-            colspan = 8 if i in el_credit_months else 7  # Extra column if EL Credit exists
+        # Add month columns with correct colspan
+        for i, month in enumerate(months, start=1):
+            colspan = len(monthly_headers) + (1 if i in el_credit_months else 0)
             header_html += f'<th colspan="{colspan}">{month}</th>'
 
         header_html += "</tr><tr><th></th><th></th>"
 
-        # Add annual leave balance headers
+        # Add annual headers
         header_html += ''.join(f'<th>{header}</th>' for header in annual_headers)
 
-        # Add monthly headers dynamically
+        # Add monthly headers with EL Credit first if exists
         for i, month in enumerate(months, start=1):
-            header_html += ''.join(f'<th>{header}</th>' for header in monthly_headers)
             if i in el_credit_months:
-                header_html += '<th style="background-color:#FFD700;">EL Credit</th>'  # Add EL Credit column
+                header_html += '<th style="background-color:#FFD700;">EL Credit</th>'  # EL Credit first
+            header_html += ''.join(f'<th>{header}</th>' for header in monthly_headers)
 
         header_html += "</tr></thead><tbody>"
 
         return header_html
 
-
     def get_leave_data(self, year, monthly_headers):
-        # Fetch opening leave balances
-        print(year)
         leave_balance_openings = LeaveBalanceOpenings.objects.filter(
             leave_type__leave_type_short_code__in=["EL", "SL", "CL"],year=year,
         ).values("user_id", "leave_type__leave_type_short_code", "opening_balance", "no_of_leaves")
-
-        # Structure leave opening balances
         leave_opening_dict = defaultdict(lambda: {lt: {"opening_balance": 0, "no_of_leaves": 0} for lt in ["EL", "SL", "CL"]})
         for balance in leave_balance_openings:
             leave_opening_dict[balance["user_id"]][balance["leave_type__leave_type_short_code"]] = {
                 "opening_balance": float(balance["opening_balance"] or 0),
-                "no_of_leaves": float(balance["no_of_leaves"] or 0)
+                "no_of_leaves": float(balance["opening_balance"] or 0)
             }
-
-        # Search filter for employees
         search_query = self.request.GET.get("q", "").strip()
         leave_summary = LeaveApplication.objects.filter(endDate__year=year, status=settings.APPROVED)
         if search_query:
@@ -313,14 +304,10 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
                 Q(appliedBy__last_name__icontains=search_query) |
                 Q(appliedBy__username__icontains=search_query)
             )
-
-        # Aggregate leave data
         leave_summary = leave_summary.values(
             "endDate__month", "leave_type__leave_type_short_code", "appliedBy__id", "appliedBy__username",
             "appliedBy__first_name", "appliedBy__last_name"
         ).annotate(total_used=Sum("usedLeave"), total_closing=Sum("balanceLeave"))
-
-        # Fetch EL Credit transactions & store in a dictionary (for fast lookup)
         el_credit_transactions = LeaveTransaction.objects.filter(
             transaction_date__year=year,
             leave_balance__leave_type__leave_type_short_code="EL"
@@ -339,35 +326,91 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
                     "emp_name": f"{leave['appliedBy__first_name']} {leave['appliedBy__last_name']}",
                     "annual_balance": leave_opening_dict[emp_id],
                     "monthly_data": {m: {key: 0 for key in monthly_headers} for m in range(1, 13)},
-                    "el_credit": el_credit_dict[emp_id],  # Store EL Credit by month
+                    "el_credit": el_credit_dict[emp_id],
                 }
             month = leave["endDate__month"]
             leave_type = leave["leave_type__leave_type_short_code"]
             employees[emp_id]["monthly_data"][month][leave_type] += leave["total_used"] or 0
-            employees[emp_id]["monthly_data"][month][f"Closing {leave_type}"] = leave["total_closing"] or 0
+            employees[emp_id]["monthly_data"][month][f"Closing {leave_type}"] = (float(leave["total_closing"])) or 0
         return employees, el_credit_dict
-
 
     def generate_table_rows(self, employees, annual_headers, monthly_headers, el_credit_dict):
         row_html = ""
-        for emp_id, emp in employees.items():
-            row_html += f'<tr><td>{emp["emp_code"]}</td><td>{emp["emp_name"]}</td>'
-            row_html += ''.join(f'<td style="background-color:#80008042">{emp["annual_balance"][bal]["opening_balance"]}</td>' for bal in annual_headers)
 
-            opening_balance = {key: emp["annual_balance"][key]["no_of_leaves"] for key in annual_headers}
+        for emp_id, emp in employees.items():
+            # Start the row with basic employee info
+            row_html += f'<tr><td>{emp["emp_code"]}</td><td>{emp["emp_name"]}</td>'
+
+            # Annual opening balances
+            row_html += ''.join(
+                f'<td style="background-color:#80008042">{emp["annual_balance"][bal]["opening_balance"]}</td>'
+                for bal in annual_headers
+            )
+
+            # Initialize opening balance
+            opening_balance = {
+                key: emp["annual_balance"][key]["no_of_leaves"]
+                for key in annual_headers
+            }
 
             for month in range(1, 13):
-                closing_balance = {key: opening_balance[key] - emp["monthly_data"][month][key] for key in annual_headers}
+                # Calculate closing balances
+                closing_balance = {
+                    key: opening_balance[key] - emp["monthly_data"][month][key]
+                    for key in annual_headers
+                }
+
+                # ✅ Apply EL credit if available
+                if "EL" in annual_headers and month in el_credit_dict.get(emp_id, {}):
+                    el_credit = float(el_credit_dict[emp_id][month])
+                    closing_balance["EL"] += el_credit
+                    # Optional: Display EL credit in a separate column
+                    row_html += f'<td style="background-color:#FFD700;">{el_credit}</td>'
+                else:
+                    el_credit = 0  # still define for consistency
+
+                # Store updated closing balances into monthly_data
                 for key in annual_headers:
                     emp["monthly_data"][month][f"Closing {key}"] = round(closing_balance[key], 2)
+
+                # Update opening balance for next month
                 opening_balance = closing_balance
 
-                row_html += ''.join(f'<td>{emp["monthly_data"][month][key]}</td>' for key in monthly_headers)
-
-                # Dynamically add "EL Credit" column **only for months that have EL credit**
-                if month in el_credit_dict.get(emp_id, {}):
-                    row_html += f'<td style="background-color:#FFD700;">{el_credit_dict[emp_id][month]}</td>'
+                # Add monthly leave usage and closings
+                row_html += ''.join(
+                    f'<td>{emp["monthly_data"][month][key]}</td>'
+                    for key in monthly_headers
+                )
 
             row_html += '</tr>'
 
         return row_html
+
+
+
+    # def generate_table_rows(self, employees, annual_headers, monthly_headers, el_credit_dict):
+    #     row_html = ""
+    #     for emp_id, emp in employees.items():
+    #         row_html += f'<tr><td>{emp["emp_code"]}</td><td>{emp["emp_name"]}</td>'
+    #         row_html += ''.join(f'<td style="background-color:#80008042">{emp["annual_balance"][bal]["opening_balance"]}</td>' for bal in annual_headers)
+
+    #         opening_balance = {key: emp["annual_balance"][key]["no_of_leaves"] for key in annual_headers}
+
+    #         for month in range(1, 13):
+                
+    #             closing_balance = {key: opening_balance[key] - emp["monthly_data"][month][key] for key in annual_headers}
+    #             if el_credit_dict[emp_id].get(month,0) > 0:
+    #                 closing_balance = float(el_credit_dict[emp_id][month])+closing_balance
+    #             for key in annual_headers:
+    #                 emp["monthly_data"][month][f"Closing {key}"] = round(closing_balance[key], 2)
+    #             opening_balance = closing_balance
+
+    #             row_html += ''.join(f'<td>{emp["monthly_data"][month][key]}</td>' for key in monthly_headers)
+
+    #             # Dynamically add "EL Credit" column **only for months that have EL credit**
+    #             if month in el_credit_dict.get(emp_id, {}):
+    #                 row_html += f'<td style="background-color:#FFD700;">{el_credit_dict[emp_id][month]}</td>'
+
+    #         row_html += '</tr>'
+
+    #     return row_html
