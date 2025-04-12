@@ -392,12 +392,13 @@ def send_personal_detail_update_email(user_full_name, username, changed_fields):
     for field, values in changed_fields.items():
         old, new = values
         body += f"- {field.replace('_', ' ').title()}: '{old}' → '{new}'\n"
-    print("Sending Mail")
-    print(body)
+    logging.info(f"Sending Personal Detail mail: {body}")
     send_mail(
         subject=subject,
         message=body,
         from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=HR_EMAIL,
+        recipient_list=[HR_EMAIL],
         fail_silently=False,
     )
+    logging.info(f"Personal Detail update mail sent at: {timezone.now()}")
+    

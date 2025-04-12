@@ -234,17 +234,17 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
         annual_headers = ["EL", "SL", "CL"]
         monthly_headers = ["EL", "SL", "CL", "LWP", "Closing EL", "Closing SL", "Closing CL"]
         
-        cache_key = f"leave_balance_{year}_{current_month}"
-        cached_data = cache.get(cache_key)
-        if cached_data:
-            return cached_data
+        # cache_key = f"leave_balance_{year}_{current_month}"
+        # cached_data = cache.get(cache_key)
+        # if cached_data:
+        #     return cached_data
         
         table_html = self.generate_table_header(columns, annual_headers, months, monthly_headers,year)
         employees,el_credits = self.get_leave_data(year, monthly_headers)
         table_html += self.generate_table_rows(employees, annual_headers, monthly_headers, el_credits)
         table_html += "</tbody></table></div>"
         
-        cache.set(cache_key, table_html, timeout=3600)
+        # cache.set(cache_key, table_html, timeout=3600)
         return table_html
     
 
