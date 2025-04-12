@@ -82,7 +82,7 @@
               {% for log in leave_application.logs.all %}
                 <li class="list-group-item">
                   <p>
-                    <strong>{{ log.action }}</strong> by {{ log.action_by_name }} - {{ log.timestamp|naturaltime }}
+                    <strong>{{ log.action }}</strong> by {{ log.action_by_name }} - {{ log.timestamp }}
                   </p>
                 </li>
               {% empty %}

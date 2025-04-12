@@ -87,7 +87,7 @@
           <ul class="list-group">
             {% for log in tour_application.logs.all|dictsortreversed:'timestamp' %}
               <li class="list-group-item">
-                <strong>{{ log.action }}</strong> by {{ log.action_by_name }} - {{ log.timestamp }} ({{ log.timestamp|naturaltime }})<p class="mb-0">{{ log.comments }}</p>
+                <strong>{{ log.action }}</strong> by {{ log.action_by_name }} - {{ log.timestamp }} ({{ log.timestamp }})<p class="mb-0">{{ log.comments }}</p>
               </li>
             {% empty %}
               <li class="list-group-item">No logs available.</li>

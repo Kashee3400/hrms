@@ -2128,3 +2128,31 @@ class HRAnnouncementAdminForm(forms.ModelForm):
             "content": _("Content"),
             "pinned":_("Pinned")
         }
+
+class AttendanceAggregationForm(forms.Form):
+    
+    start_date = forms.DateField(
+        label=_("From Date"),
+        required=True,
+        widget=DatePickerInput(
+            options={
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            attrs={"class": "form-control"},
+        ),
+    )
+    end_date = forms.DateField(
+        label=_("To Date"),
+        required=True,
+        widget=DatePickerInput(
+            options={
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            range_from="from_date",
+            attrs={"class": "form-control"},
+        ),
+    )

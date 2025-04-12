@@ -1899,7 +1899,8 @@ class EmployeeListView(LoginRequiredMixin, ListView):
         ]
         return context
 
-
+from django.contrib.admin.models import LogEntry, CHANGE, ADDITION
+from django.contrib.contenttypes.models import ContentType
 class LeaveTransactionCreateView(FormView):
     form_class = LeaveTransactionForm
     template_name = "hrms_app/leave_transaction.html"
@@ -1929,13 +1930,25 @@ class LeaveTransactionCreateView(FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        urls = [
-            ("dashboard", {"label": "Dashboard"}),
-            ("leave_transaction_create", {"label": "Leave Transaction"}),
-        ]
-        context.update({"urls": urls, "title": self.title})
-        return context
 
+        leave_balance_ct = ContentType.objects.get_for_model(LeaveBalanceOpenings)
+
+        logs = LogEntry.objects.filter(
+            content_type=leave_balance_ct,
+            user=self.request.user  # or remove to show all users
+        ).order_by('-action_time')[:100]
+
+        context.update({
+            "logs": logs,
+            "title": self.title,
+            "date_form":AttendanceAggregationForm(self.request.GET),
+            "urls": [
+                ("dashboard", {"label": "Dashboard"}),
+                ("leave_transaction_create", {"label": "Leave Transaction"}),
+            ],
+        })
+
+        return context
 
 class LeaveBalanceUpdateView(View):
     template_name = "hrms_app/leave_bal_up.html"

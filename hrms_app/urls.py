@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include,re_path
 from hrms_app.views.api_views import *
+from hrms_app.views.leave_balance_view import ForwardLeaveBalanceView,CreditELLeaveView,UserAttendanceAggregation
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,TokenVerifyView
@@ -36,4 +37,8 @@ urlpatterns = [
     path('get_top_5_employees/<int:year>/', Top5EmployeesView.as_view(), name='get_top_5_employees'),
     path("send_otp/", SendOTPView.as_view(), name="send_otp"),
     path("verify_otp/", VerifyOTPView.as_view(), name="verify_otp"),
+    path('forward-leave-balances/', ForwardLeaveBalanceView.as_view(), name='forward-leave-balances'),
+    path("credit-el-leaves/", CreditELLeaveView.as_view(), name="credit_el_leaves"),
+    path("attendance-aggregation-count/", UserAttendanceAggregation.as_view(), name="attendance-aggregation-count"),
+
 ]

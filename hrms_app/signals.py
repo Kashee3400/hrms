@@ -179,3 +179,11 @@ def get_instance_date(instance, sender):
         raise ImproperlyConfigured(
             f"The model {sender.__name__} does not have a recognized date field for lock validation."
         )
+
+
+from .models import HRAnnouncement
+from .tasks import send_announcement_email_task
+
+@receiver(post_save, sender=HRAnnouncement)
+def send_announcement_signal(sender, instance, created, **kwargs):
+    send_announcement_email_task.delay(instance.id, created)

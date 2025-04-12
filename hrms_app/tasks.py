@@ -221,7 +221,7 @@ def send_reminder_email():
     subject = f'Reminder For Attendance Regularization'
     email = EmailMessage(
         subject,
-        "It is requested to all the employee the check attendance status(Leave, Tour, Late Coming, Early Going, Mis punching) and take approval for salary finalization if any.",
+        "It is requested to all the employee the check attendance status(Leave, Tour, Late Coming, Early Going, Mis punching) and take approval for salary finalization if any.\n Attendance Will be locked on 25th day of this month",
         settings.DEFAULT_FROM_EMAIL,
         ['all@kasheemilk.com'],
     )
@@ -406,3 +406,33 @@ def send_personal_detail_update_email(user_full_name, username, changed_fields):
     )
     logging.info(f"Personal Detail update mail sent at: {timezone.now()}")
     
+
+from celery import shared_task
+from django.core.mail import send_mass_mail
+from .models import HRAnnouncement
+
+@shared_task
+def send_announcement_email_task(announcement_id, created):
+    try:
+        announcement = HRAnnouncement.objects.get(pk=announcement_id)
+
+        if not announcement.is_active:
+            return
+        subject_prefix = "[HR Announcement]"
+        action = "New" if created else "Updated"
+        subject = f"{subject_prefix} {action}: {announcement.title}"
+        message = f"""
+        {action} Announcement: {announcement.title}
+        Type: {announcement.get_type_display()}
+        Start Date: {announcement.start_date}
+        End Date: {announcement.end_date if announcement.end_date else "Indefinite"}
+        {announcement.content}
+        Login to view more details.
+        """
+        users = USER.objects.filter(groups__in=announcement.audience_roles.all()).distinct()
+        recipient_emails = [u.email for u in users if u.email]
+        if not recipient_emails:
+            return
+        send_mass_mail([(subject, message, None, recipient_emails)], fail_silently=True)
+    except HRAnnouncement.DoesNotExist:
+        pass

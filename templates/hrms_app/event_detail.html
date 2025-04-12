@@ -94,7 +94,7 @@
                     <ul class="list-unstyled">
                       {% for log in object.actions.all|dictsortreversed:'timestamp' %}
                         <li class="p-2 mb-2" style="background-color: azure;">
-                          <strong class="{{ log.action }}">{{ log.action|capfirst }}</strong> by {{ log.action_by_name }} - {{ log.timestamp|naturaltime }}
+                          <strong class="{{ log.action }}">{{ log.action|capfirst }}</strong> by {{ log.action_by_name }} - {{ log.timestamp }}
                         </li>
                       {% empty %}
                         <li>No logs available.</li>
