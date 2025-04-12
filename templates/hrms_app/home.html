@@ -64,7 +64,7 @@
 {% block content %}
   <div class="my-2">
     <div class="row">
-      <div class="{% if request.user.is_rm %} col-lg-4 {% else %}col-lg-6 {% endif %} d-flex flex-column px-1">
+      <div class="{% if request.user.is_rm or request.user.is_superuser %} col-lg-4 {% else %}col-lg-6 {% endif %} d-flex flex-column px-1">
         <div class="row flex-grow">
           <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
             <div class="card card-rounded pt-3 px-0">
@@ -136,7 +136,7 @@
           </div>
         </div>
       {% endif %}
-      <div class="{% if request.user.is_rm %} col-lg-4 {% else %}col-lg-6 {% endif %} d-flex flex-column px-1">
+      <div class="{% if request.user.is_rm or request.user.is_superuser %} col-lg-4 {% else %}col-lg-6 {% endif %} d-flex flex-column px-1">
         <div class="row flex-grow">
           <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
             <div class="card card-rounded pt-3">
