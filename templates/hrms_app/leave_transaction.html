@@ -7,162 +7,128 @@
 
 {% block extrastyle %}
   <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
-  <style>
-    .required {
-      color: red;
-    }
-    
-    /* Input container */
-    .input-container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      border-bottom: 2px solid #007bff;
-      padding-bottom: 10px;
-      margin-bottom: 20px;
-      position: relative;
-    }
-    
-    /* Input field styling */
-    .input-field {
-      width: 80%;
-      padding: 10px;
-      font-size: 16px;
-      border: none;
-      outline: none;
-      border-bottom: 2px solid #007bff;
-      transition: all 0.3s ease;
-    }
-    
-    /* Highlight input on focus */
-    .input-field:focus {
-      border-bottom: 2px solid #0056b3;
-      box-shadow: 0 1px 5px rgba(0, 123, 255, 0.3);
-    }
-    
-    /* Message container */
-    .message-container {
-      text-align: center;
-      font-size: 16px;
-      font-weight: bold;
-    }
-    
-    /* Loader animation */
-    .loader {
-      border: 8px solid #f3f3f3;
-      border-top: 8px solid #007bff;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin-top: 20px;
-    }
-    
-    /* Spinner animation */
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg);
-      }
-      100% {
-        transform: rotate(360deg);
-      }
-    }
-    .log-box-scrollable {
-      max-height: 60vh;
-      overflow-y: auto;
-      border-left: 4px solid #0d6efd; /* Optional: highlight with primary color */
-      animation: slideIn 0.4s ease-out;
-    }
-    
-    @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(15px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="{% static 'hrms_app/css/leave_bal.css' %}" />
 {% endblock %}
 
 {% block content %}
   {% render_breadcrumb 'Leave Transaction' urls %}
   <div class="bg-white p-4">
     <div class="row">
-      <div class="col-6">
+      <div class="col-12 col-sm-12 col-md-6 col-lg-6">
+        <h5 class="mt-4">{% trans 'Employee Attendance Aggregation' %}</h5>
+        <div class="table-responsive">
+          <div style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-stripped" id="leaveStatusTable">
+              <thead class="table-light sticky-header">
+                <tr>
+                  <th>
+                    <input type="checkbox" id="selectAll" />
+                  </th>
+                  <th>
+                    {% trans 'Emp Code' %}
+                  </th>
+                  <th>
+                    {% trans 'P' %}
+                  </th>
+                  <th>
+                    {% trans 'H' %}
+                  </th>
+                  <th>
+                    {% trans 'T' %}
+                  </th>
+                  <th>
+                    {% trans 'CL' %}
+                  </th>
+                  <th>
+                    {% trans 'CLH' %}
+                  </th>
+                  <th>
+                    {% trans 'SL' %}
+                  </th>
+                  <th>
+                    {% trans 'SLH' %}
+                  </th>
+                  <th>
+                    {% trans 'FL' %}
+                  </th>
+                  <th>
+                    {% trans 'EL' %}
+                  </th>
+                  <th>
+                    {% trans 'TH' %}
+                  </th>
+                  <th>
+                    {% trans 'OFF' %}
+                  </th>
+                  <th>
+                    {% trans 'Total' %}
+                  </th>
+                  <th>
+                    {% trans 'Credit' %}
+                  </th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div id="balance-loader" class="custom-box-loader" style="display: none;">
+            <div class="box"></div>
+            <div class="box"></div>
+            <div class="box"></div>
+          </div>          
+        </div>
         <div class="container mt-4">
-          <h5 class="mb-3 border-bottom pb-2">{% trans "Forward Leave Balances" %}</h5>
-          <div class="d-flex align-items-center gap-2">
-            <input type="number" id="yearInput" class="input-field me-2" placeholder="Enter year (e.g., 2025)" style="max-width: 200px;" />
-            <button id="forwardLeavesBtn" class="btn btn-primary btn-sm me-2">{% trans "Submit" %}</button>
-            <div id="loader" class="spinner-border text-primary" style="display: none;" role="status">
-              <span class="visually-hidden">{% trans "Loading..." %}</span>
+          <h5 class="mb-3 border-bottom pb-2">{% trans 'Quarterly EL Credit' %}</h5>
+          <div class="row g-2 align-items-center">
+            <div class="col-auto">
+              <button id="creditELBtn" class="btn btn-success btn-sm">{% trans 'Credit EL to All' %}</button>
+            </div>
+            <div class="col-auto">
+              <div id="elLoader" class="spinner-border text-primary" role="status" style="display: none;">
+                <span class="visually-hidden">{% trans 'Processing...' %}</span>
+              </div>
+            </div>
+          </div>
+          <div id="elCreditMessage" class="alert d-none mt-3" role="alert"></div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-12 col-md-4 col-lg-4">
+        <div class="container mt-4">
+          <h5 class="mb-3 border-bottom pb-2">{% trans 'Forward Leave Balances' %}</h5>
+          <div class="row g-2 align-items-center">
+            <div class="col-auto input-container">
+              <input type="number" id="yearInput" class="input-field" placeholder="{% trans 'Enter year (e.g., 2025)' %}" />
+            </div>
+            <div class="col-auto">
+              <button id="forwardLeavesBtn" class="btn btn-primary btn-sm">{% trans 'Submit' %}</button>
+            </div>
+            <div class="col-auto">
+              <div id="loader" class="spinner-border text-primary" style="display: none;" role="status">
+                <span class="visually-hidden">{% trans 'Loading...' %}</span>
+              </div>
             </div>
           </div>
           <div id="leaveForwardMessage" class="mt-3 message-container"></div>
         </div>
-        {% comment %} <form id="transaction_form" method="post">
-          {% csrf_token %}
-          <div class="row g-3">
-            {% for field in form %}
-              {% if field.name != 'remarks' %}
-                <div class="col-md-4 col-12">
-                  {{ field.label_tag }}{% if field.field.required %}
-                    <span class="text-danger">*</span>
-                  {% endif %}
-                  {{ field }}
-                  {% if field.errors %}
-                    <div class="text-danger">{{ field.errors }}</div>
-                  {% endif %}
-                  <small class="form-text text-muted">{{ field.help_text }}</small>
-                </div>
-              {% endif %}
-            {% endfor %}
 
-            <div class="col-12">
-              {{ form.remarks.label_tag }}{% if form.remarks.field.required %}
-                <span class="text-danger">*</span>
-              {% endif %}
-              {{ form.remarks }}
-              {% if form.remarks.errors %}
-                <div class="text-danger">{{ form.remarks.errors }}</div>
-              {% endif %}
-              <small class="form-text text-muted">{{ form.remarks.help_text }}</small>
-            </div>
-          </div>
-
-          <div class="row mt-3">
-            <div class="col-12 text-center">
-              <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#confirmationModal">{% trans 'Submit' %}</button>
-            </div>
-          </div>
-        </form> {% endcomment %}
         <div class="container my-4">
-          <h5 class="mb-3 border-bottom pb-2">{% trans "Check all Employee Attendance Count" %}</h5>
-          <div class="d-flex align-items-center gap-2">
-            <input id="startDate" class="input-field datepicker" placeholder="Start Date" />
-            <input id="endDate" class="input-field datepicker" placeholder="End Date" />
-            <button id="checkLeaveDaysBtn" class="btn btn-primary btn-sm">{% trans "Check" %}</button>
+          <h5 class="mb-3 border-bottom pb-2">{% trans 'Check all Employee Attendance Count' %}</h5>
+          <div class="row g-2 align-items-center">
+            <div class="col input-container">
+              <input id="startDate" class="input-field datepicker" placeholder="{% trans 'Start Date' %}" />
+            </div>
+            <div class="col input-container">
+              <input id="endDate" class="input-field datepicker" placeholder="{% trans 'End Date' %}" />
+            </div>
+            <div class="col-auto">
+              <button id="checkLeaveDaysBtn" class="btn btn-primary btn-sm">{% trans 'Check' %}</button>
+            </div>
           </div>
           <div id="leaveDaysResult" class="mt-3 text-info fw-bold"></div>
         </div>
-        <div class="container mt-4">
-          <h5 class="mb-3 border-bottom pb-2">{% trans "Quarterly EL Credit" %}</h5>
-          <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
-            <input type="number" id="elYearInput" class="input-field w-auto" placeholder="Year (e.g., 2025)" />
-            <input type="number" id="elDaysInput" class="input-field w-auto" placeholder="Days (default 7.5)" />
-            <button id="creditELBtn" class="btn btn-success btn-sm">{% trans "Credit EL to All" %}</button>
-            <div id="elLoader" class="spinner-border text-primary ms-2" role="status" style="display: none;">
-              <span class="visually-hidden">{% trans "Processing..." %}</span>
-            </div>
-          </div>
-          <div id="elCreditMessage" class="alert d-none" role="alert"></div>
-        </div>
       </div>
-      <div class="col-6">
-        <h5 class="mt-4">{% trans "Leave Balance Logs" %}</h5>
+      <div class="col-12 col-sm-12 col-md-2 col-lg-2">
+        <h5 class="mt-4">{% trans 'Leave Transaction Logs' %}</h5>
         <div class="log-box log-box-scrollable border p-3 mb-4 rounded shadow-sm bg-light">
           {% if logs %}
             <ul class="list-unstyled mb-0">
@@ -182,32 +148,8 @@
       </div>
     </div>
   </div>
-
-  <!-- Modal -->
-  <div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header bg-warning text-white">
-          <h5 class="modal-title" id="confirmationModalLabel">Are you sure?</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          {% trans 'You want to submit leave transaction. Please check the details before you submit.' %}
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
-          <button type="button" class="btn btn-primary" onclick="submitForm()">{% trans 'Submit' %}</button>
-        </div>
-      </div>
-    </div>
-  </div>
 {% endblock %}
 
 {% block extra_js %}
-  <script>
-    function submitForm() {
-      document.getElementById('transaction_form').submit()
-    }
-  </script>
   <script src="{% static 'hrms_app/js/leave_bal.js' %}"></script>
 {% endblock %}

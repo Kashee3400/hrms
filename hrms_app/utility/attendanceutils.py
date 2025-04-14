@@ -228,7 +228,7 @@ def aggregate_attendance_data(
 
     # Process attendance logs
     for log in attendance_logs:
-        employee_id = log.applied_by.id
+        employee_id = log.applied_by.username
         log_date = localtime(log.start_date).date()
         office_closer = OfficeClosure.objects.filter(date=log_date).values("short_code").first()
         if office_closer:
@@ -252,7 +252,7 @@ def aggregate_attendance_data(
             log.start_date, log.start_time, log.end_date, log.end_time
         )
         for date, short_code, _ in daily_durations:
-            employee_id = log.applied_by.id
+            employee_id = log.applied_by.username
             attendance_data[employee_id][date] = [
                 {
                     "status": short_code,
@@ -268,7 +268,7 @@ def aggregate_attendance_data(
 
     # Process leave logs
     for log in leave_logs:
-        employee_id = log.leave_application.appliedBy.id
+        employee_id = log.leave_application.appliedBy.username
         log_date = log.date
         leave_type = log.leave_application.leave_type
         leave_status = leave_type.leave_type_short_code

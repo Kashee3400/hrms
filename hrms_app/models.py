@@ -1724,17 +1724,6 @@ class LeaveTransaction(models.Model):
         verbose_name_plural = _("Leave Transactions")
         ordering = ["-transaction_date"]
 
-    def apply_transaction(self):
-        if self.transaction_type == 'add':
-            if self.leave_balance.remaining_leave_balances is not None:
-                self.leave_balance.remaining_leave_balances += self.no_of_days_approved
-                self.leave_balance.no_of_leaves += self.no_of_days_approved
-        elif self.transaction_type == 'subtract':
-            if self.leave_balance.remaining_leave_balances is not None:
-                self.leave_balance.remaining_leave_balances -= self.no_of_days_approved
-                self.leave_balance.no_of_leaves -= self.no_of_days_approved
-        self.leave_balance.save()
-
 
 class CompensatoryOff(models.Model):
     id = models.UUIDField(primary_key=True, editable=False, verbose_name="Unique ID")

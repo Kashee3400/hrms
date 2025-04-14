@@ -1211,6 +1211,7 @@ def make_json_serializable(data):
     return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
 
 class EventListView(View):
+    
     def get(self, request, *args, **kwargs):
         user_id = request.GET.get("employee", self.request.user.id)
         start_param = request.GET.get("start")
@@ -1277,30 +1278,30 @@ class EventListView(View):
         for office_closer in office_closers:
             closed_date = office_closer.date
             closed_dates.add(closed_date)
-            
-            events_data.append({
-                "id": office_closer.pk,
-                "title": office_closer.reason,
-                "start": timezone.localtime(timezone.make_aware(
-                    datetime.combine(closed_date, datetime.min.time())
-                )).isoformat(),
-                "end": timezone.localtime(timezone.make_aware(
-                    datetime.combine(closed_date, datetime.min.time()) + timedelta(days=1)
-                )).isoformat(),
-                "url": "#!",
-            })
-            events_data.append({
-                "id": office_closer.pk,
-                "title": "Present",
-                "start": timezone.localtime(timezone.make_aware(
-                    datetime.combine(closed_date, datetime.min.time())
-                )).isoformat(),
-                "end": timezone.localtime(timezone.make_aware(
-                    datetime.combine(closed_date, datetime.min.time()) + timedelta(days=1)
-                )).isoformat(),
-                "color":"#06B900",
-                "url": "#!",
-            })
+            if attendances.filter(start_date__date=office_closer.date).exists():
+                events_data.append({
+                    "id": office_closer.pk,
+                    "title": office_closer.reason,
+                    "start": timezone.localtime(timezone.make_aware(
+                        datetime.combine(closed_date, datetime.min.time())
+                    )).isoformat(),
+                    "end": timezone.localtime(timezone.make_aware(
+                        datetime.combine(closed_date, datetime.min.time()) + timedelta(days=1)
+                    )).isoformat(),
+                    "url": "#!",
+                })
+                events_data.append({
+                    "id": office_closer.pk,
+                    "title": "Present",
+                    "start": timezone.localtime(timezone.make_aware(
+                        datetime.combine(closed_date, datetime.min.time())
+                    )).isoformat(),
+                    "end": timezone.localtime(timezone.make_aware(
+                        datetime.combine(closed_date, datetime.min.time()) + timedelta(days=1)
+                    )).isoformat(),
+                    "color":"#06B900",
+                    "url": "#!",
+                })
 
         # Step 2: Add attendance only if it doesn't fall on closed dates
         for att in attendances:
@@ -1850,23 +1851,12 @@ class CustomUploadView(View):
             response = {"uploaded": False, "message": "No file uploaded"}
         return JsonResponse(response)
 
-@method_decorator(login_required,name="dispatch")
-class EmployeeListView(LoginRequiredMixin, ListView):
+class EmployeeListView(ModelPermissionRequiredMixin, ListView):
     model = CustomUser
     template_name = "hrms_app/employee/employees.html"
     context_object_name = "users"
     paginate_by = 20
-
-    def dispatch(self, request, *args, **kwargs):
-        # First, enforce login requirement
-        if not request.user.is_authenticated:
-            return self.handle_no_permission()
-
-        # Then, enforce staff or superuser check
-        if not (request.user.is_staff or request.user.is_superuser):
-            return self.handle_no_permission()
-
-        return super().dispatch(request, *args, **kwargs)
+    permission_action = "view"
 
     def get_queryset(self):
         queryset = CustomUser.objects.all()
@@ -1935,7 +1925,7 @@ class LeaveTransactionCreateView(FormView):
 
         logs = LogEntry.objects.filter(
             content_type=leave_balance_ct,
-            user=self.request.user  # or remove to show all users
+            user=self.request.user 
         ).order_by('-action_time')[:100]
 
         context.update({

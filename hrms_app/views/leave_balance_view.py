@@ -7,6 +7,7 @@ from hrms_app.models import (
     AttendanceLog,
     UserTour,
 )
+from collections import defaultdict
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -61,14 +62,6 @@ class ForwardLeaveBalanceView(View):
                     balance.closing_balance = balance.remaining_leave_balances or 0
                     balance.save()
 
-                    # Log the update to closing balance
-                    log_admin_action(
-                        request.user,
-                        balance,
-                        CHANGE,
-                        f"Set closing balance for year {balance.year} ({balance.leave_type.leave_type_short_code})",
-                    )
-
                     code = balance.leave_type.leave_type_short_code.upper()
 
                     if code in ["SL", "EL"]:
@@ -105,8 +98,6 @@ class ForwardLeaveBalanceView(View):
 
                 # Bulk create new entries
                 LeaveBalanceOpenings.objects.bulk_create(filtered_new_entries)
-
-                # Log each addition
                 for entry in filtered_new_entries:
                     log_admin_action(
                         request.user,
@@ -126,47 +117,41 @@ class ForwardLeaveBalanceView(View):
             return JsonResponse({"error": str(e)}, status=500)
 
 
-from django.contrib.auth.decorators import login_required, user_passes_test
-from django.utils.decorators import method_decorator
-
-
 @method_decorator(login_required, name="dispatch")
 @method_decorator(user_passes_test(lambda u: u.is_superuser), name="dispatch")
 class CreditELLeaveView(View):
     def post(self, request, *args, **kwargs):
         try:
             data = json.loads(request.body)
-            year = int(data.get("year", timezone.now().year))
-            days = float(data.get("days", 7.5))
-
-            try:
-                el_type = LeaveType.objects.get(leave_type_short_code__iexact="EL")
-            except LeaveType.DoesNotExist:
-                return JsonResponse(
-                    {"error": "LeaveType with short code 'EL' not found."}, status=400
-                )
-
+            year = data.get("year", timezone.now().year)
+            employee_data = data.get("employees", [])
+            emp_codes = [emp["emp_code"] for emp in employee_data]
+            emp_credit_map = {emp["emp_code"]: emp["balance"] for emp in employee_data}
+            el_type = LeaveType.objects.get(leave_type_short_code="EL")
             balances = LeaveBalanceOpenings.objects.select_related("user").filter(
-                leave_type=el_type, year=year
+                leave_type=el_type, year=year, user__username__in=emp_codes
             )
-
             if not balances.exists():
                 return JsonResponse(
                     {"detail": f"No EL leave balances found for year {year}."},
                     status=404,
                 )
-
             updated = 0
             errors = []
-
             with transaction.atomic():
+                transactions = []
                 for balance in balances:
+                    emp_code = balance.user.username
+                    days = emp_credit_map.get(emp_code)
+                    if days is None:
+                        errors.append(f"{emp_code}: Credit days not provided.")
+                        continue
                     try:
                         balance.remaining_leave_balances = (
                             balance.remaining_leave_balances or 0
                         ) + days
                         balance.save()
-                        LeaveTransaction.objects.create(
+                        transactions.append(LeaveTransaction(
                             leave_balance=balance,
                             leave_type=el_type,
                             transaction_date=timezone.now(),
@@ -174,11 +159,18 @@ class CreditELLeaveView(View):
                             no_of_days_approved=days,
                             transaction_type="add",
                             remarks="Quarterly EL credit",
-                        )
+                        ))
 
+                        log_admin_action(
+                            request.user,
+                            balance.pk,
+                            CHANGE,
+                            f"Credited {days} EL for {emp_code} year {year}.",
+                        )
                         updated += 1
                     except Exception as e:
-                        errors.append(f"{balance.user.username}: {str(e)}")
+                        errors.append(f"{emp_code}: {str(e)}")
+                LeaveTransaction.objects.bulk_create(transactions)
 
             return JsonResponse(
                 {
@@ -186,18 +178,9 @@ class CreditELLeaveView(View):
                     "errors": errors,
                 }
             )
-
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
 
-from collections import defaultdict
-from datetime import datetime
-from django.utils.timezone import make_aware
-from django.http import JsonResponse
-from django.views import View
-from django.contrib.auth import get_user_model
-
-User = get_user_model()
 
 class UserAttendanceAggregation(View):
     def _get_filtered_employees(self, location=None, active=False):
@@ -217,12 +200,18 @@ class UserAttendanceAggregation(View):
         end_date = request.GET.get("end_date")
 
         if not start_date or not end_date:
-            return JsonResponse({"error": "Start and end dates are required."}, status=400)
+            return JsonResponse(
+                {"error": "Start and end dates are required."}, status=400
+            )
 
         try:
-            converted_from_datetime, converted_to_datetime = self._get_date_range(start_date, end_date)
+            converted_from_datetime, converted_to_datetime = self._get_date_range(
+                start_date, end_date
+            )
         except ValueError:
-            return JsonResponse({"error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
+            return JsonResponse(
+                {"error": "Invalid date format. Use YYYY-MM-DD."}, status=400
+            )
 
         employees = self._get_filtered_employees(active=True)
         employee_ids = employees.values_list("id", flat=True)
@@ -240,16 +229,20 @@ class UserAttendanceAggregation(View):
             for day, records in daily_data.items():
                 for record in records:
                     status = record.get("status")
-                    increment = 0.5 if record.get("is_half_day") else 1
+                    increment = 0.5 if status in ["H"] else 1
                     status_counter[status] += increment
 
             # Add total of all statuses
             status_counter["total"] = sum(status_counter.values())
             aggregated_status_counts[user_id] = dict(status_counter)
 
-        return JsonResponse({
-            "aggregated_status_counts": aggregated_status_counts,
-            "start_date": start_date,
-            "end_date": end_date,
-            "total_days":(converted_to_datetime-converted_from_datetime).days +1
-        }, status=200)
+        return JsonResponse(
+            {
+                "aggregated_status_counts": aggregated_status_counts,
+                "start_date": start_date,
+                "end_date": end_date,
+                "total_days": (converted_to_datetime - converted_from_datetime).days
+                + 1,
+            },
+            status=200,
+        )

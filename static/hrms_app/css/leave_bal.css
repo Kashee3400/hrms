@@ -1,0 +1,124 @@
+.required {
+    color: red;
+}
+
+/* Input container */
+.input-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+/* Input field styling */
+.input-field {
+    width: 80%;
+    padding: 10px;
+    font-size: 16px;
+    border: none;
+    outline: none;
+    border-bottom: 2px solid #007bff;
+    transition: all 0.3s ease;
+}
+
+/* Highlight input on focus */
+.input-field:focus {
+    border-bottom: 2px solid #0056b3;
+    box-shadow: 0 1px 5px rgba(0, 123, 255, 0.3);
+}
+
+/* Message container */
+.message-container {
+    text-align: center;
+    font-size: 16px;
+    font-weight: bold;
+}
+
+/* Loader animation */
+.loader {
+    border: 8px solid #f3f3f3;
+    border-top: 8px solid #007bff;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-top: 20px;
+}
+
+/* Spinner animation */
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.log-box-scrollable {
+    max-height: 60vh;
+    overflow-y: auto;
+    border-left: 4px solid #0d6efd;
+    /* Optional: highlight with primary color */
+    animation: slideIn 0.4s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(15px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.custom-box-loader {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 150px;
+    /* adjust as needed */
+    gap: 6px;
+}
+
+.custom-box-loader .box {
+    width: 12px;
+    height: 40px;
+    background-color: #007bff;
+    animation: upDown 0.6s infinite ease-in-out;
+}
+
+.custom-box-loader .box:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.custom-box-loader .box:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes upDown {
+
+    0%,
+    100% {
+        transform: scaleY(1);
+    }
+
+    50% {
+        transform: scaleY(1.8);
+    }
+}
+
+.sticky-header th {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa;
+    /* Match Bootstrap's .table-light */
+    z-index: 10;
+}
