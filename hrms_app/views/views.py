@@ -1613,8 +1613,8 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
                         
         tour.applied_by = user
         messages.success(self.request, "Tour Applied Successfully")
-        # self.send_tour_notification(obj=tour)
-        # return super().form_valid(form)
+        self.send_tour_notification(obj=tour)
+        return super().form_valid(form)
         return redirect("apply_tour")
 
     def form_invalid(self, form):

@@ -119,9 +119,9 @@
             <p>
               <i class="fas fa-pause-circle me-2 text-muted"></i> {% trans 'On Hold:' %} <strong>{{ leave_balance.on_hold }}</strong>
             </p>
-            <p>
-              <i class="fas fa-check-circle me-2 text-muted"></i> {% trans 'Used Leave:' %} <strong>{{ leave_balance.used_leave }}</strong>
-            </p>
+            {% comment %} <p> {% endcomment %}
+              {% comment %} <i class="fas fa-check-circle me-2 text-muted"></i> {% trans 'Used Leave:' %} <strong>{{ leave_balance.used_leave }}</strong> {% endcomment %}
+            {% comment %} </p> {% endcomment %}
           </div>
           <div class="leave-action text-center mt-auto">
             <a href="{{ leave_balance.url }}?next={{ request.path }}" class="btn btn-outline-primary btn-sm" style="border-color: {{ leave_balance.color }}; color: {{ leave_balance.color }};">Apply Leave <i class="fas fa-arrow-right ms-1"></i></a>
