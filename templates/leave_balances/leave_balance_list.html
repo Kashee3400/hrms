@@ -91,8 +91,8 @@
 <div class="container">
   <div class="d-flex flex-nowrap overflow-auto py-3">
     {% for leave_balance in leave_balances %}
-      <div class="flex-shrink-0 me-3" style="width: 20%;">
-        <!-- ~4 items per view -->
+      <div class="flex-shrink-0 me-3" style="flex: 0 0 auto; width: 100%; max-width: 250px;">
+        <!-- Card -->
         <div class="card leave-card shadow-sm border-0 h-100">
           <div class="leave-header mb-3" style="border-left: 6px solid {{ leave_balance.color }}; padding-left: 10px;">
             <div class="d-flex align-items-center justify-content-between">
@@ -119,9 +119,6 @@
             <p>
               <i class="fas fa-pause-circle me-2 text-muted"></i> {% trans 'On Hold:' %} <strong>{{ leave_balance.on_hold }}</strong>
             </p>
-            {% comment %} <p> {% endcomment %}
-              {% comment %} <i class="fas fa-check-circle me-2 text-muted"></i> {% trans 'Used Leave:' %} <strong>{{ leave_balance.used_leave }}</strong> {% endcomment %}
-            {% comment %} </p> {% endcomment %}
           </div>
           <div class="leave-action text-center mt-auto">
             <a href="{{ leave_balance.url }}?next={{ request.path }}" class="btn btn-outline-primary btn-sm" style="border-color: {{ leave_balance.color }}; color: {{ leave_balance.color }};">Apply Leave <i class="fas fa-arrow-right ms-1"></i></a>

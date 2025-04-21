@@ -1401,7 +1401,7 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
         user = self.request.user
         qs_current_user = self.model.objects.none()
         qs_current_user = self.model.objects.filter(
-            applied_by=user, is_regularisation=True, status=settings.PENDING
+            applied_by=user, is_regularisation=True, status=settings.PENDING,is_submitted=True
         )
         qs_current_user
         return self.filter_by_date_range(qs_current_user)
@@ -1615,7 +1615,7 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
         messages.success(self.request, "Tour Applied Successfully")
         self.send_tour_notification(obj=tour)
         return super().form_valid(form)
-        return redirect("apply_tour")
+        # return redirect("apply_tour")
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
