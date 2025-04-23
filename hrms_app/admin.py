@@ -215,6 +215,7 @@ class AttendanceLogAdmin(admin.ModelAdmin):
 
     def approve_attendance(self, request, queryset):
         """Custom admin action to approve attendance logs."""
+        static_data = self.get_static_data()
         
         for obj in queryset:
             
@@ -223,23 +224,21 @@ class AttendanceLogAdmin(admin.ModelAdmin):
                 previous_data=make_json_serializable(model_to_dict(obj)),
                 modified_by=obj.applied_by,
             )
-
+            log_start_date = localtime(obj.start_date)
+            user_expected_logout_time = log_start_date + timedelta(
+                hours=static_data["asettings"].full_day_hours
+            )
             if obj.reg_status == settings.EARLY_GOING:
                 obj.end_date = obj.to_date
             elif obj.reg_status == settings.LATE_COMING:
                 obj.start_date = obj.from_date
+            else:
+                obj.end_date = user_expected_logout_time
             obj.save()
             
-            log_start_date = localtime(obj.start_date)
             log_end_date = localtime(obj.end_date)
             total_duration = log_end_date - log_start_date
-
-            # Retrieve user shift and static settings
-            static_data = self.get_static_data()  # Adjusted to remove obj.applied_by
-            user_expected_logout_time = log_start_date + timedelta(
-                hours=static_data["asettings"].full_day_hours
-            )
-
+            
             # Determine attendance status
             status_handler = AttendanceStatusHandler(
                 self.get_user_shift(obj.applied_by),

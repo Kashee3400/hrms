@@ -295,17 +295,19 @@ class EmployeeProfileView(LoginRequiredMixin, DetailView):
 
         return redirect(request.path)
 
+
 from django.urls import reverse
+
 
 class PersonalDetailUpdateView(ModelPermissionRequiredMixin, UpdateView):
     model = PersonalDetails
     form_class = EmployeePersonalDetailForm
-    template_name = 'hrms_app/employee/personal_detail_form.html'
+    template_name = "hrms_app/employee/personal_detail_form.html"
     permission_action = "change"
 
     def get_object(self, queryset=None):
-        if self.request.user.is_superuser and 'pk' in self.kwargs:
-            return get_object_or_404(PersonalDetails, pk=self.kwargs['pk'])
+        if self.request.user.is_superuser and "pk" in self.kwargs:
+            return get_object_or_404(PersonalDetails, pk=self.kwargs["pk"])
         return get_object_or_404(PersonalDetails, user=self.request.user)
 
     def form_valid(self, form):
@@ -325,7 +327,9 @@ class PersonalDetailUpdateView(ModelPermissionRequiredMixin, UpdateView):
                 changed_fields=changed_fields,
             )
 
-        messages.success(self.request, "Your personal details have been updated successfully.")
+        messages.success(
+            self.request, "Your personal details have been updated successfully."
+        )
         return super().form_valid(form)
 
     def form_invalid(self, form):
@@ -333,8 +337,7 @@ class PersonalDetailUpdateView(ModelPermissionRequiredMixin, UpdateView):
         return super().form_invalid(form)
 
     def get_success_url(self):
-        return reverse('employee_profile', kwargs={'pk': self.object.pk})
-
+        return reverse("employee_profile", kwargs={"pk": self.object.pk})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -342,10 +345,12 @@ class PersonalDetailUpdateView(ModelPermissionRequiredMixin, UpdateView):
             ("home", {"label": "Home"}),
         ]
         context.update(
-            {                "urls": urls,
+            {
+                "urls": urls,
             }
         )
         return context
+
 
 class LeaveTrackerView(ModelPermissionRequiredMixin, SingleTableMixin, TemplateView):
     template_name = "hrms_app/leave-tracker.html"
@@ -353,7 +358,7 @@ class LeaveTrackerView(ModelPermissionRequiredMixin, SingleTableMixin, TemplateV
     table_class = LeaveApplicationTable
     permission_action = "view"
     title = _("Leave Tracker")
-    
+
     def perform_search(self, queryset, search_term):
         if search_term:
             queryset = queryset.filter(
@@ -669,7 +674,6 @@ class LeaveApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
     form_class = LeaveStatusUpdateForm
     template_name = "hrms_app/leave_application_detail.html"
     permission_action = "change"
-    
 
     def get_object(self, queryset=None):
         return get_object_or_404(LeaveApplication, slug=self.kwargs.get("slug"))
@@ -703,6 +707,7 @@ class LeaveApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
         return reverse_lazy(
             "leave_application_detail", kwargs={"slug": self.object.slug}
         )
+
 
 class LeaveApplicationDetailView(ModelPermissionRequiredMixin, DetailView):
     model = LeaveApplication
@@ -838,7 +843,6 @@ class EventPageView(ModelPermissionRequiredMixin, TemplateView):
     model = AttendanceLog
     title = _("Attendance Log")
     permission_action = "view"
-    
 
     def get_context_data(self, **kwargs):
         """Prepare the context for the template."""
@@ -868,8 +872,7 @@ class EventPageView(ModelPermissionRequiredMixin, TemplateView):
         return context
 
 
-
-class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
+class EventDetailPageView(ModelPermissionRequiredMixin, UpdateView):
     model = AttendanceLog
     template_name = "hrms_app/event_detail.html"
     form_class = AttendanceLogForm
@@ -877,7 +880,7 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
     slug_url_kwarg = "slug"
     title = _("Attendance Log")
     permission_action = "change"
-    
+
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
         user = self.request.user
@@ -888,53 +891,68 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
 
     def _can_user_access_log(self, user, log):
         return (
-            log.applied_by == user or
-            log.applied_by.reports_to == user or
-            user.is_staff or
-            user.is_superuser or
-            getattr(user.personal_detail.designation.department, 'department', None) == "admin"
+            log.applied_by == user
+            or log.applied_by.reports_to == user
+            or user.is_staff
+            or user.is_superuser
+            or getattr(user.personal_detail.designation.department, "department", None)
+            == "admin"
         )
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         log = self.get_object()
         early_going, late_coming = self.check_event(log)
-        
-        kwargs.update({
-            "user": self.request.user,
-            "is_manager": self.request.user == log.applied_by.reports_to,
-            "early_going":early_going,
-            "late_coming":late_coming,
-        })
+
+        kwargs.update(
+            {
+                "user": self.request.user,
+                "is_manager": self.request.user == log.applied_by.reports_to,
+                "early_going": early_going,
+                "late_coming": late_coming,
+            }
+        )
         return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         log = self.get_object()
         early_going, late_coming = self.check_event(log)
-        context.update({
-            "is_manager": self.request.user == log.applied_by.reports_to,
-            "urls": self._get_breadcrumb_urls(log),
-            "action_form": AttendanceLogActionForm(),
-            "title": self.title,
-            "subtitle": log.slug,
-            "early_going":early_going,
-            "late_coming":late_coming,
-            "reg_count": self._get_regularization_count(log),
-        })
+        context.update(
+            {
+                "is_manager": self.request.user == log.applied_by.reports_to,
+                "urls": self._get_breadcrumb_urls(log),
+                "action_form": AttendanceLogActionForm(),
+                "title": self.title,
+                "subtitle": log.slug,
+                "early_going": early_going,
+                "late_coming": late_coming,
+                "reg_count": self._get_regularization_count(log),
+            }
+        )
         return context
 
     def form_valid(self, form):
-        if self._is_beyond_policy_allowed() or not self._has_exceeded_regularization_limit():
+        if (
+            self._is_beyond_policy_allowed()
+            or not self._has_exceeded_regularization_limit()
+        ):
             return self._process_submission(form)
         messages.error(
             self.request,
-            _(f"You have already applied for the maximum number of regularizations ({self._get_regularization_limit()} times).")
+            _(
+                f"You have already applied for the maximum number of regularizations ({self._get_regularization_limit()} times)."
+            ),
         )
         return self.form_invalid(form)
 
     def form_invalid(self, form):
-        messages.error(self.request, _("There were errors in your submission. Please correct them and try again."))
+        messages.error(
+            self.request,
+            _(
+                "There were errors in your submission. Please correct them and try again."
+            ),
+        )
         return self.render_to_response(self.get_context_data(form=form))
 
     def _get_app_setting(self, key, default=None):
@@ -943,22 +961,29 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
 
     def _get_regularization_limit(self):
         setting = self._get_app_setting("REGULARIZATION_LIMIT")
-        return int(getattr(setting, 'value', 3))
+        return int(getattr(setting, "value", 3))
 
     def _is_beyond_policy_allowed(self):
         setting = self._get_app_setting("REGULARIZATION_LIMIT")
-        return getattr(setting, 'beyond_policy', False)
+        return getattr(setting, "beyond_policy", False)
 
     def _has_exceeded_regularization_limit(self):
         current_log = self.get_object()
-        return self._get_regularization_count(current_log) >= self._get_regularization_limit()
+        return (
+            self._get_regularization_count(current_log)
+            >= self._get_regularization_limit()
+        )
 
     def _get_regularization_count(self, log):
-        return AttendanceLog.objects.filter(
-            applied_by=log.applied_by,
-            start_date__year=log.start_date.year,
-            start_date__month=log.start_date.month,
-        ).filter(Q(regularized=True) | Q(is_submitted=True)).count()
+        return (
+            AttendanceLog.objects.filter(
+                applied_by=log.applied_by,
+                start_date__year=log.start_date.year,
+                start_date__month=log.start_date.month,
+            )
+            .filter(Q(regularized=True) | Q(is_submitted=True))
+            .count()
+        )
 
     def _get_breadcrumb_urls(self, log):
         return [
@@ -966,6 +991,7 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
             ("calendar", {"label": "Attendance"}),
             ("event_detail", {"label": log.title, "slug": log.slug}),
         ]
+
     def check_event(self, obj):
         """
         This function checks the events (Early Going and Late Coming)
@@ -973,19 +999,23 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
         """
         late_coming_case = {}
         early_going_case = {}
-        
+
         user = obj.applied_by
         user_shift = user.shifts.last().shift_timing
-        
+
         if not obj.regularized:
             check_in_datetime = localtime(obj.start_date)
             check_out_datetime = localtime(obj.end_date)
             grace_start_time = user_shift.grace_start_time
             grace_end_time = user_shift.grace_end_time
-            grace_start_datetime = make_aware(datetime.combine(check_in_datetime.date(), grace_start_time))
-            grace_end_datetime = make_aware(datetime.combine(check_out_datetime.date(), grace_end_time))
+            grace_start_datetime = make_aware(
+                datetime.combine(check_in_datetime.date(), grace_start_time)
+            )
+            grace_end_datetime = make_aware(
+                datetime.combine(check_out_datetime.date(), grace_end_time)
+            )
             check_in_plus_8hrs = check_in_datetime + timedelta(hours=8)
-            
+
             if check_in_datetime > grace_start_datetime:
                 duration_td = check_in_datetime - grace_start_datetime
                 duration_str = str(duration_td)[:-3]  # Format: 'HH:MM'
@@ -993,33 +1023,39 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
                     "case": "late_coming",
                     "from_date": grace_start_datetime,
                     "to_date": check_in_datetime,
-                    "duration": duration_str
+                    "duration": duration_str,
                 }
-            
-            if check_out_datetime < check_in_plus_8hrs or check_out_datetime < grace_end_datetime:
+
+            if (
+                check_out_datetime < check_in_plus_8hrs
+                or check_out_datetime < grace_end_datetime
+            ):
                 duration_td = grace_end_datetime - check_out_datetime
                 duration_str = str(duration_td)[:-3]
                 early_going_case = {
                     "case": "early_going",
                     "from_date": check_out_datetime,
                     "to_date": grace_end_datetime,
-                    "duration": duration_str
+                    "duration": duration_str,
                 }
-        
+
         # Return the cases, or empty dictionaries if no event was found
         return early_going_case or {}, late_coming_case or {}
 
-
     def _process_submission(self, form):
         form.instance.is_submitted = True
-        regularization_hr = (form.instance.to_date - form.instance.from_date).total_seconds() / 3600
+        regularization_hr = (
+            form.instance.to_date - form.instance.from_date
+        ).total_seconds() / 3600
         if form.instance.reg_status != settings.MIS_PUNCHING:
             max_hr_setting = self._get_app_setting("REGULARIZATION_MAX_HR")
             max_hr = int(getattr(max_hr_setting, "value", 2))
-            if not getattr(max_hr_setting, 'beyond_policy', False) and regularization_hr > max_hr:
+            if (
+                not getattr(max_hr_setting, "beyond_policy", False)
+                and regularization_hr > max_hr
+            ):
                 messages.error(
-                    self.request,
-                    _(f"You can only regularize up to {max_hr}) hrs.")
+                    self.request, _(f"You can only regularize up to {max_hr}) hrs.")
                 )
                 return self.form_invalid(form)
 
@@ -1031,8 +1067,10 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
         )
         messages.success(self.request, _("Regularization updated successfully."))
         self.send_notification(self.object)
-        return HttpResponseRedirect(reverse("event_detail", kwargs={"slug": self.object.slug}))
-    
+        return HttpResponseRedirect(
+            reverse("event_detail", kwargs={"slug": self.object.slug})
+        )
+
     def send_notification(self, log):
         """Send notification for regularization."""
         current_site = Site.objects.get_current()
@@ -1043,10 +1081,11 @@ class EventDetailPageView(ModelPermissionRequiredMixin,UpdateView):
         except Exception as e:
             pass
 
-class AttendanceLogActionView(ModelPermissionRequiredMixin,View):
+
+class AttendanceLogActionView(ModelPermissionRequiredMixin, View):
     model = AttendanceLog
     permission_action = "change"
-    
+
     def fetch_static_data(self):
         """Fetch static data used in attendance calculations."""
         return {
@@ -1210,8 +1249,9 @@ def make_json_serializable(data):
     """Ensure data is JSON serializable."""
     return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
 
+
 class EventListView(View):
-    
+
     def get(self, request, *args, **kwargs):
         user_id = request.GET.get("employee", self.request.user.id)
         start_param = request.GET.get("start")
@@ -1228,12 +1268,16 @@ class EventListView(View):
         check_in_time, check_out_time = at.get_check_in_out_times(user)
         events_data = []
         if check_in_time:
-            events_data.append({
-                "id": user.pk,
-                "title": "Punched In",
-                "start": timezone.localtime(timezone.make_aware(check_in_time)).isoformat(),
-                "url": "#!",
-            })
+            events_data.append(
+                {
+                    "id": user.pk,
+                    "title": "Punched In",
+                    "start": timezone.localtime(
+                        timezone.make_aware(check_in_time)
+                    ).isoformat(),
+                    "url": "#!",
+                }
+            )
         # Holidays
         holidays = Holiday.objects.all()
         if start_date and end_date:
@@ -1242,18 +1286,25 @@ class EventListView(View):
             )
 
         for holiday in holidays:
-            events_data.append({
-                "id": holiday.pk,
-                "title": holiday.title,
-                "start": timezone.localtime(timezone.make_aware(
-                    datetime.combine(holiday.start_date, datetime.min.time())
-                )).isoformat(),
-                "end": timezone.localtime(timezone.make_aware(
-                    datetime.combine(holiday.end_date, datetime.min.time()) + timedelta(days=1)
-                )).isoformat(),
-                "color": holiday.color_hex,
-                "url": "#!",
-            })
+            events_data.append(
+                {
+                    "id": holiday.pk,
+                    "title": holiday.title,
+                    "start": timezone.localtime(
+                        timezone.make_aware(
+                            datetime.combine(holiday.start_date, datetime.min.time())
+                        )
+                    ).isoformat(),
+                    "end": timezone.localtime(
+                        timezone.make_aware(
+                            datetime.combine(holiday.end_date, datetime.min.time())
+                            + timedelta(days=1)
+                        )
+                    ).isoformat(),
+                    "color": holiday.color_hex,
+                    "url": "#!",
+                }
+            )
 
         # User-related data
         attendances = AttendanceLog.objects.filter(applied_by=user)
@@ -1262,7 +1313,9 @@ class EventListView(View):
         office_closers = OfficeClosure.objects.all()
 
         if start_date and end_date:
-            attendances = attendances.filter(end_date__gte=start_date, start_date__lte=end_date)
+            attendances = attendances.filter(
+                end_date__gte=start_date, start_date__lte=end_date
+            )
             leave_applications = leave_applications.filter(
                 endDate__gte=start_date.date(), startDate__lte=end_date.date()
             )
@@ -1279,29 +1332,43 @@ class EventListView(View):
             closed_date = office_closer.date
             closed_dates.add(closed_date)
             if attendances.filter(start_date__date=office_closer.date).exists():
-                events_data.append({
-                    "id": office_closer.pk,
-                    "title": office_closer.reason,
-                    "start": timezone.localtime(timezone.make_aware(
-                        datetime.combine(closed_date, datetime.min.time())
-                    )).isoformat(),
-                    "end": timezone.localtime(timezone.make_aware(
-                        datetime.combine(closed_date, datetime.min.time()) + timedelta(days=1)
-                    )).isoformat(),
-                    "url": "#!",
-                })
-                events_data.append({
-                    "id": office_closer.pk,
-                    "title": "Present",
-                    "start": timezone.localtime(timezone.make_aware(
-                        datetime.combine(closed_date, datetime.min.time())
-                    )).isoformat(),
-                    "end": timezone.localtime(timezone.make_aware(
-                        datetime.combine(closed_date, datetime.min.time()) + timedelta(days=1)
-                    )).isoformat(),
-                    "color":"#06B900",
-                    "url": "#!",
-                })
+                events_data.append(
+                    {
+                        "id": office_closer.pk,
+                        "title": office_closer.reason,
+                        "start": timezone.localtime(
+                            timezone.make_aware(
+                                datetime.combine(closed_date, datetime.min.time())
+                            )
+                        ).isoformat(),
+                        "end": timezone.localtime(
+                            timezone.make_aware(
+                                datetime.combine(closed_date, datetime.min.time())
+                                + timedelta(days=1)
+                            )
+                        ).isoformat(),
+                        "url": "#!",
+                    }
+                )
+                events_data.append(
+                    {
+                        "id": office_closer.pk,
+                        "title": "Present",
+                        "start": timezone.localtime(
+                            timezone.make_aware(
+                                datetime.combine(closed_date, datetime.min.time())
+                            )
+                        ).isoformat(),
+                        "end": timezone.localtime(
+                            timezone.make_aware(
+                                datetime.combine(closed_date, datetime.min.time())
+                                + timedelta(days=1)
+                            )
+                        ).isoformat(),
+                        "color": "#06B900",
+                        "url": "#!",
+                    }
+                )
 
         # Step 2: Add attendance only if it doesn't fall on closed dates
         for att in attendances:
@@ -1324,36 +1391,60 @@ class EventListView(View):
                     "end": timezone.localtime(att.end_date).isoformat(),
                     "url": reverse_lazy("event_detail", kwargs={"slug": att.slug}),
                 }
-                events_data.append({**base_event, "title": att.att_status, "color": att.color_hex})
+                events_data.append(
+                    {**base_event, "title": att.att_status, "color": att.color_hex}
+                )
                 if att.regularized:
                     events_data.append({**base_event, "title": "Regularized"})
 
         # Tours
         for tour in tour_applications:
-            events_data.append({
-                "id": tour.slug,
-                "title": f"Tour -> {tour.status}",
-                "start": timezone.localtime(timezone.make_aware(
-                    datetime.combine(tour.start_date, tour.start_time)
-                )).isoformat(),
-                "end": timezone.localtime(timezone.make_aware(
-                    datetime.combine(tour.end_date, tour.end_time)
-                )).isoformat(),
-                "url": reverse_lazy("tour_application_detail", kwargs={"slug": tour.slug}),
-                "color" : "#B1B1B1" if tour.status == settings.PENDING else "#3a87ad"
-            })
+            events_data.append(
+                {
+                    "id": tour.slug,
+                    "title": f"Tour -> {tour.status}",
+                    "start": timezone.localtime(
+                        timezone.make_aware(
+                            datetime.combine(tour.start_date, tour.start_time)
+                        )
+                    ).isoformat(),
+                    "end": timezone.localtime(
+                        timezone.make_aware(
+                            datetime.combine(tour.end_date, tour.end_time)
+                        )
+                    ).isoformat(),
+                    "url": reverse_lazy(
+                        "tour_application_detail", kwargs={"slug": tour.slug}
+                    ),
+                    "color": (
+                        "#B1B1B1" if tour.status == settings.PENDING else "#3a87ad"
+                    ),
+                }
+            )
 
         # Leaves
         for leave in leave_applications:
-            events_data.append({
-                "id": leave.slug,
-                "title": f"{leave.leave_type.leave_type} {leave.status}",
-                "start": timezone.localdate(leave.startDate).isoformat(),
-                "end": (datetime.combine(timezone.localdate(leave.endDate), datetime.min.time()) + timedelta(days=1)).isoformat(),
-                "color": leave.leave_type.color_hex if not leave.status == settings.PENDING else "#B1B1B1",
-                "url": reverse_lazy("leave_application_detail", kwargs={"slug": leave.slug}),
-            })
-
+            events_data.append(
+                {
+                    "id": leave.slug,
+                    "title": f"{leave.leave_type.leave_type} {leave.status}",
+                    "start": timezone.localdate(leave.startDate).isoformat(),
+                    "end": (
+                        datetime.combine(
+                            timezone.localdate(leave.endDate), datetime.min.time()
+                        )
+                        + timedelta(days=1)
+                    ).isoformat(),
+                    "color": (
+                        leave.leave_type.color_hex
+                        if not leave.status == settings.PENDING
+                        else "#B1B1B1"
+                    ),
+                    "url": reverse_lazy(
+                        "leave_application_detail", kwargs={"slug": leave.slug}
+                    ),
+                }
+            )
 
         return JsonResponse(events_data, safe=False)
 
@@ -1401,37 +1492,71 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
         user = self.request.user
         qs_current_user = self.model.objects.none()
         qs_current_user = self.model.objects.filter(
-            applied_by=user, is_regularisation=True, status=settings.PENDING,is_submitted=True
+            applied_by=user,
+            status__in=[settings.PENDING, settings.RECOMMEND],
+            is_submitted=True,
+            is_regularisation=True,
         )
-        qs_current_user
         return self.filter_by_date_range(qs_current_user)
 
     def get_assigned_users_queryset(self):
         user = self.request.user
         if user.is_superuser or user.is_staff:
-            qs_all = self.model.objects.filter(
-                is_regularisation=True, status=settings.PENDING
-            ).exclude(pk=user.pk).order_by("applied_by__first_name")
+            qs_all = (
+                self.model.objects.filter(
+                    is_regularisation=True,
+                    status__in=[settings.PENDING, settings.RECOMMEND],
+                    is_submitted=True,
+                )
+                .exclude(applied_by=user)
+                .order_by("applied_by__first_name")
+            )
             return self.filter_by_date_range(qs_all)
 
         if hasattr(user, "employees"):
             qs = self.model.objects.filter(
                 applied_by__in=user.employees.all(),
-                is_regularisation=True,is_submitted=True,
-                status=settings.PENDING
-            )
+                is_regularisation=True,
+                is_submitted=True,
+                status__in=[settings.PENDING, settings.RECOMMEND],
+            ).exclude(applied_by=user)
             return self.filter_by_date_range(qs)
         return self.model.objects.none()
 
+    def get_approved_regs_users_queryset(self):
+        user = self.request.user
+        start_month = self.request.GET.get("start_month")
+        end_month = self.request.GET.get("end_month")
+
+        qs_all = self.model.objects.filter(regularized=True).exclude(applied_by=user).order_by("applied_by__first_name").order_by('-start_date')
+
+        if start_month:
+            try:
+                qs_all = qs_all.filter(start_date__gte=start_month)
+            except ValueError:
+                pass  # optionally log this
+
+        if end_month:
+            try:
+                qs_all = qs_all.filter(start_date__lte=end_month)
+            except ValueError:
+                pass  # optionally log this
+
+        if not (user.is_superuser or user.is_staff) and not hasattr(user, "employees"):
+            return self.model.objects.none()
+
+        return qs_all
+
+
     def get_filterset(self, filterset_class):
-        return filterset_class(
-            self.request.GET, queryset=self.get_queryset()
-        )
+        return filterset_class(self.request.GET, queryset=self.get_queryset())
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["filter"] = self.get_filterset(self.filterset_class)
         context["assigned_regs"] = self.get_assigned_users_queryset()
+        context['approved_regs'] = self.get_approved_regs_users_queryset()
+        context['month_form'] = MonthRangeForm(self.request.GET)
         context.update({"title": self.title})
         return context
 
@@ -1468,6 +1593,7 @@ class ChangePasswordView(LoginRequiredMixin, FormView):
         kwargs["user"] = self.request.user
         return kwargs
 
+
 from django_tables2.views import MultiTableMixin
 
 
@@ -1476,14 +1602,14 @@ class TourTrackerView(ModelPermissionRequiredMixin, SingleTableMixin, FilterView
     model = UserTour
     table_class = UserTourTable
     permission_action = "view"
-    
+
     def get_queryset(self):
         """Filter tours based on the logged-in user’s tours and search criteria."""
         user = self.request.user
         queryset = UserTour.objects.filter(applied_by=user).order_by("-start_date")
         return queryset
         # return self.filter_tours(queryset=queryset, form=None)
-    
+
     def filter_tours(self, queryset, form):
         """Apply filtering based on status and date range."""
         if form is not None and form.is_valid():
@@ -1507,7 +1633,7 @@ class TourTrackerView(ModelPermissionRequiredMixin, SingleTableMixin, FilterView
                 | Q(to_destination__icontains=search_term)
             )
         return queryset
-    
+
     def get_context_data(self, **kwargs):
         """Prepare the context for the template."""
         context = super().get_context_data(**kwargs)
@@ -1567,29 +1693,43 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
     def form_valid(self, form):
         tour = form.save(commit=False)
         user = self.request.user
-        attendance_log = AttendanceLog.objects.filter(applied_by=user,start_date__date=tour.start_date,regularized=True).last()
-        log_history = AttendanceLogHistory.objects.filter(attendance_log=attendance_log).last()
+        attendance_log = AttendanceLog.objects.filter(
+            applied_by=user, start_date__date=tour.start_date, regularized=True
+        ).last()
+        log_history = AttendanceLogHistory.objects.filter(
+            attendance_log=attendance_log
+        ).last()
         if log_history:
             data = log_history.previous_data
             from_date = localtime(at.str_to_date(data["from_date"]))
             to_date = localtime(at.str_to_date(data["to_date"]))
-            status = data['reg_status']
+            status = data["reg_status"]
             if status == "late coming" and tour.end_time > from_date.time():
-                messages.error(self.request, f"Tour end time on {tour.start_date.strftime('%d %b %Y')} conflicts with regularization time.")
+                messages.error(
+                    self.request,
+                    f"Tour end time on {tour.start_date.strftime('%d %b %Y')} conflicts with regularization time.",
+                )
                 return self.form_invalid(form)
             if status == "early going" and tour.start_time < to_date.time():
-                messages.error(self.request, f"Tour start time on {tour.start_date.strftime('%d %b %Y')} conflicts with regularization time.")
+                messages.error(
+                    self.request,
+                    f"Tour start time on {tour.start_date.strftime('%d %b %Y')} conflicts with regularization time.",
+                )
                 return self.form_invalid(form)
         overlapping_leaves = LeaveApplication.objects.filter(
             appliedBy=user,
-            status__in=[settings.APPROVED, settings.PENDING, settings.PENDING_CANCELLATION],
+            status__in=[
+                settings.APPROVED,
+                settings.PENDING,
+                settings.PENDING_CANCELLATION,
+            ],
             startDayChoice=settings.FULL_DAY,
             endDayChoice=settings.FULL_DAY,
             startDate__lte=tour.end_date,
-            endDate__gte=tour.start_date
+            endDate__gte=tour.start_date,
         )
         if overlapping_leaves:
-            shifts = getattr(user, 'shifts', None)
+            shifts = getattr(user, "shifts", None)
             if not shifts:
                 messages.error(self.request, "Shift details not found.")
                 return self.form_invalid(form)
@@ -1598,19 +1738,25 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
             shift_end = shift.end_time
             for leave in overlapping_leaves:
                 leave_dates = [
-                    localtime(leave.startDate)+ timedelta(days=i)
+                    localtime(leave.startDate) + timedelta(days=i)
                     for i in range((leave.endDate - leave.startDate).days + 1)
                 ]
                 for leave_date in leave_dates:
                     if tour.end_date == leave_date.date():
                         if tour.end_time >= shift_start:
-                            messages.error(self.request, f"Tour end time on {leave_date.date().strftime('%d %b %Y')} conflicts with full-day leave.")
+                            messages.error(
+                                self.request,
+                                f"Tour end time on {leave_date.date().strftime('%d %b %Y')} conflicts with full-day leave.",
+                            )
                             return self.form_invalid(form)
                     if tour.start_date == leave_date.date():
                         if tour.start_time <= shift_end:
-                            messages.error(self.request, f"Tour start time on {leave_date.date().strftime('%d %b %Y')} conflicts with full-day leave.")
+                            messages.error(
+                                self.request,
+                                f"Tour start time on {leave_date.date().strftime('%d %b %Y')} conflicts with full-day leave.",
+                            )
                             return self.form_invalid(form)
-                        
+
         tour.applied_by = user
         messages.success(self.request, "Tour Applied Successfully")
         self.send_tour_notification(obj=tour)
@@ -1619,10 +1765,10 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
-    
-    def send_tour_notification(self,obj):
+
+    def send_tour_notification(self, obj):
         current_site = Site.objects.get_current()
-        protocol = 'http'  # or 'https' if applicable
+        protocol = "http"  # or 'https' if applicable
         domain = current_site.domain
         try:
             send_tour_notifications.delay(obj.id, protocol, domain)
@@ -1736,7 +1882,6 @@ class TourApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
     template_name = "hrms_app/apply-tour.html"
     permission_action = "change"
 
-
     def get_object(self, queryset=None):
         return get_object_or_404(UserTour, slug=self.kwargs.get("slug"))
 
@@ -1772,10 +1917,10 @@ class TourApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
         messages.success(self.request, "Tour status updated successfully.")
         self.send_tour_notification(tour_application)
         return response
-    
-    def send_tour_notification(self,obj):
+
+    def send_tour_notification(self, obj):
         current_site = Site.objects.get_current()
-        protocol = 'http'  # or 'https' if applicable
+        protocol = "http"  # or 'https' if applicable
         domain = current_site.domain
         try:
             send_tour_notifications.delay(obj.id, protocol, domain)
@@ -1851,6 +1996,7 @@ class CustomUploadView(View):
             response = {"uploaded": False, "message": "No file uploaded"}
         return JsonResponse(response)
 
+
 class EmployeeListView(ModelPermissionRequiredMixin, ListView):
     model = CustomUser
     template_name = "hrms_app/employee/employees.html"
@@ -1889,8 +2035,11 @@ class EmployeeListView(ModelPermissionRequiredMixin, ListView):
         ]
         return context
 
+
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION
 from django.contrib.contenttypes.models import ContentType
+
+
 class LeaveTransactionCreateView(FormView):
     form_class = LeaveTransactionForm
     template_name = "hrms_app/leave_transaction.html"
@@ -1924,21 +2073,23 @@ class LeaveTransactionCreateView(FormView):
         leave_balance_ct = ContentType.objects.get_for_model(LeaveBalanceOpenings)
 
         logs = LogEntry.objects.filter(
-            content_type=leave_balance_ct,
-            user=self.request.user 
-        ).order_by('-action_time')[:100]
+            content_type=leave_balance_ct, user=self.request.user
+        ).order_by("-action_time")[:100]
 
-        context.update({
-            "logs": logs,
-            "title": self.title,
-            "date_form":AttendanceAggregationForm(self.request.GET),
-            "urls": [
-                ("dashboard", {"label": "Dashboard"}),
-                ("leave_transaction_create", {"label": "Leave Transaction"}),
-            ],
-        })
+        context.update(
+            {
+                "logs": logs,
+                "title": self.title,
+                "date_form": AttendanceAggregationForm(self.request.GET),
+                "urls": [
+                    ("dashboard", {"label": "Dashboard"}),
+                    ("leave_transaction_create", {"label": "Leave Transaction"}),
+                ],
+            }
+        )
 
         return context
+
 
 class LeaveBalanceUpdateView(View):
     template_name = "hrms_app/leave_bal_up.html"

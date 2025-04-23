@@ -2136,6 +2136,7 @@ class AttendanceAggregationForm(forms.Form):
         required=True,
         widget=DatePickerInput(
             options={
+                "format": "DD MMM, YYYY",
                 "showClear": True,
                 "showClose": True,
                 "useCurrent": False,
@@ -2148,6 +2149,7 @@ class AttendanceAggregationForm(forms.Form):
         required=True,
         widget=DatePickerInput(
             options={
+                "format": "DD MMM, YYYY",
                 "showClear": True,
                 "showClose": True,
                 "useCurrent": False,
@@ -2156,3 +2158,33 @@ class AttendanceAggregationForm(forms.Form):
             attrs={"class": "form-control"},
         ),
     )
+
+class MonthRangeForm(forms.Form):
+    start_month = forms.DateField(
+        label=_("From Month"),
+        required=False,
+        widget=DatePickerInput(
+            options={
+                "format": "DD MMM, YYYY",
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            attrs={"class": "form-control"},
+        ),
+    )
+    end_month = forms.DateField(
+        label=_("To Month"),
+        required=False,
+        widget=DatePickerInput(
+            options={
+                "format": "DD MMM, YYYY",
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            range_from="start_month",
+            attrs={"class": "form-control"},
+        ),
+    )
+

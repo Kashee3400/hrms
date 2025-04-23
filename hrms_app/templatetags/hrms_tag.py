@@ -267,7 +267,7 @@ def user_summary_counts(context):
     
     total_pending_tour = UserTour.objects.filter(
             applied_by=user,
-            status=settings.PENDING,
+            status__in=[settings.PENDING,settings.EXTENDED],
         ).count()
 
     # Counts dict

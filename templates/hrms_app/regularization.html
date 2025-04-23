@@ -1,9 +1,10 @@
 {% extends 'hrms_app/base.html' %}
 {% load static hrms_tag humanize i18n %}
-{% load render_table from django_tables2 %}
 
+
+{% load render_table from django_tables2 %}
 {% block title %}
-  {{ user.get_short_name|capfirst }} | {% trans 'Regularizations' %}
+  {{ user.get_short_name|capfirst }} |{% trans 'Regularizations' %}
 {% endblock %}
 
 {% block extrastyle %}
@@ -87,19 +88,19 @@
                           {% trans 'Requested By' %}
                         </th>
                         <th>
-                          {% trans 'Type' %}
-                        </th>
-                        <th>
-                          {% trans 'From' %}
-                        </th>
-                        <th>
-                          {% trans 'To' %}
-                        </th>
-                        <th>
-                          {% trans 'Duration' %}
+                          {% trans 'Regularization Status' %}
                         </th>
                         <th>
                           {% trans 'Status' %}
+                        </th>
+                        <th>
+                          {% trans 'From Date' %}
+                        </th>
+                        <th>
+                          {% trans 'To Date' %}
+                        </th>
+                        <th>
+                          {% trans 'Regularization Duration' %}
                         </th>
                         <th>
                           {% trans 'Action' %}
@@ -109,18 +110,101 @@
                     <tbody>
                       {% for reg in assigned_regs %}
                         <tr>
-                          <td>
-                            {{ reg.applied_by }}
-                          </td>
+                          <td>{{ reg.applied_by }}</td>
                           <td>
                             <h6>{{ reg.reg_status|capfirst }}</h6>
                           </td>
+                          <td>{{ reg.status|capfirst }}</td>
                           <td>{{ reg.start_date.date }}</td>
                           <td>{{ reg.end_date.date }}</td>
                           <td>{{ reg.reg_duration }}</td>
-                          <td>{{ reg.status|capfirst }}</td>
                           <td>
                             <a href="{% url 'event_detail' reg.slug %}">{% trans 'Approve/Reject/Cancel' %}</a>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bg-light p-2 mt-3">
+      <div class="row">
+        <div class="col-12">
+          <div class="card mt-4">
+            <div class="card-header bg-light text-dark d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">{% trans 'Approved Regularizations' %}</h5>
+              <div class="col-12 col-md-4 col-lg-3">
+                
+              </div>
+            </div>
+            <div class="container">
+              <form method="get">
+                <div class="row align-items-center g-2">
+                  {% for field in month_form %}
+                    <div class="col-md-3 d-flex flex-column">
+                      {{ field.label_tag }} 
+                      {{ field }}
+                    </div>
+                  {% endfor %}
+                  <div class="col-md-3 d-flex justify-content-start align-items-center gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary me-2">
+                      <span class="mif-filter"></span> Filter
+                    </button>
+                    <a class="btn btn-sm btn-secondary" href="{% url 'regularization' %}">
+                      Clear Filter
+                    </a>
+                  </div>
+                </div>
+              </form>
+            </div>
+            
+            <div class="card-body">
+              <div class="col-12">
+                <div class="dt-responsive table-responsive mt-1">
+                  <table class="table table-striped requested-table">
+                    <thead>
+                      <tr>
+                        <th>
+                          {% trans 'Requested By' %}
+                        </th>
+                        <th>
+                          {% trans 'Regularization Status' %}
+                        </th>
+                        <th>
+                          {% trans 'Status' %}
+                        </th>
+                        <th>
+                          {% trans 'From Date' %}
+                        </th>
+                        <th>
+                          {% trans 'To Date' %}
+                        </th>
+                        <th>
+                          {% trans 'Regularization Duration' %}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for reg in approved_regs %}
+                        <tr>
+                          <td>{{ reg.applied_by }}</td>
+                          <td>{{ reg.history.last.previous_data.reg_status|capfirst }}</td>
+                          <td>
+                            {% if reg.regularized %}Approved{% endif %}
+                          </td>
+                          <td>{{ reg.start_date.date }}</td>
+                          <td>{{ reg.end_date.date }}</td>
+                          <td>
+                            {% if reg.history.last.previous_data.reg_status == 'mis punching' %}
+                              8 Hrs
+                            {% else %}
+                              {{ reg.history.last.previous_data.reg_duration }}
+                            {% endif %}
                           </td>
                         </tr>
                       {% endfor %}
