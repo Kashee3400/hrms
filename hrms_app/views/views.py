@@ -1508,7 +1508,7 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
                     status__in=[settings.PENDING, settings.RECOMMEND],
                     is_submitted=True,
                 )
-                .exclude(applied_by=user)
+                
                 .order_by("applied_by__first_name")
             )
             return self.filter_by_date_range(qs_all)
@@ -1519,7 +1519,7 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
                 is_regularisation=True,
                 is_submitted=True,
                 status__in=[settings.PENDING, settings.RECOMMEND],
-            ).exclude(applied_by=user)
+            )
             return self.filter_by_date_range(qs)
         return self.model.objects.none()
 
@@ -1528,7 +1528,7 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
         start_month = self.request.GET.get("start_month")
         end_month = self.request.GET.get("end_month")
 
-        qs_all = self.model.objects.filter(regularized=True).exclude(applied_by=user).order_by("applied_by__first_name").order_by('-start_date')
+        qs_all = self.model.objects.filter(regularized=True).order_by("applied_by__first_name").order_by('-start_date')
 
         if start_month:
             try:

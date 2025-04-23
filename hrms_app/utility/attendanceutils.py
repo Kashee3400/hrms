@@ -13,26 +13,50 @@ from hrms_app.utility.report_utils import *
 
 
 def get_check_in_out_times(user):
+    # Validate user info
+    if not hasattr(user, 'device_location') or not hasattr(user, 'personal_detail'):
+        return None, None
+
     office_location = user.device_location
-    emp_code = user.personal_detail.employee_code
+    emp_detail = getattr(user, 'personal_detail', None)
+    emp_code = getattr(emp_detail, 'employee_code', None)
+
+    if not office_location or not emp_code:
+        return None, None
+
+    # Get device instance
     device_instance = DeviceInformation.objects.filter(
         device_location=office_location
     ).first()
 
-    today_date = datetime.now().date()  # Get today's date as a date object
-    from_date = f"{today_date} 00:01"
-    to_date = f"{today_date} 23:59"
+    if not device_instance:
+        return None, None
+
+    # Prepare date range
+    today = datetime.now().date()
+    from_date = f"{today} 00:01"
+    to_date = f"{today} 23:59"
+
+    # Call SOAP API
     result = call_soap_api(
         device_instance=device_instance, from_date=from_date, to_date=to_date
     )
-    login_time = None
-    logout_time = None
-    if emp_code in result and result[emp_code]:
-        emp_result = result[emp_code][today_date]
-        if emp_result:
-            login_time = emp_result[0]
-            logout_time = emp_result[-1] if len(emp_result) > 1 else None
+
+    if not result or emp_code not in result:
+        return None, None
+
+    emp_data = result.get(emp_code, {})
+    emp_result = emp_data.get(today)
+
+    if not emp_result or not isinstance(emp_result, list):
+        return None, None
+
+    # Extract login/logout
+    login_time = emp_result[0]
+    logout_time = emp_result[-1] if len(emp_result) > 1 else None
+
     return login_time, logout_time
+
 
 
 def get_from_to_datetime():
