@@ -2636,7 +2636,11 @@ class AttendanceLog(models.Model):
         verbose_name=_("Is Early Going"),
         help_text=_("Indicate if this entry is for early going regularization."),
     )
-
+    regularized_backend = models.BooleanField(
+        default=False,
+        verbose_name=_("Backend Regularized"),
+        help_text=_("Indicate if this entry is regularized from backend."),
+    )
     def clean(self):
         if self.reg_status != settings.MIS_PUNCHING:
             if self.start_date is not None and self.end_date is not None:

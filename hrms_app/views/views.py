@@ -993,7 +993,7 @@ class EventDetailPageView(ModelPermissionRequiredMixin, UpdateView):
                 start_date__year=log.start_date.year,
                 start_date__month=log.start_date.month,
             )
-            .filter(Q(regularized=True) | Q(is_submitted=True))
+            .filter(Q(regularized=True) | Q(is_submitted=True)).exclude(regularized_backend = True)
             .count()
         )
 

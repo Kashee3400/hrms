@@ -176,6 +176,7 @@ class AttendanceLogAdmin(admin.ModelAdmin):
         "color_representation",
         "is_regularisation",
         "is_submitted",
+        "regularized_backend",
         "slug",
     )
     search_fields = [
@@ -270,9 +271,10 @@ class AttendanceLogAdmin(admin.ModelAdmin):
             hours = total_minutes // 60
             minutes = total_minutes % 60
             obj.duration = f"{int(hours):02}:{int(minutes):02}"
-            if obj.att_status_short_code == 'P':                
+            if obj.att_status_short_code == 'P':
                 obj.regularized = True
                 obj.is_submitted = True
+                obj.regularized_backend = True
             else:
                 obj.regularized = True
                 obj.is_submitted = True
