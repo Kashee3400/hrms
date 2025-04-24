@@ -211,7 +211,7 @@ class LeavePolicyManager:
         print(gap)
         gap = gap - non_working_days
         if gap > 3:
-            raise ValidationError(f"{self.leave_type.leave_type_short_code} application denied.You can apply till working 3 days.")
+            raise ValidationError(f"{self.leave_type.leave_type_short_code} application denied.You can apply within 3 working days.")
 
     def validate_min_days(self):
         if float(self.booked_leave) < float(self.leave_type.min_days_limit):
