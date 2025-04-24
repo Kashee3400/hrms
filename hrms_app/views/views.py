@@ -105,7 +105,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         """Add custom context data for the dashboard."""
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        send_reminder_email()
         context["current_date"] = datetime.now().strftime("%A, %d %B %Y")
         check_in_time, check_out_time = at.get_check_in_out_times(user)
         context["check_in_time"] = self.format_time(check_in_time)
