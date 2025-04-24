@@ -218,15 +218,28 @@ def populate_attendance_log():
 
 @shared_task
 def send_reminder_email():
-    subject = f'Reminder For Attendance Regularization'
-    email = EmailMessage(
-        subject,
-        "It is requested to all the employee the check attendance status(Leave, Tour, Late Coming, Early Going, Mis punching) and take approval for salary finalization if any.\n Attendance Will be locked on 25th day of this month",
-        settings.DEFAULT_FROM_EMAIL,
-        ['all@kasheemilk.com'],
+    subject = 'Reminder For Attendance Regularization'
+    from_email = settings.DEFAULT_FROM_EMAIL
+    to = ['all@kasheemilk.com']
+    # to = ['divyanshu.kumar@kasheemilk.com']
+
+    text_content = (
+        "It is requested to all the employees to check attendance status "
+        "(Leave, Tour, Late Coming, Early Going, Mis punching) and take approval "
+        "for salary finalization if any.\n"
+        "Attendance will be locked on 25th day of this month."
     )
-    email.send()
-    logging.info(f"reminder mail sent at {timezone.now()}")
+
+    html_content = (
+        "<p>It is requested to all the employees to check attendance status "
+        "(Leave, Tour, Late Coming, Early Going, Mis punching) and take approval "
+        "for salary finalization if any.</p>"
+        "<p><strong style='color: red;'>- Attendance will be locked on 25th day of this month.</strong></p>"
+    )
+    msg = EmailMultiAlternatives(subject, text_content, from_email, to)
+    msg.attach_alternative(html_content, "text/html")
+    msg.send()
+    logging.info(f"Reminder mail sent at {timezone.now()}")
 
 
 def send_greeting_email(obj, occasion_type):

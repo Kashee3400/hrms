@@ -50,6 +50,12 @@
                 <strong>Total Days:</strong>
                 <span class="float-end fw-bold">{{ leave_application.usedLeave }}</span>
               </li>
+              {% if leave_application.leave_address %}
+              <li class="list-group-item">
+                <strong>Leave Address:</strong>
+                <span class="float-end fw-bold">{{ leave_application.leave_address }}</span>
+              </li>
+              {% endif %}
               <li class="list-group-item">
                 <strong>Status:</strong>
                 <span class="float-end fw-bold text-uppercase {{ leave_application.status }}">{{ leave_application.status }}</span>

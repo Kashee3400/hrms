@@ -1,5 +1,6 @@
 from hrms_app.utility.common_imports import *
 from django.utils.translation import gettext_lazy as _
+from hrms_app.tasks import send_reminder_email
 
 
 def custom_permission_denied(request, exception=None):
@@ -104,6 +105,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         """Add custom context data for the dashboard."""
         context = super().get_context_data(**kwargs)
         user = self.request.user
+        send_reminder_email()
         context["current_date"] = datetime.now().strftime("%A, %d %B %Y")
         check_in_time, check_out_time = at.get_check_in_out_times(user)
         context["check_in_time"] = self.format_time(check_in_time)
@@ -461,6 +463,7 @@ class LeaveTrackerView(ModelPermissionRequiredMixin, SingleTableMixin, TemplateV
             )
         return context
 
+from django.urls import reverse, NoReverseMatch
 
 @method_decorator(login_required, name="dispatch")
 class ApplyOrUpdateLeaveView(
@@ -537,10 +540,20 @@ class ApplyOrUpdateLeaveView(
         )
         messages.success(self.request, success_message)
         next_url = self.request.POST.get("next")
-        if next_url and urlparse(next_url).netloc == "":
-            return redirect(next_url)
-
-        return redirect(reverse_lazy("leave_tracker"))
+        leave_url = reverse('leave_application_detail', kwargs={'slug': leave_application.slug})
+        if not leave_url :
+            leave_url = next_url
+        try:
+            # Try to construct the leave URL
+            leave_url = reverse('leave_application_detail', kwargs={'slug': leave_application.slug})
+            return redirect(leave_url)
+        except NoReverseMatch:
+            # Fallback to `next` if `leave_url` fails
+            next_url = self.request.POST.get("next")
+            if next_url and urlparse(next_url).netloc == "":
+                return redirect(next_url)
+            # Final fallback (optional): default route or homepage
+            return redirect(reverse_lazy("leave_tracker"))  # replace 'home' with your fallback view name
 
     def form_invalid(self, form):
         """Handle form submission failure."""

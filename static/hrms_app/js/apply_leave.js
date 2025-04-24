@@ -121,6 +121,14 @@ $(document).ready(function () {
             }
         }
     }
+    function formatDateToYMD(date) {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0'); // Months are 0-based
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+    
 
     function generateDateOptions(startDate, endDate) {
         var currentDate = new Date(startDate);
@@ -129,7 +137,7 @@ $(document).ready(function () {
         var totalDays = 0;
         var holidays = {};
         $.ajax({
-            url: `/api/v1/holidays/?start_date=${startDate}&end_date=${endDate}`,
+            url: `/api/v1/holidays/?start_date=${formatDateToYMD(startDate)}&end_date=${formatDateToYMD(endDate)}`,
             type: "GET",
             async: false,
             success: function (response) {

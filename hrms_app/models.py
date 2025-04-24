@@ -1047,6 +1047,13 @@ class LeaveApplication(models.Model):
         verbose_name=_("Status"),
         help_text=_("Current status of the leave application."),
     )
+    leave_address = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name=_("Leave Address"),
+        help_text=_("Please provide the address."),
+    )
 
     startDayChoice = models.CharField(
         max_length=20,

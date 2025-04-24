@@ -815,6 +815,7 @@ class LeaveApplicationForm(forms.ModelForm):
             "leave_type",
             "startDate",
             "endDate",
+            "leave_address",
             "startDayChoice",
             "endDayChoice",
             "usedLeave",
@@ -850,6 +851,9 @@ class LeaveApplicationForm(forms.ModelForm):
             "usedLeave": forms.TextInput(
                 attrs={"type": "text", "data-role": "input", "readonly": "readonly"}
             ),
+            "leave_address": forms.TextInput(
+                attrs={"type": "text","class": "form-control"}
+            ),
             "balanceLeave": forms.TextInput(
                 attrs={"type": "text", "data-role": "input", "readonly": "readonly"}
             ),
@@ -859,6 +863,7 @@ class LeaveApplicationForm(forms.ModelForm):
             "startDate": _("Start Date"),
             "endDate": _("End Date"),
             "usedLeave": _("Currently Booked"),
+            "leave_address":_("Leave Address"),
             "balanceLeave": _("Available Balance"),
             "reason": _("Reason"),
             "startDayChoice": _("Start Day"),
@@ -897,6 +902,8 @@ class LeaveApplicationForm(forms.ModelForm):
         startDayChoice = cleaned_data.get("startDayChoice")
         endDayChoice = cleaned_data.get("endDayChoice")
         attachment = cleaned_data.get("attachment")
+        leave_address = cleaned_data.get("leave_address")
+        reason = cleaned_data.get("reason")
 
         if not startDate or not endDate:
             if not startDate:
@@ -908,6 +915,10 @@ class LeaveApplicationForm(forms.ModelForm):
         if startDate > endDate:
             self.add_error("endDate", _("End Date must be after Start Date."))
             return cleaned_data
+        if not leave_address:
+            self.add_error("leave_address", _("Leave Address is required."))
+        if not reason:
+            self.add_error("reason", _("Reason is required."))
 
         if leaveTypeId and leaveTypeId.leave_type_short_code == "SL" and usedLeave and int(usedLeave) > 3:
             if not attachment:
