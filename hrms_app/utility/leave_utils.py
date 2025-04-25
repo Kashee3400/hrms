@@ -6,6 +6,7 @@ from hrms_app.models import (
     UserTour,
     LeaveDayChoiceAdjustment,
     LeaveBalanceOpenings,
+    AppSetting
 )
 from hrms_app.hrms.utils import get_non_working_days
 from django.conf import settings
@@ -200,9 +201,9 @@ class LeavePolicyManager:
         """
         Applies Casual Leave specific policies.
         """
-        self.apply_min_notice_days_policy()  # this function checks the minimum notice day for that particular leave type
-        self.validate_min_days()  # this function checks the minimum days allowed for that particular leave type
-        self.apply_max_days_limit_policy()  # this function checks the maximum notice day for that particular leave type
+        self.apply_min_notice_days_policy()
+        self.validate_min_days()
+        self.apply_max_days_limit_policy()
         self.apply_sl_policy()
         
         
@@ -211,7 +212,10 @@ class LeavePolicyManager:
         non_working_days = get_non_working_days(start=self.end_date.date(),end=current_date)
         gap = (current_date - self.end_date.date()).days + 1
         gap = gap - non_working_days
-        if gap > 3:
+        app_setting = AppSetting.objects.filter(key="CL_SL_WORKING_DAY_LIMIT").first()
+        if app_setting.beyond_policy:
+            return
+        if gap > int(app_setting.value):
             raise ValidationError(f"{self.leave_type.leave_type_short_code} application denied.You can apply within 3 working days.")
 
     def validate_min_days(self):
