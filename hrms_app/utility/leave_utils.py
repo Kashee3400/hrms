@@ -203,12 +203,13 @@ class LeavePolicyManager:
         self.apply_min_notice_days_policy()  # this function checks the minimum notice day for that particular leave type
         self.validate_min_days()  # this function checks the minimum days allowed for that particular leave type
         self.apply_max_days_limit_policy()  # this function checks the maximum notice day for that particular leave type
+        self.apply_sl_policy()
+        
         
     def apply_sl_policy(self):
         current_date = timezone.now().date()
-        non_working_days = get_non_working_days(start=self.start_date.date(),end=current_date)
-        gap = (current_date - self.start_date.date()).days + 1
-        print(gap)
+        non_working_days = get_non_working_days(start=self.end_date.date(),end=current_date)
+        gap = (current_date - self.end_date.date()).days + 1
         gap = gap - non_working_days
         if gap > 3:
             raise ValidationError(f"{self.leave_type.leave_type_short_code} application denied.You can apply within 3 working days.")
