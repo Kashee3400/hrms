@@ -2638,6 +2638,8 @@ class AttendanceLog(models.Model):
     )
     regularized_backend = models.BooleanField(
         default=False,
+        blank =True,
+        null = True,
         verbose_name=_("Backend Regularized"),
         help_text=_("Indicate if this entry is regularized from backend."),
     )
