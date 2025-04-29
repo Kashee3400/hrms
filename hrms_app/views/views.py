@@ -1770,17 +1770,17 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
                             return self.form_invalid(form)
 
         tour.applied_by = user
+        tour.save()
         messages.success(self.request, "Tour Applied Successfully")
         self.send_tour_notification(obj=tour)
         return super().form_valid(form)
-        # return redirect("apply_tour")
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))
 
     def send_tour_notification(self, obj):
         current_site = Site.objects.get_current()
-        protocol = "http"  # or 'https' if applicable
+        protocol = "http"
         domain = current_site.domain
         try:
             send_tour_notifications.delay(obj.id, protocol, domain)
