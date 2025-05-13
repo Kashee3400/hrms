@@ -51,10 +51,10 @@
                 <span class="float-end fw-bold">{{ leave_application.usedLeave }}</span>
               </li>
               {% if leave_application.leave_address %}
-              <li class="list-group-item">
-                <strong>Leave Address:</strong>
-                <span class="float-end fw-bold">{{ leave_application.leave_address }}</span>
-              </li>
+                <li class="list-group-item">
+                  <strong>Leave Address:</strong>
+                  <span class="float-end fw-bold">{{ leave_application.leave_address }}</span>
+                </li>
               {% endif %}
               <li class="list-group-item">
                 <strong>Status:</strong>
@@ -103,15 +103,15 @@
               <form id="leave-application-form" method="post" action="{% url 'leave_application_update' leave_application.slug %}">
                 {% csrf_token %}
                 <div class="row g-3">
-                  {% if not request.user.pk == leave_application.appliedBy.pk and leave_application.status == 'approved' %}
+                  {% if is_manager %}
                     <div class="col-md-6">{{ status_form.status }}</div>
                     <div class="col-md-6">
-                      <button type="button" class="btn btn-primary btn-sm w-100 {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %}" data-bs-toggle="modal" data-bs-target="#updateDialog">{% trans 'Submit Request' %}</button>
+                      <button type="button" class="btn btn-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#updateDialog">{% trans 'Update' %}</button>
                     </div>
-                  {% elif is_manager %}
+                    {% elif leave_application.appliedBy == user and leave_application.status|in_list:'approved,' %}
                     <div class="col-md-6">{{ status_form.status }}</div>
                     <div class="col-md-6">
-                      <button type="button" class="btn btn-primary btn-sm w-100 {% if user == leave_application.appliedBy and leave_application.status == 'cancelled' %}disabled{% endif %}" data-bs-toggle="modal" data-bs-target="#updateDialog">{% trans 'Update' %}</button>
+                      <button type="button" class="btn btn-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#updateDialog">{% trans 'Submit Request' %}</button>
                     </div>
                   {% endif %}
                 </div>

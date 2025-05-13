@@ -57,7 +57,7 @@
       {% endif %}
     </div>
   </div>
-  {% if request.user.is_rm %}
+  {% comment %} {% if request.user.is_rm %} {% endcomment %}
     <div class="bg-light p-2">
       {% if employee_leaves.leaves %}
         <div class="row">
@@ -171,7 +171,7 @@
         </div>
       {% endif %}
     </div>
-  {% endif %}
+  {% comment %} {% endif %} {% endcomment %}
 {% endblock %}
 
 {% block extra_js %}

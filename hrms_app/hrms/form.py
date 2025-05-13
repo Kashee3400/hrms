@@ -925,22 +925,23 @@ class LeaveApplicationForm(forms.ModelForm):
                 self.add_error("attachment", _("Attachment is required for Sick Leave applications exceeding 3 days."))
         
         exclude_application_id=self.instance.id if self.instance and self.instance.pk else None
-        try:
-            policy_manager = LeavePolicyManager(
-                user=self.user,
-                leave_type=leaveTypeId,
-                start_date=startDate,
-                end_date=endDate,
-                start_day_choice=startDayChoice,
-                end_day_choice=endDayChoice,
-                bookedLeave=usedLeave,
-                exclude_application_id=exclude_application_id
-            )
-            policy_manager.validate_policies()
-        except ValidationError as e:
-            self.add_error(None, str(e))
+        # Only validate policies if it's a new leave application (i.e., no instance.pk)
+        if not self.instance or not self.instance.pk:
+            try:
+                policy_manager = LeavePolicyManager(
+                    user=self.user,
+                    leave_type=leaveTypeId,
+                    start_date=startDate,
+                    end_date=endDate,
+                    start_day_choice=startDayChoice,
+                    end_day_choice=endDayChoice,
+                    bookedLeave=usedLeave,
+                    exclude_application_id=exclude_application_id  # Not needed for new leave
+                )
+                policy_manager.validate_policies()
+            except ValidationError as e:
+                self.add_error(None, str(e))
         return cleaned_data
-
 
 class HolidayForm(forms.ModelForm):
 
