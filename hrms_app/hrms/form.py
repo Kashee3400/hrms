@@ -356,13 +356,19 @@ class PasswordResetForm(forms.Form):
         that prevent inactive users and users with unusable passwords from
         resetting their password.
         """
-        email_field_name = User.get_email_field_name()
+        email_field_name = "official_email"
+        # email_field_name = User.get_email_field_name()
         active_users = User._default_manager.filter(
             **{
                 "%s__iexact" % email_field_name: email,
                 "is_active": True,
             }
         )
+
+        # active_users = User._default_manager.filter(
+        # official_email__iexact=email,
+        # is_active=True)
+
         return (
             u
             for u in active_users
@@ -393,7 +399,8 @@ class PasswordResetForm(forms.Form):
             domain = current_site.domain
         else:
             site_name = domain = domain_override
-        email_field_name = User.get_email_field_name()
+        # email_field_name = User.get_email_field_name()
+        email_field_name = "official_email"        
         for user in self.get_users(email):
             user_email = getattr(user, email_field_name)
             context = {

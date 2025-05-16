@@ -578,7 +578,7 @@ class ApplyOrUpdateLeaveView(
         context.update(
             {
                 "leave_balance": leave_balance,
-                "rem_bal": int(rem_bal),
+                "rem_bal":int(rem_bal) if leave_balance.leave_type.leave_type_short_code == "EL" else rem_bal,
                 "object": self.object,
                 "el_count": el_count,
                 "form": kwargs.get(

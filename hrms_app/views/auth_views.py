@@ -8,12 +8,7 @@ from django.contrib.auth import login as auth_login
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.forms import (
-    PasswordChangeForm,
-    PasswordResetForm,
-    SetPasswordForm,
-)
-from hrms_app.hrms.form import AuthenticationForm
+from hrms_app.hrms.form import AuthenticationForm,PasswordResetForm,PasswordChangeForm,SetPasswordForm
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.exceptions import ImproperlyConfigured, ValidationError
@@ -213,7 +208,7 @@ class PasswordResetView(PasswordContextMixin, FormView):
     email_template_name = "registration/password_reset_email.html"
     extra_email_context = None
     form_class = PasswordResetForm
-    from_email = None
+    from_email = settings.HRMS_DEFAULT_FROM_EMAIL
     html_email_template_name = None
     subject_template_name = "registration/password_reset_subject.txt"
     success_url = reverse_lazy("password_reset_done")
