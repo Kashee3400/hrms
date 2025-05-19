@@ -688,20 +688,37 @@ class LeaveApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
     permission_action = "change"
 
     def get_object(self, queryset=None):
-        return get_object_or_404(LeaveApplication, slug=self.kwargs.get("slug"))
+        # Fetch the object once and save the old status to use during form processing
+        self.leave_application = get_object_or_404(LeaveApplication, slug=self.kwargs.get("slug"))
+        self.old_status = self.leave_application.status
+        return self.leave_application
 
     def update_leave_balance(self, leave_application):
-        leave_balance = LeaveBalanceOpenings.objects.filter(
-            user=leave_application.appliedBy,
-            leave_type=leave_application.leave_type,
-            year=localtime(leave_application.startDate).year,
-        ).first()
-        if leave_balance:
-            if leave_application.status == settings.APPROVED:
-                leave_balance.remaining_leave_balances -= leave_application.usedLeave
-            elif leave_application.status == settings.CANCELLED:
-                leave_balance.remaining_leave_balances += leave_application.usedLeave
-            leave_balance.save()
+            if self.old_status == leave_application.status:
+                return
+
+            leave_balance = LeaveBalanceOpenings.objects.filter(
+                user=leave_application.appliedBy,
+                leave_type=leave_application.leave_type,
+                year=localtime(leave_application.startDate).year,
+            ).first()
+
+            if not leave_balance:
+                return
+
+            try:
+                # Deduct if status changed to APPROVED from non-approved
+                if leave_application.status == settings.APPROVED and self.old_status not in [settings.APPROVED, settings.CANCELLED]:
+                    leave_balance.remaining_leave_balances -= leave_application.usedLeave
+
+                # Restore if cancelled or rejected after approval
+                elif leave_application.status in [settings.CANCELLED, settings.REJECTED] and self.old_status == settings.APPROVED:
+                    leave_balance.remaining_leave_balances += leave_application.usedLeave
+
+                leave_balance.save()
+
+            except Exception as e:
+                messages.error(self.request, _("Failed to update leave balance: ") + str(e))
 
     def form_valid(self, form):
         response = super().form_valid(form)
@@ -748,6 +765,7 @@ class LeaveApplicationDetailView(ModelPermissionRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         leave_application = self.get_object()
+        print(f'Is Locked: {self.get_lock_status(leave_application=leave_application)}')
         context["is_locked"] = self.get_lock_status(leave_application=leave_application)
         context.update(
             {
@@ -769,10 +787,11 @@ class LeaveApplicationDetailView(ModelPermissionRequiredMixin, DetailView):
         lock_status = LockStatus.objects.filter(
             from_date__lte=localtime(
                 leave_application.startDate
-            ).date(),  # 21 feb 2025    15 mar 2025
+            ).date(),
             to_date__gte=localtime(
                 leave_application.startDate
-            ).date(),  # 20 mar 2025     15 Mar 2025
+            ).date(),
+            is_locked='locked'
         )
         return lock_status.exists()
 
