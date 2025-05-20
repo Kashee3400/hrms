@@ -765,7 +765,6 @@ class LeaveApplicationDetailView(ModelPermissionRequiredMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         leave_application = self.get_object()
-        print(f'Is Locked: {self.get_lock_status(leave_application=leave_application)}')
         context["is_locked"] = self.get_lock_status(leave_application=leave_application)
         context.update(
             {
@@ -1902,7 +1901,9 @@ class TourApplicationDetailView(ModelPermissionRequiredMixin, UpdateView):
 
     def get_lock_status(self, tour):
         lock_status = LockStatus.objects.filter(
-            from_date__lte=tour.start_date, to_date__gte=tour.end_date
+            from_date__lte=tour.start_date,
+            to_date__gte=tour.start_date,
+            is_locked='locked'
         )
         return lock_status.exists()
 
