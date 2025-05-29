@@ -551,8 +551,7 @@ class ApplyOrUpdateLeaveView(
             next_url = self.request.POST.get("next")
             if next_url and urlparse(next_url).netloc == "":
                 return redirect(next_url)
-            # Final fallback (optional): default route or homepage
-            return redirect(reverse_lazy("leave_tracker"))  # replace 'home' with your fallback view name
+            return redirect(reverse_lazy("leave_tracker"))
 
     def form_invalid(self, form):
         """Handle form submission failure."""

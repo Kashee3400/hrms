@@ -99,23 +99,47 @@ def set_user_tour_slug(sender, instance, **kwargs):
         instance.slug = slug
 
 
-@receiver(post_save, sender=LeaveApplication)
-def create_leave_days(sender, instance, created, **kwargs):
-    """
-    Create LeaveDay instances after LeaveApplication is saved.
-    """
-    if created and instance.startDate and instance.endDate:
-        current_date = instance.startDate.date()
-        end_date = instance.endDate.date()
+# @receiver(post_save, sender=LeaveApplication)
+# def create_leave_days(sender, instance, created, **kwargs):
+#     """
+#     Create LeaveDay instances after LeaveApplication is saved.
+#     """
+#     if created and instance.startDate and instance.endDate:
+#         current_date = instance.startDate.date()
+#         end_date = instance.endDate.date()
         
+#         while current_date <= end_date:
+#             if current_date == instance.startDate.date():
+#                 is_full_day = (instance.startDayChoice == settings.FULL_DAY)
+#             elif current_date == instance.endDate.date():
+#                 is_full_day = (instance.endDayChoice == settings.FULL_DAY)
+#             else:
+#                 is_full_day = True
+
+#             LeaveDay.objects.create(
+#                 leave_application=instance,
+#                 date=current_date,
+#                 is_full_day=is_full_day,
+#             )
+#             current_date += timedelta(days=1)
+
+@receiver(post_save, sender=LeaveApplication)
+def create_or_update_leave_days(sender, instance, created, **kwargs):
+    """
+    Create or update LeaveDay instances when LeaveApplication is created or updated.
+    """
+    if instance.startDate and instance.endDate:
+        instance.leave_days.all().delete()
+        from django.utils.timezone import localtime
+        current_date = localtime(instance.startDate).date()
+        end_date = localtime(instance.endDate).date()
         while current_date <= end_date:
-            if current_date == instance.startDate.date():
+            if current_date == localtime(instance.startDate).date():
                 is_full_day = (instance.startDayChoice == settings.FULL_DAY)
-            elif current_date == instance.endDate.date():
+            elif current_date == localtime(instance.endDate).date():
                 is_full_day = (instance.endDayChoice == settings.FULL_DAY)
             else:
                 is_full_day = True
-
             LeaveDay.objects.create(
                 leave_application=instance,
                 date=current_date,

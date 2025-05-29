@@ -1086,7 +1086,7 @@ class LeaveApplication(models.Model):
     )
         # Add a file upload field
     attachment = models.FileField(
-        upload_to="leave_attachments/",  # Files will be uploaded to MEDIA_ROOT/leave_attachments/
+        upload_to="leave_attachments/",
         blank=True,
         null=True,
         verbose_name=_("Attachment"),
