@@ -1093,6 +1093,7 @@ class LeaveApplication(models.Model):
         help_text=_("Upload an image or PDF file (optional)."),
     )
 
+    is_leave_deducted = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         if self.startDate and self.endDate and self.startDate > self.endDate:

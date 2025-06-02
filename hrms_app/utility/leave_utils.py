@@ -25,7 +25,7 @@ def get_employee_requested_leave(user, status=None):
                 "end_date": format_date(leaveApplication.endDate),
             }
             for leaveApplication in LeaveApplication.objects.filter(
-                status__in=[leave_status, settings.RECOMMEND]
+                status__in=[leave_status, settings.RECOMMEND,settings.PENDING_CANCELLATION]
             )
         ]
     else:

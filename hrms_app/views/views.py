@@ -693,31 +693,33 @@ class LeaveApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
         return self.leave_application
 
     def update_leave_balance(self, leave_application):
-            if self.old_status == leave_application.status:
-                return
+        if self.old_status == leave_application.status:
+            return
 
-            leave_balance = LeaveBalanceOpenings.objects.filter(
-                user=leave_application.appliedBy,
-                leave_type=leave_application.leave_type,
-                year=localtime(leave_application.startDate).year,
-            ).first()
-
-            if not leave_balance:
-                return
-
-            try:
-                # Deduct if status changed to APPROVED from non-approved
-                if leave_application.status == settings.APPROVED and self.old_status not in [settings.APPROVED, settings.CANCELLED]:
-                    leave_balance.remaining_leave_balances -= leave_application.usedLeave
-
-                # Restore if cancelled or rejected after approval
-                elif leave_application.status in [settings.CANCELLED, settings.REJECTED] and self.old_status == settings.APPROVED:
-                    leave_balance.remaining_leave_balances += leave_application.usedLeave
-
-                leave_balance.save()
-
-            except Exception as e:
-                messages.error(self.request, _("Failed to update leave balance: ") + str(e))
+        leave_balance = LeaveBalanceOpenings.objects.filter(
+            user=leave_application.appliedBy,
+            leave_type=leave_application.leave_type,
+            year=localtime(leave_application.startDate).year,
+        ).first()
+        if not leave_balance:
+            return
+        try:
+            # Deduct leave only if moving to APPROVED from a non-deducted state
+            if (leave_application.status == settings.APPROVED and
+                self.old_status in [settings.PENDING, settings.RECOMMEND, settings.NOT_RECOMMEND, settings.PENDING_CANCELLATION,settings.REJECTED, settings.CANCELLED] and
+                not leave_application.is_leave_deducted):                
+                leave_balance.remaining_leave_balances -= leave_application.usedLeave
+                leave_application.is_leave_deducted = True
+            # Restore leave only if moving away from PENDING_CANCELLATION to REJECTED or CANCELLED
+            elif (leave_application.status in [settings.REJECTED, settings.CANCELLED] and
+                (self.old_status == settings.PENDING_CANCELLATION or self.old_status == settings.APPROVED) and
+                leave_application.is_leave_deducted):
+                leave_balance.remaining_leave_balances += leave_application.usedLeave
+                leave_application.is_leave_deducted = False
+            leave_balance.save()
+            leave_application.save()
+        except Exception as e:
+            messages.error(self.request, _("Failed to update leave balance: ") + str(e))
 
     def form_valid(self, form):
         response = super().form_valid(form)

@@ -512,7 +512,6 @@ class EmployeeShiftAdmin(admin.ModelAdmin):
 
 admin.site.register(EmployeeShift, EmployeeShiftAdmin)
 
-
 class LeaveApplicationAdmin(admin.ModelAdmin):
     list_display = [
         "appliedBy",
@@ -534,6 +533,32 @@ class LeaveApplicationAdmin(admin.ModelAdmin):
         "appliedBy__first_name",
         "appliedBy__last_name",
     ]
+    ordering = ("-applyingDate",)
+    readonly_fields = ("applicationNo", "applyingDate", "updatedAt")  # ← added applyingDate here
+
+    fieldsets = (
+        ("Employee Info", {
+            "fields": ("appliedBy",)
+        }),
+        ("Leave Details", {
+            "fields": (
+                "leave_type",
+                "applicationNo",
+                "applyingDate",
+                ("startDate", "startDayChoice"),
+                ("endDate", "endDayChoice"),
+                "leave_address",
+                "reason",
+            )
+        }),
+        ("Leave Balance", {
+            "fields": ("usedLeave", "balanceLeave"),
+        }),
+        ("Application Status", {
+            "fields": ("status", "updatedAt"),
+        }),
+    )
+
 
 admin.site.register(LeaveApplication, LeaveApplicationAdmin)
 
