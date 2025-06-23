@@ -1559,24 +1559,34 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
         start_month = self.request.GET.get("start_month")
         end_month = self.request.GET.get("end_month")
 
-        qs_all = self.model.objects.filter(regularized=True).order_by("applied_by__first_name").order_by('-start_date')
+        # Base queryset: only approved ones
+        qs_all = self.model.objects.filter(regularized=True)
 
+        # Date filtering
         if start_month:
             try:
                 qs_all = qs_all.filter(start_date__gte=start_month)
             except ValueError:
-                pass  # optionally log this
+                pass  # optionally log invalid date
 
         if end_month:
             try:
                 qs_all = qs_all.filter(start_date__lte=end_month)
             except ValueError:
-                pass  # optionally log this
+                pass  # optionally log invalid date
 
-        if not (user.is_superuser or user.is_staff) and not hasattr(user, "employees"):
-            return self.model.objects.none()
+        # Access control
+        if user.is_superuser or user.is_staff:
+            # Return all filtered & approved entries
+            return qs_all.order_by("applied_by__first_name", "-start_date")
 
-        return qs_all
+        elif hasattr(user, "employees"):
+            # Filter to only entries by employees of this user
+            return qs_all.filter(applied_by__in=user.employees.all())\
+                        .order_by("applied_by__first_name", "-start_date")
+
+        # Fallback: no access
+        return self.model.objects.none()
 
 
     def get_filterset(self, filterset_class):
