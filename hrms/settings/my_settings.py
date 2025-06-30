@@ -58,18 +58,18 @@ ATTENDANCE_STATUS_CHOICES = [
 
 ATTENDANCE_LOG_STATUS_CHOICES = [
     (PENDING, _("Pending")),
-    (APPROVED, _("Approved")),
-    (REJECTED, _("Rejected")),
-    (RECOMMEND, _("Recommended")),
-    (NOT_RECOMMEND, _("Not Recommended")),
+    (APPROVED, _("Approve")),
+    (REJECTED, _("Reject")),
+    (RECOMMEND, _("Recommend")),
+    (NOT_RECOMMEND, _("Not Recommend")),
 ]
 
 TOUR_STATUS_CHOICES = [
     (PENDING, _("Pending")),
-    (APPROVED, _("Approved")),
-    (REJECTED, _("Rejected")),
-    (COMPLETED, _("Completed")),
-    (CANCELLED, _("Cancelled")),
+    (APPROVED, _("Approve")),
+    (REJECTED, _("Reject")),
+    (COMPLETED, _("Complete")),
+    (CANCELLED, _("Cancel")),
     (EXTENDED, _("Extended")),
     (PENDING_CANCELLATION, _("Pending Cancellation")),
 ]
@@ -81,12 +81,12 @@ APPROVAL_TYPE_CHOICES = [
 
 LEAVE_STATUS_CHOICES = [
     (PENDING, _("Pending")),
-    (APPROVED, _("Approved")),
-    (REJECTED, _("Rejected")),
-    (CANCELLED, _("Cancelled")),
+    (APPROVED, _("Approve")),
+    (REJECTED, _("Reject")),
+    (CANCELLED, _("Cancel")),
     (PENDING_CANCELLATION, _("Pending Cancellation")),
-    (RECOMMEND, _("Recommended")),
-    (NOT_RECOMMEND, _("Not Recommended")),
+    (RECOMMEND, _("Recommend")),
+    (NOT_RECOMMEND, _("Not Recommend")),
 ]
 
 START_LEAVE_TYPE_CHOICES = [
@@ -346,16 +346,16 @@ SIMPLE_JWT = {
 
 
 MONTHS = [
-            "January",
-            "February",
-            "March",
-            "April",
-            "May",
-            "June",
-            "July",
-            "August",
-            "September",
-            "October",
-            "November",
-            "December",
-        ]
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+]

@@ -7,7 +7,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.contrib.sites.shortcuts import get_current_site
 from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
-from hrms_app.utility.leave_utils import LeavePolicyManager,LeaveStatsManager
+from hrms_app.utility.leave_utils import LeavePolicyManager, LeaveStatsManager
 from django.template import loader
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -400,7 +400,7 @@ class PasswordResetForm(forms.Form):
         else:
             site_name = domain = domain_override
         # email_field_name = User.get_email_field_name()
-        email_field_name = "official_email"        
+        email_field_name = "official_email"
         for user in self.get_users(email):
             user_email = getattr(user, email_field_name)
             context = {
@@ -698,7 +698,6 @@ class TourForm(forms.ModelForm):
                 },
                 attrs={"class": "form-control"},
             ),
-
             "end_date": DatePickerInput(
                 options={
                     "format": "DD MMM, YYYY",
@@ -746,7 +745,7 @@ class TourForm(forms.ModelForm):
         start_time = cleaned_data.get("start_time")
         end_time = cleaned_data.get("end_time")
         approval_type = cleaned_data.get("approval_type")
-        
+
         if start_date and end_date:
             if start_date > end_date:
                 raise ValidationError(_("End date must be after start date."))
@@ -859,7 +858,7 @@ class LeaveApplicationForm(forms.ModelForm):
                 attrs={"type": "text", "data-role": "input", "readonly": "readonly"}
             ),
             "leave_address": forms.TextInput(
-                attrs={"type": "text","class": "form-control"}
+                attrs={"type": "text", "class": "form-control"}
             ),
             "balanceLeave": forms.TextInput(
                 attrs={"type": "text", "data-role": "input", "readonly": "readonly"}
@@ -870,7 +869,7 @@ class LeaveApplicationForm(forms.ModelForm):
             "startDate": _("Start Date"),
             "endDate": _("End Date"),
             "usedLeave": _("Currently Booked"),
-            "leave_address":_("Leave Address"),
+            "leave_address": _("Leave Address"),
             "balanceLeave": _("Available Balance"),
             "reason": _("Reason"),
             "startDayChoice": _("Start Day"),
@@ -883,7 +882,9 @@ class LeaveApplicationForm(forms.ModelForm):
         super(LeaveApplicationForm, self).__init__(*args, **kwargs)
         leave_type_obj = LeaveType.objects.filter(id=leave_type).first()
         stats = LeaveStatsManager(self.user, leave_type_obj)
-        self.fields["balanceLeave"].initial = stats.get_remaining_balance(year=timezone.now().year)
+        self.fields["balanceLeave"].initial = stats.get_remaining_balance(
+            year=timezone.now().year
+        )
         if leave_type_obj.leave_type_short_code == "SL":
             self.fields["attachment"] = forms.FileField(
                 required=False,  # Initially not required
@@ -899,7 +900,7 @@ class LeaveApplicationForm(forms.ModelForm):
                 ),
             )
         self.fields["leave_type"].initial = leave_type
-        
+
     def clean(self):
         cleaned_data = super().clean()
         startDate = cleaned_data.get("startDate")
@@ -927,11 +928,23 @@ class LeaveApplicationForm(forms.ModelForm):
         if not reason:
             self.add_error("reason", _("Reason is required."))
 
-        if leaveTypeId and leaveTypeId.leave_type_short_code == "SL" and usedLeave and int(usedLeave) > 3:
+        if (
+            leaveTypeId
+            and leaveTypeId.leave_type_short_code == "SL"
+            and usedLeave
+            and int(usedLeave) > 3
+        ):
             if not attachment:
-                self.add_error("attachment", _("Attachment is required for Sick Leave applications exceeding 3 days."))
-        
-        exclude_application_id=self.instance.id if self.instance and self.instance.pk else None
+                self.add_error(
+                    "attachment",
+                    _(
+                        "Attachment is required for Sick Leave applications exceeding 3 days."
+                    ),
+                )
+
+        exclude_application_id = (
+            self.instance.id if self.instance and self.instance.pk else None
+        )
         # Only validate policies if it's a new leave application (i.e., no instance.pk)
         if not self.instance or not self.instance.pk:
             try:
@@ -943,12 +956,13 @@ class LeaveApplicationForm(forms.ModelForm):
                     start_day_choice=startDayChoice,
                     end_day_choice=endDayChoice,
                     bookedLeave=usedLeave,
-                    exclude_application_id=exclude_application_id  # Not needed for new leave
+                    exclude_application_id=exclude_application_id,  # Not needed for new leave
                 )
                 policy_manager.validate_policies()
             except ValidationError as e:
                 self.add_error(None, str(e))
         return cleaned_data
+
 
 class HolidayForm(forms.ModelForm):
 
@@ -1027,7 +1041,7 @@ class AttendanceLogForm(forms.ModelForm):
             "reason": forms.Textarea(attrs={"class": "form-control"}),
             "status": forms.Select(attrs={"class": "form-control"}),
         }
-        
+
     def __init__(self, *args, **kwargs):
         self.user = kwargs.pop("user", None)
         self.is_manager = kwargs.pop("is_manager", False)
@@ -1073,6 +1087,63 @@ class AttendanceLogForm(forms.ModelForm):
                 self.fields[field_name].widget.attrs["disabled"] = "disabled"
 
 
+# class LeaveStatusUpdateForm(forms.ModelForm):
+#     class Meta:
+#         model = LeaveApplication
+#         fields = ["status"]
+
+#     def __init__(self, *args, **kwargs):
+#         user = kwargs.pop("user", None)
+#         super().__init__(*args, **kwargs)
+#         filtered_choices = settings.LEAVE_STATUS_CHOICES
+#         if user is not None:
+#             current_status = self.instance
+#             is_rm = hasattr(user, "employees") and user.employees.exists()
+
+#             if is_rm and user != current_status.appliedBy:
+#                 if (
+#                     user.personal_detail.designation.department.department != "admin"
+#                     and current_status.leave_type.leave_type_short_code == "LWP"
+#                 ):
+#                     filtered_choices = [
+#                         choice
+#                         for choice in settings.LEAVE_STATUS_CHOICES
+#                         if choice[0] in [settings.RECOMMEND, settings.NOT_RECOMMEND]
+#                     ]
+#                 else:
+#                     if current_status.status == settings.PENDING_CANCELLATION:
+#                         filtered_choices = [
+#                             choice
+#                             for choice in settings.LEAVE_STATUS_CHOICES
+#                             if choice[0] in [settings.CANCELLED]
+#                         ]
+#                     else:
+#                         filtered_choices = [
+#                             choice
+#                             for choice in settings.LEAVE_STATUS_CHOICES
+#                             if choice[0] in [settings.APPROVED, settings.REJECTED]
+#                         ]
+
+#             elif user == current_status.appliedBy:  # Employee
+#                 if current_status.status == settings.CANCELLED:
+#                     # Employee can only choose CANCELLED if already cancelled
+#                     filtered_choices = [
+#                         choice
+#                         for choice in settings.LEAVE_STATUS_CHOICES
+#                         if choice[0] == settings.CANCELLED
+#                     ]
+#                 else:
+#                     # If not cancelled, employee can choose PENDING_CANCELLATION
+#                     filtered_choices = [
+#                         choice
+#                         for choice in settings.LEAVE_STATUS_CHOICES
+#                         if choice[0] == settings.PENDING_CANCELLATION
+#                     ]
+
+#         # Ensure that we always set the 'status' field with the filtered choices
+#         self.fields["status"].widget = forms.Select(choices=filtered_choices)
+
+
 class LeaveStatusUpdateForm(forms.ModelForm):
     class Meta:
         model = LeaveApplication
@@ -1081,48 +1152,58 @@ class LeaveStatusUpdateForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        filtered_choices = settings.LEAVE_STATUS_CHOICES
-        if user is not None:
-            current_status = self.instance
-            if user.is_rm and user != current_status.appliedBy:
-                # Reporting Manager can choose from APPROVED, REJECTED, CANCELLED
-                if (
-                    user.personal_detail.designation.department.department != "admin"
-                    and current_status.leave_type.leave_type_short_code == "LWP"
-                ):
-                    filtered_choices = [
-                        choice
-                        for choice in settings.LEAVE_STATUS_CHOICES
-                        if choice[0] in [settings.RECOMMEND, settings.NOT_RECOMMEND]
-                    ]
 
-                else:
-                    filtered_choices = [
-                        choice
-                        for choice in settings.LEAVE_STATUS_CHOICES
-                        if choice[0]
-                        in [settings.APPROVED, settings.REJECTED, settings.CANCELLED]
-                    ]
+        self.fields["status"].widget = forms.Select(
+            choices=self.get_filtered_choices(user)
+        )
 
-            elif user == current_status.appliedBy:  # Employee
-                if current_status.status == settings.CANCELLED:
-                    # Employee can only choose CANCELLED if already cancelled
-                    filtered_choices = [
-                        choice
-                        for choice in settings.LEAVE_STATUS_CHOICES
-                        if choice[0] == settings.CANCELLED
-                    ]
-                else:
-                    # If not cancelled, employee can choose PENDING_CANCELLATION
-                    filtered_choices = [
-                        choice
-                        for choice in settings.LEAVE_STATUS_CHOICES
-                        if choice[0] == settings.PENDING_CANCELLATION
-                    ]
+    def get_filtered_choices(self, user):
+        current_status = self.instance
+        all_choices = settings.LEAVE_STATUS_CHOICES
 
-        # Ensure that we always set the 'status' field with the filtered choices
-        self.fields["status"].widget = forms.Select(choices=filtered_choices)
+        if user is None:
+            return all_choices
 
+        is_applicant = user == current_status.appliedBy
+        is_rm = hasattr(user, "employees") and user.employees.exists()
+        is_lwp = current_status.leave_type.leave_type_short_code == "LWP"
+        is_admin_dept = (
+            user.personal_detail.designation.department.department == "admin"
+        )
+
+        # Case: Employee
+        if is_applicant:
+            if current_status.status in [settings.CANCELLED, settings.REJECTED]:
+                return []  # No actions allowed
+            return [
+                (status, label)
+                for status, label in all_choices
+                if status == settings.PENDING_CANCELLATION
+            ]
+
+        # Case: Reporting Manager
+        if is_rm:
+            if not is_admin_dept and is_lwp:
+                return [
+                    (status, label)
+                    for status, label in all_choices
+                    if status in [settings.RECOMMEND, settings.NOT_RECOMMEND]
+                ]
+            elif current_status.status == settings.PENDING_CANCELLATION:
+                return [
+                    (status, label)
+                    for status, label in all_choices
+                    if status == settings.CANCELLED
+                ]
+            else:
+                return [
+                    (status, label)
+                    for status, label in all_choices
+                    if status in [settings.APPROVED, settings.REJECTED]
+                ]
+
+        # Fallback to default
+        return all_choices
 
 class TourStatusUpdateForm(forms.ModelForm):
     reason = forms.CharField(
@@ -1155,7 +1236,7 @@ class TourStatusUpdateForm(forms.ModelForm):
                 },
                 attrs={
                     "class": "form-control",
-                }
+                },
             ),
             "status": forms.Select(
                 attrs={
@@ -1502,6 +1583,7 @@ class PersonalDetailsForm(forms.ModelForm):
             return self.instance.avatar
         return avatar
 
+
 class EmployeePersonalDetailForm(forms.ModelForm):
     class Meta:
         model = PersonalDetails
@@ -1516,7 +1598,7 @@ class EmployeePersonalDetailForm(forms.ModelForm):
             "marital_status",
             "marriage_ann",
         ]
-        
+
         labels = {
             "avatar": _("Avatar"),
             "mobile_number": _("Mobile Number"),
@@ -1526,7 +1608,7 @@ class EmployeePersonalDetailForm(forms.ModelForm):
             "official_mobile_number": _("Official Mobile Number"),
             "religion": _("Religion"),
             "marital_status": _("Marital Status"),
-            "marriage_ann": _("Marriage Anniversary Date")
+            "marriage_ann": _("Marriage Anniversary Date"),
         }
 
         widgets = {
@@ -1538,12 +1620,26 @@ class EmployeePersonalDetailForm(forms.ModelForm):
                     "data-mode": "drop",
                 }
             ),
-            "mobile_number": forms.TextInput(attrs={"class": "form-control", "placeholder": _("Enter Mobile Number")}),
-            "alt_mobile_number": forms.TextInput(attrs={"class": "form-control", "placeholder": _("Enter Emergency Contact Number")}),
+            "mobile_number": forms.TextInput(
+                attrs={"class": "form-control", "placeholder": _("Enter Mobile Number")}
+            ),
+            "alt_mobile_number": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Enter Emergency Contact Number"),
+                }
+            ),
             "gender": forms.Select(attrs={"class": "form-control"}),
             "designation": forms.Select(attrs={"class": "form-control"}),
-            "official_mobile_number": forms.TextInput(attrs={"class": "form-control", "placeholder": _("Enter Official Mobile Number")}),
-            "religion": forms.Select(attrs={"class": "form-control", "data-role": "select"}),
+            "official_mobile_number": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": _("Enter Official Mobile Number"),
+                }
+            ),
+            "religion": forms.Select(
+                attrs={"class": "form-control", "data-role": "select"}
+            ),
             "marital_status": forms.Select(attrs={"class": "form-control"}),
             "marriage_ann": DatePickerInput(
                 options={
@@ -1559,7 +1655,7 @@ class EmployeePersonalDetailForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # This makes the avatar field optional even if it's required on the model
-        self.fields['avatar'].required = False
+        self.fields["avatar"].required = False
 
     def clean_avatar(self):
         avatar = self.cleaned_data.get("avatar")
@@ -1977,6 +2073,8 @@ class AvatarUpdateForm(forms.ModelForm):
                     "Invalid image file. Please upload a valid image."
                 )
         return avatar
+
+
 class LeaveBalanceForm(forms.Form):
     user = forms.ModelChoiceField(
         queryset=User.objects.all(),
@@ -2145,11 +2243,12 @@ class HRAnnouncementAdminForm(forms.ModelForm):
             "start_date": _("Start Date"),
             "end_date": _("End Date"),
             "content": _("Content"),
-            "pinned":_("Pinned")
+            "pinned": _("Pinned"),
         }
 
+
 class AttendanceAggregationForm(forms.Form):
-    
+
     start_date = forms.DateField(
         label=_("From Date"),
         required=True,
@@ -2177,6 +2276,7 @@ class AttendanceAggregationForm(forms.Form):
             attrs={"class": "form-control"},
         ),
     )
+
 
 class MonthRangeForm(forms.Form):
     start_month = forms.DateField(
@@ -2206,4 +2306,3 @@ class MonthRangeForm(forms.Form):
             attrs={"class": "form-control"},
         ),
     )
-
