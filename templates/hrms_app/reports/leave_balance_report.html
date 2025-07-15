@@ -2,12 +2,11 @@
 {% load static hrms_tag humanize i18n %}
 
 {% block title %}
-  {% trans 'Report' %} | {{ title }}
+  {% trans 'Report' %}| {{ title }}
 {% endblock %}
 
 {% block extrastyle %}
-
-<style>
+  <style>
     .table-wrapper {
       overflow: auto;
       max-height: 70vh;
@@ -16,7 +15,8 @@
       border-collapse: collapse;
       position: relative;
     }
-    th, td {
+    th,
+    td {
       border: 1px solid #ddd;
       padding: 0.5rem;
       text-align: left;
@@ -27,11 +27,11 @@
       background-color: #f2f2f2;
       z-index: 3;
     }
-
+    
     .fixed-column {
       position: sticky;
       left: 0;
-      background-color:#b7eadc;
+      background-color: #b7eadc;
       z-index: 1;
     }
     .fixed-column:nth-child(2) {
@@ -41,51 +41,64 @@
 {% endblock %}
 
 {% block content %}
-{% comment %} {% render_breadcrumb 'Leave Balance Report (Yearly)' urls %} {% endcomment %}
+  {% comment %} {% render_breadcrumb 'Leave Balance Report (Yearly)' urls %} {% endcomment %}
 
-<div class="bg-light my-2">
-  <form method="get">
-    <div class="row m-2">
-      <div class="col-md-3 col-12 mb-2">{{ form.location.label_tag }} {{ form.location }}</div>
-      <!-- Year Filter -->
-      <div class="col-md-3 col-12 mb-2">{{ form.year.label_tag }} {{ form.year }}</div>
-      <!-- Active Filter -->
-      <div class="col-md-3 col-12 mb-2">{{ form.active.label_tag }} {{ form.active }}</div>
-      <!-- Buttons: Filter, Clear Filter, Export -->
-      <div class="col-md-3 col-12 mb-2">
-        <button type="submit" class="btn btn-sm btn-primary"><span class="mif-filter"></span> Filter</button>
-        <a class="btn btn-sm btn-secondary" href="{% url 'calendar' %}">Clear Filter</a>
-        <button type="submit" name="export" value="true" class="btn btn-sm btn-success"><span class="mif-file-excel"></span> Export to Excel</button>
-      </div>
-    </div>
-    <div class="row mt-3 mx-3">
-      <!-- Search Input -->
-      <div class="col-12 col-md-4 col-lg-3">
-        <div class="input-group">
-          <input 
-            type="text" 
-            class="form-control px-3 py-2" 
-            name="q" 
-            value="{{ search_query }}" 
-            placeholder="Search users..."
-          />
-          <span class="input-group-text bg-primary text-white">
-            <i class="fa-solid fa-magnifying-glass"></i>
-          </span>
+  <div class="bg-light my-2">
+    <form method="get">
+      <div class="row m-2">
+        <div class="col-md-3 col-12 mb-2">{{ form.location.label_tag }} {{ form.location }}</div>
+        <!-- Year Filter -->
+        <div class="col-md-3 col-12 mb-2">{{ form.year.label_tag }} {{ form.year }}</div>
+        <!-- Active Filter -->
+        <div class="col-md-3 col-12 mb-2">{{ form.active.label_tag }} {{ form.active }}</div>
+        <!-- Buttons: Filter, Clear Filter, Export -->
+        <div class="col-md-3 col-12 mb-2">
+          <button type="submit" class="btn btn-sm btn-primary"><span class="mif-filter"></span> Filter</button>
+          <a class="btn btn-sm btn-secondary" href="{% url 'calendar' %}">Clear Filter</a>
         </div>
       </div>
-    </div>
-  </form>
-</div>
-<div class="bg-white my-2 p-2">
-  <div class="dt-responsive table-responsive">{{ table|safe }}</div>
-</div>
-
-{% comment %} <div class="bg-white my-2 p-2">
-  <div class="dt-responsive table-responsive">{{ month_table|safe }}</div>
-</div> {% endcomment %}
-
+    </form>
+  </div>
+  <div class="bg-white my-2 p-2">
+    <div class="dt-responsive table-responsive">{{ table|safe }}</div>
+  </div>
 {% endblock %}
 
 {% block extra_js %}
+  <!-- DataTables core -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" />
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.1/css/buttons.dataTables.min.css" />
+
+  <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
+  <!-- DataTables Export Buttons -->
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.html5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/2.4.1/js/buttons.print.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+  <script>
+    $('#leave-balance-table').DataTable({
+      scrollX: true,
+      paging: false,
+      searching: true,
+      ordering: false,
+      info: false,
+      dom: 'Bfrtip',
+      buttons: [
+        {
+          extend: 'excelHtml5',
+          title: 'Leave_Balance_Report',
+          text: 'Export to Excel',
+          exportOptions: {
+            columns: ':visible'
+          }
+        }
+      ],
+      columnDefs: [{ targets: '_all', defaultContent: '' }]
+    })
+  </script>
 {% endblock %}

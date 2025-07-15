@@ -123,6 +123,7 @@ class CreditELLeaveView(View):
     def post(self, request, *args, **kwargs):
         try:
             data = json.loads(request.body)
+            print(data)
             year = data.get("year", timezone.now().year)
             employee_data = data.get("employees", [])
             emp_codes = [emp["emp_code"] for emp in employee_data]
@@ -151,19 +152,21 @@ class CreditELLeaveView(View):
                             balance.remaining_leave_balances or 0
                         ) + days
                         balance.save()
-                        transactions.append(LeaveTransaction(
-                            leave_balance=balance,
-                            leave_type=el_type,
-                            transaction_date=timezone.now(),
-                            no_of_days_applied=0,
-                            no_of_days_approved=days,
-                            transaction_type="add",
-                            remarks="Quarterly EL credit",
-                        ))
+                        transactions.append(
+                            LeaveTransaction(
+                                leave_balance=balance,
+                                leave_type=el_type,
+                                transaction_date=timezone.now(),
+                                no_of_days_applied=0,
+                                no_of_days_approved=days,
+                                transaction_type="add",
+                                remarks="Quarterly EL credit",
+                            )
+                        )
 
                         log_admin_action(
                             request.user,
-                            balance.pk,
+                            balance,
                             CHANGE,
                             f"Credited {days} EL for {emp_code} year {year}.",
                         )
