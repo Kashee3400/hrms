@@ -528,7 +528,7 @@ class ApplyOrUpdateLeaveView(
         leave_application = form.save(commit=False)
         stats = LeaveStatsManager(user=user, leave_type=leave_application.leave_type)
         remaining_balance = stats.get_remaining_balance(year=timezone.now().year)
-        if leave_application.usedLeave > remaining_balance:
+        if leave_application.usedLeave > remaining_balance and leave_type.leave_type_short_code != "LWP":
             form.add_error("usedLeave", _("Total days exceeds your remaining balance."))
             return self.form_invalid(form)
         leave_application.appliedBy = user
