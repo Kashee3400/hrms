@@ -97,13 +97,13 @@
             </ul>
           </div>
         </div>
-        {% if not is_locked %}
+        <!-- {% if not is_locked %} -->
           <div class="card mt-4">
             <div class="card-body">
               <form id="leave-application-form" method="post" action="{% url 'leave_application_update' leave_application.slug %}">
                 {% csrf_token %}
                 <div class="row g-3">
-                  {% if is_manager %}
+                  {% if is_manager or user.personal_detail.designation.department.department == "admin"%}
                     <div class="col-md-6">{{ status_form.status }}</div>
                     <div class="col-md-6">
                       <button type="button" class="btn btn-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#updateDialog">{% trans 'Update' %}</button>
@@ -150,7 +150,7 @@
               </form>
             </div>
           </div>
-        {% endif %}
+        <!-- {% endif %} -->
       </div>
     </div>
   </div>

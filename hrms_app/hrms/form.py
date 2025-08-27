@@ -1087,63 +1087,6 @@ class AttendanceLogForm(forms.ModelForm):
                 self.fields[field_name].widget.attrs["disabled"] = "disabled"
 
 
-# class LeaveStatusUpdateForm(forms.ModelForm):
-#     class Meta:
-#         model = LeaveApplication
-#         fields = ["status"]
-
-#     def __init__(self, *args, **kwargs):
-#         user = kwargs.pop("user", None)
-#         super().__init__(*args, **kwargs)
-#         filtered_choices = settings.LEAVE_STATUS_CHOICES
-#         if user is not None:
-#             current_status = self.instance
-#             is_rm = hasattr(user, "employees") and user.employees.exists()
-
-#             if is_rm and user != current_status.appliedBy:
-#                 if (
-#                     user.personal_detail.designation.department.department != "admin"
-#                     and current_status.leave_type.leave_type_short_code == "LWP"
-#                 ):
-#                     filtered_choices = [
-#                         choice
-#                         for choice in settings.LEAVE_STATUS_CHOICES
-#                         if choice[0] in [settings.RECOMMEND, settings.NOT_RECOMMEND]
-#                     ]
-#                 else:
-#                     if current_status.status == settings.PENDING_CANCELLATION:
-#                         filtered_choices = [
-#                             choice
-#                             for choice in settings.LEAVE_STATUS_CHOICES
-#                             if choice[0] in [settings.CANCELLED]
-#                         ]
-#                     else:
-#                         filtered_choices = [
-#                             choice
-#                             for choice in settings.LEAVE_STATUS_CHOICES
-#                             if choice[0] in [settings.APPROVED, settings.REJECTED]
-#                         ]
-
-#             elif user == current_status.appliedBy:  # Employee
-#                 if current_status.status == settings.CANCELLED:
-#                     # Employee can only choose CANCELLED if already cancelled
-#                     filtered_choices = [
-#                         choice
-#                         for choice in settings.LEAVE_STATUS_CHOICES
-#                         if choice[0] == settings.CANCELLED
-#                     ]
-#                 else:
-#                     # If not cancelled, employee can choose PENDING_CANCELLATION
-#                     filtered_choices = [
-#                         choice
-#                         for choice in settings.LEAVE_STATUS_CHOICES
-#                         if choice[0] == settings.PENDING_CANCELLATION
-#                     ]
-
-#         # Ensure that we always set the 'status' field with the filtered choices
-#         self.fields["status"].widget = forms.Select(choices=filtered_choices)
-
-
 class LeaveStatusUpdateForm(forms.ModelForm):
     class Meta:
         model = LeaveApplication
@@ -1170,7 +1113,7 @@ class LeaveStatusUpdateForm(forms.ModelForm):
         is_admin_dept = (
             user.personal_detail.designation.department.department == "admin"
         )
-
+        print(is_admin_dept, is_lwp)
         # Case: Employee
         if is_applicant:
             if current_status.status in [settings.CANCELLED, settings.REJECTED]:
@@ -1180,7 +1123,12 @@ class LeaveStatusUpdateForm(forms.ModelForm):
                 for status, label in all_choices
                 if status == settings.PENDING_CANCELLATION
             ]
-
+        if is_admin_dept and is_lwp:
+            return [
+                    (status, label)
+                    for status, label in all_choices
+                    if status in [settings.APPROVED, settings.REJECTED]
+                ]
         # Case: Reporting Manager
         if is_rm:
             if not is_admin_dept and is_lwp:
@@ -1195,6 +1143,7 @@ class LeaveStatusUpdateForm(forms.ModelForm):
                     for status, label in all_choices
                     if status == settings.CANCELLED
                 ]
+            
             else:
                 return [
                     (status, label)
