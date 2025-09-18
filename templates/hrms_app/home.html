@@ -165,7 +165,7 @@
                   {% for user in request.user.employees.all %}
                     <li class="list-group-item d-flex align-items-center">
                       <img src="{% if user.personal_detail.avatar %}
-                          {{ user.personal_detail.avatar.url }}
+                          {{ user.personal_detail.get_avatar_url }}
                         {% else %}
                           {% static 'source/images/user1-128x128.jpg' %}
                         {% endif %}"

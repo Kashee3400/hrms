@@ -23,7 +23,7 @@
         <div class="card">
           <div class="card-header bg-info text-white d-flex align-items-center">
             {% if leave_application.appliedBy.personal_detail.avatar %}
-              <img src="{{ leave_application.appliedBy.personal_detail.avatar.url }}" class="rounded-circle me-3" style="width: 40px; height: 40px;" alt="Avatar" />
+              <img src="{{ leave_application.appliedBy.personal_detail.get_avatar_url }}" class="rounded-circle me-3" style="width: 40px; height: 40px;" alt="Avatar" />
             {% endif %}
             <div>
               <h5 class="mb-0">{{ leave_application.appliedBy }}</h5>

@@ -411,8 +411,8 @@ class LeaveApplicationSerializer(serializers.ModelSerializer):
         if personal_detail and personal_detail.avatar:
             request = self.context.get("request")  # Use the request object for full URL
             if request:
-                return request.build_absolute_uri(personal_detail.avatar.url)
-            return personal_detail.avatar.url  # Return relative URL if request is not available
+                return request.build_absolute_uri(personal_detail.get_avatar_url)
+            return personal_detail.get_avatar_url # Return relative URL if request is not available
         return None  # Return None if no avatar exists
     
     def validate(self, data):
@@ -506,8 +506,8 @@ class UserTourSerializer(serializers.ModelSerializer):
         if personal_detail and personal_detail.avatar:
             request = self.context.get("request")  # Use the request object for full URL
             if request:
-                return request.build_absolute_uri(personal_detail.avatar.url)
-            return personal_detail.avatar.url  # Return relative URL if request is not available
+                return request.build_absolute_uri(personal_detail.get_avatar_url)
+            return personal_detail.get_avatar_url  # Return relative URL if request is not available
         return None  # Return None if no avatar exists
     
     def validate(self, attrs):

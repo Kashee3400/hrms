@@ -7,7 +7,7 @@
         </div>
         <div class="app-bar-container">
             <a href="#" class="app-bar-item">
-                <img src="{% if user.personal_detail.avatar %}{{user.personal_detail.avatar.url}}{% else %}{% static 'source/images/jek_vorobey.jpg' %}{% endif %}"
+                <img src="{% if user.personal_detail.avatar %}{{user.personal_detail.get_avatar_url}}{% else %}{% static 'source/images/jek_vorobey.jpg' %}{% endif %}"
                     class="avatar">
                 <span class="ml-2 app-bar-name">{% if user.first_name %}{{user.first_name}} {{user.last_name}}
                     {% else %} {{user.username}}
@@ -15,7 +15,7 @@
             </a>
             <div class="bg-darkCyan user-block shadow-1" data-role="collapse" data-collapsed="true">
                 <div class="fg-white p-2 text-center">
-                    <img src="{% if user.personal_detail.avatar %}{{user.personal_detail.avatar.url}}{% else %}{% static 'source/images/jek_vorobey.jpg' %}{% endif %}"
+                    <img src="{% if user.personal_detail.avatar %}{{user.personal_detail.get_avatar_url}}{% else %}{% static 'source/images/jek_vorobey.jpg' %}{% endif %}"
                         class="avatar">
                     <div class="h4 mb-0">{% if user.first_name %}{{user.first_name}} {{user.last_name}}
                         {% else %} {{user.username}} {% endif %}</div>

@@ -147,7 +147,7 @@
                               </td>
                               <td>
                                 <div class="d-flex">
-                                  <img {% if muser.personal_detail.avatar %} src="{{muser.personal_detail.avatar.url}}" {% else %} src="{% static 'images/faces/face1.jpg' %}"{% endif %} alt="" />
+                                  <img {% if muser.personal_detail.avatar %} src="{{muser.personal_detail.get_avatar_url}}" {% else %} src="{% static 'images/faces/face1.jpg' %}"{% endif %} alt="" />
                                   <div>
                                     <h6>{{ muser.username }}</h6> <!-- Display the username -->
                                     <p>{{ muser.get_full_name }}</p> <!-- Optionally display the full name of the user -->

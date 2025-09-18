@@ -14,7 +14,7 @@
               </div>
             </div>
             <div class="text-center">
-              <img src="{{ employee.avatar.url }}" alt="Avatar" class="img-thumbnail rounded-circle" style="width: 150px; height: 150px;" />
+              <img src="{{ employee.get_avatar_url }}" alt="Avatar" class="img-thumbnail rounded-circle" style="width: 150px; height: 150px;" />
               <h5 class="mt-3">{{ employee.user.first_name }} {{ employee.user.last_name }}</h5>
               <p>
                 <span class="event-text">

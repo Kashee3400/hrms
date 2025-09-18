@@ -22,7 +22,7 @@
         <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
           <div class="d-flex align-items-center">
             {% if tour_application.applied_by.personal_detail.avatar %}
-              <img src="{{ tour_application.applied_by.personal_detail.avatar.url }}" class="rounded-circle me-3" alt="Avatar" style="width: 50px; height: 50px;" />
+              <img src="{{ tour_application.applied_by.personal_detail.get_avatar_url }}" class="rounded-circle me-3" alt="Avatar" style="width: 50px; height: 50px;" />
             {% endif %}
             <div>
               <h5 class="card-title mb-0">{{ tour_application.applied_by }}</h5>

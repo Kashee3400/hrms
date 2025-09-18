@@ -67,11 +67,7 @@
             <div class="card">
               <div class="card-body">
                 <div class="d-flex flex-column align-items-center">
-                  <img src="{% if user.personal_detail.avatar %}
-                      {{ user.personal_detail.avatar.url }}
-                    {% else %}
-                      {% static 'hrms_app/im/person.png' %}
-                    {% endif %}"
+                  <img src="{{user.personal_detail.get_avatar_url}}"
                     class="avatar rounded-circle mb-2 img-fluid"
                     style="max-width: 100px; max-height: 100px; width: auto; height: auto;" />
                   <h5 class="card-title">{{ user.personal_detail.salutation }} {{ user.get_full_name }}</h5>

@@ -110,7 +110,7 @@
                               <div class="d-flex">
                                 <img style="height: 50px; width: auto;"
                                 {% if leave.appliedBy.personal_detail.avatar %} 
-                                  src="{{leave.appliedBy.personal_detail.avatar.url}}" 
+                                  src="{{leave.appliedBy.personal_detail.get_avatar_url}}"
                                 {% else %} src="{% static 'images/faces/face1.jpg' %}"{% endif %} alt="{{ leave.appliedBy }}" />
                                 <div>
                                   <h6>{{ leave.appliedBy }}</h6>
