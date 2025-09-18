@@ -15,6 +15,8 @@ from django.core.validators import MinValueValidator
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
+from django.templatetags.static import static
+
 
 
 class Role(models.Model):
@@ -733,13 +735,17 @@ class PersonalDetails(models.Model):
     def __str__(self):
         return f"Personal Details of {self.user.first_name} - {self.mobile_number}"
     
-    def get_avatar_url(self):
-        if self.avatar and self.avatar.name:
-            try:
+    @property
+    def avatar_url(self):
+        try:
+            if self.avatar and self.avatar.name:
                 return self.avatar.url
-            except (ValueError, FileNotFoundError):
-                pass
+        except Exception:
+            pass
         return static("images/faces/face8.jpg")
+
+    def get_avatar_url(self):
+        return self.avatar_url
     
     class Meta:
         db_table = "tbl_personal_details"
