@@ -8,19 +8,19 @@
     position: relative;
     transition: color 0.3s;
   }
-  
+
   .nested-nav .nav-link:hover {
     color: #0d6efd;
     text-decoration: none;
   }
-  
+
   /* Separator styling */
   .nav-separator {
     color: #999;
     margin: 0 8px;
     font-weight: 500;
   }
-  
+
   /* Dropdown Styles */
   .nested-nav .dropdown-menu {
     display: none;
@@ -32,37 +32,39 @@
     border-radius: 0.5rem;
     background-color: #fff;
     padding: 0.5rem 0;
-    box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
   }
-  
+
   .nested-nav .dropdown-menu .dropdown-item {
     font-size: 14px;
     padding: 8px 16px;
     color: #333;
   }
-  
+
   .nested-nav .dropdown-menu .dropdown-item:hover {
     background-color: #f0f0f0;
     color: #0d6efd;
   }
-  
+
   /* Arrow icon */
   .toggle-icon {
     transition: transform 0.3s ease;
   }
-  
+
   .dropdown.show .toggle-icon {
     transform: rotate(180deg);
   }
-  </style>
-  
+</style>
+
 <nav class="navbar default-layout col-lg-12 col-12 p-0 fixed-top d-flex align-items-top flex-row">
   <div class="text-center navbar-brand-wrapper d-flex align-items-center justify-content-start">
     <div class="me-3">
-      <button class="navbar-toggler navbar-toggler align-self-center" type="button" data-bs-toggle="minimize"><span class="icon-menu"></span></button>
+      <button class="navbar-toggler navbar-toggler align-self-center" type="button" data-bs-toggle="minimize"><span
+          class="icon-menu"></span></button>
     </div>
     <div>
-      <a class="navbar-brand brand-logo" href="{% url 'admin:index' %}"><img src="{% static LOGO_URL %}" alt="logo" /></a>
+      <a class="navbar-brand brand-logo" href="{% url 'admin:index' %}"><img src="{% static LOGO_URL %}"
+          alt="logo" /></a>
       <a class="navbar-brand brand-logo-mini" href="/"><img src="{% static LOGO_MINI_URL %}" alt="logo" /></a>
     </div>
   </div>
@@ -86,7 +88,7 @@
               <a class="nav-link text-white" href="{{ index_url }}">{% trans 'Admin Dashboard' %}</a>
             </li>
             <li class="nav-separator">|</li>
-          {% endif %}
+            {% endif %}
             <!-- Tours (Dropdown) -->
             <li class="nav-item dropdown position-relative">
               <a class="nav-link text-white dropdown-toggle d-flex align-items-center" href="#">
@@ -111,7 +113,7 @@
             {% endif %}
           </ul>
         </nav>
-        
+
       </li>
     </ul>
     <ul class="navbar-nav ms-auto">
@@ -124,35 +126,38 @@
       {% load_notifications request.user %}
       <li class="nav-item dropdown d-none d-lg-block user-dropdown">
         <a class="nav-link" id="UserDropdown" href="#" data-bs-toggle="dropdown" aria-expanded="false">
-          <img class="img-xs rounded-circle" 
-            {% if user.personal_detail.avatar %}
-                src="{{ user.personal_detail.avatar.url }}"
-            {% else %}
-                src="{% static 'images/faces/face8.jpg' %}"
-            {% endif %}
-            alt="Profile image" />
-        <div class="dropdown-menu dropdown-menu-right navbar-dropdown" aria-labelledby="UserDropdown">
-          <div class="dropdown-header text-center">
-            <img style="height: 60px;width: 60px;" class="img-md rounded-circle" 
-            {% if user.personal_detail.avatar %}src="{{user.personal_detail.avatar.url}}"{% else %}src="{% static 'images/faces/face8.jpg' %}"{% endif %}
-            alt="Profile image" />
-            <p class="mb-1 mt-3 font-weight-semibold">{% firstof user.get_full_name user.get_username %}</p>
-            <p class="fw-light text-muted mb-0">{{user.email}}</p>
-          </div>
-          <a class="dropdown-item" href="{% url 'employee_profile' request.user.pk %}"><i class="dropdown-item-icon mdi mdi-account-outline text-primary me-2"></i> {% trans "My Profile" %}</a>
-          <a class="dropdown-item" href="{% url 'password_change' %}"><i class="dropdown-item-icon mdi mdi-pencil text-primary me-2"></i>{% trans "Change Password" %}</a>
-          {% if request.user.is_authenticated %}
+          <img class="img-xs rounded-circle" src="{{ user.personal_detail.get_avatar_url }}" alt="Profile image"
+            onerror="this.onerror=null;this.src='{% static 'images/faces/face8.jpg' %}';" />
+
+          <div class="dropdown-menu dropdown-menu-right navbar-dropdown" aria-labelledby="UserDropdown">
+            <div class="dropdown-header text-center">
+              <img style="height: 60px;width: 60px;" class="img-xs rounded-circle"
+                src="{{ user.personal_detail.get_avatar_url }}" alt="Profile image"
+                onerror="this.onerror=null;this.src='{% static 'images/faces/face8.jpg' %}';" />
+
+
+              <p class="mb-1 mt-3 font-weight-semibold">{% firstof user.get_full_name user.get_username %}</p>
+              <p class="fw-light text-muted mb-0">{{user.email}}</p>
+            </div>
+            <a class="dropdown-item" href="{% url 'employee_profile' request.user.pk %}"><i
+                class="dropdown-item-icon mdi mdi-account-outline text-primary me-2"></i> {% trans "My Profile" %}</a>
+            <a class="dropdown-item" href="{% url 'password_change' %}"><i
+                class="dropdown-item-icon mdi mdi-pencil text-primary me-2"></i>{% trans "Change Password" %}</a>
+            {% if request.user.is_authenticated %}
             <form id="logout-form" method="post" action="{% url 'logout' %}">
               {% csrf_token %}
-              <button class="dropdown-item" type="submit"><i class="dropdown-item-icon mdi mdi-power text-primary me-2"></i>{% trans 'Log out' %}</button>
+              <button class="dropdown-item" type="submit"><i
+                  class="dropdown-item-icon mdi mdi-power text-primary me-2"></i>{% trans 'Log out' %}</button>
             </form>
-          {% else %}
-            <a href="{% url 'login' %}" class="dropdown-item"><i class="dropdown-item-icon mdi mdi-login text-primary me-2"></i>{% trans "Sign IN" %}</a>
-          {% endif %}
-        </div>
+            {% else %}
+            <a href="{% url 'login' %}" class="dropdown-item"><i
+                class="dropdown-item-icon mdi mdi-login text-primary me-2"></i>{% trans "Sign IN" %}</a>
+            {% endif %}
+          </div>
       </li>
     </ul>
-    <button class="navbar-toggler navbar-toggler-right d-lg-none align-self-center" type="button" data-bs-toggle="offcanvas"><span class="mdi mdi-menu"></span></button>
+    <button class="navbar-toggler navbar-toggler-right d-lg-none align-self-center" type="button"
+      data-bs-toggle="offcanvas"><span class="mdi mdi-menu"></span></button>
   </div>
 </nav>
 

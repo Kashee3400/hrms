@@ -732,7 +732,11 @@ class PersonalDetails(models.Model):
 
     def __str__(self):
         return f"Personal Details of {self.user.first_name} - {self.mobile_number}"
-
+    
+    def get_avatar_url(self):
+        if self.avatar and self.avatar.name:
+            return self.avatar.url
+        return static("images/faces/face8.jpg")
     class Meta:
         db_table = "tbl_personal_details"
         managed = True
