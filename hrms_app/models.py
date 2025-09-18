@@ -735,8 +735,12 @@ class PersonalDetails(models.Model):
     
     def get_avatar_url(self):
         if self.avatar and self.avatar.name:
-            return self.avatar.url
+            try:
+                return self.avatar.url
+            except (ValueError, FileNotFoundError):
+                pass
         return static("images/faces/face8.jpg")
+    
     class Meta:
         db_table = "tbl_personal_details"
         managed = True
