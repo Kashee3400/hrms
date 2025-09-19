@@ -18,7 +18,6 @@ SALUTATION_CHOICES = [
     ("Er.", "Er."),
 ]
 
-
 HALF_DAY = "Half Day"
 PRESENT = "Present"
 ABSENT = "Absent"
@@ -95,7 +94,6 @@ START_LEAVE_TYPE_CHOICES = [
     (SECOND_HALF, _("Second Half (Afternoon)")),
 ]
 
-
 LEAVE_TYPE_CHOICES = [
     (UP, _("Unpaid Leave (LWP)")),
     (CL, _("Casual Leave (CL)")),
@@ -105,13 +103,11 @@ LEAVE_TYPE_CHOICES = [
     (CO, _("Comp OFF (CO)")),
 ]
 
-
 SENT_MAIL_STATUS_CHOICES = (
     (PENDING, _("Pending")),
     (SENT, _("Sent")),
     (FAILED, _("Failed")),
 )
-
 
 ROLE_CHOICES = [
     (ON_ROLE, "On-Role"),
@@ -160,7 +156,6 @@ NOTIFICATION_TYPES = [
     (CHAT, "Chat"),
     (ATTENDANCE_REGULARISATION, "Attendance Regularization"),
 ]
-
 
 customColorPalette = [
     {"color": "hsl(4, 90%, 58%)", "label": "Red"},
@@ -306,9 +301,7 @@ CKEDITOR_5_CONFIGS = {
     },
 }
 
-
 CK_EDITOR_5_UPLOAD_FILE_VIEW_NAME = "custom_upload_file"
-
 
 handler403 = "hrms_app.views.custom_permission_denied_view"
 
@@ -344,7 +337,6 @@ SIMPLE_JWT = {
     "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
 }
 
-
 MONTHS = [
     "January",
     "February",
@@ -359,3 +351,43 @@ MONTHS = [
     "November",
     "December",
 ]
+
+# Default working hours configuration
+DEFAULT_WORK_START_TIME = '09:00'
+DEFAULT_WORK_END_TIME = '18:00'
+DEFAULT_BREAK_DURATION = 1  # hours
+
+# Attendance colors for UI
+ATTENDANCE_COLORS = {
+    'present': '#28a745',  # Green
+    'absent': '#dc3545',  # Red
+    'half_day': '#ffc107',  # Yellow
+    'late': '#fd7e14',  # Orange
+    'early_going': '#6f42c1',  # Purple
+    'on_leave': '#17a2b8',  # Cyan
+}
+
+# Maximum bulk attendance limit (to prevent system overload)
+MAX_BULK_ATTENDANCE_EMPLOYEES = 1000
+MAX_BULK_ATTENDANCE_DAYS = 31
+
+# Email notifications (if you want to add email features later)
+ATTENDANCE_EMAIL_NOTIFICATIONS = {
+    'bulk_attendance_created': True,
+    'attendance_approved': True,
+    'attendance_rejected': True,
+}
+
+# Attendance report settings
+ATTENDANCE_REPORT_FORMATS = ['pdf', 'excel', 'csv']
+ATTENDANCE_TIMEZONE = 'Asia/Kolkata'  # Adjust to your timezone
+
+# Pagination settings for attendance views
+ATTENDANCE_PAGINATE_BY = 25
+
+# Cache settings for attendance (optional - for performance)
+ATTENDANCE_CACHE_TIMEOUT = 300  # 5 minutes
+
+# Audit trail settings
+KEEP_ATTENDANCE_AUDIT_LOGS = True
+ATTENDANCE_AUDIT_RETENTION_DAYS = 365

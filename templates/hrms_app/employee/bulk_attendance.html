@@ -1,0 +1,540 @@
+{% extends 'hrms_app/base.html' %}
+{% load static i18n l10n %}
+{% load widget_tweaks %}
+
+{% block title %}Bulk Attendance Management{% endblock %}
+{% block extrastyle %}
+    <link rel="stylesheet" href="{% static 'hrms_app/css/attendance.css' %}">
+{% endblock %}
+
+{% block content %}
+    <div class="container-fluid py-4 px-0">
+        <!-- Enhanced Header -->
+        <div class="page-header text-center mb-4">
+            <div class="container">
+                <div class="row align-items-center">
+                    <div class="col-md-8 text-md-start">
+                        <h3 class="mb-2 fw-bold">
+                            <i class="fas fa-calendar-check me-3"></i>
+                            Bulk Attendance Management
+                        </h3>
+                        <p class="mb-0 fs-5 opacity-75">Mark attendance as present for multiple employees
+                            efficiently</p>
+                    </div>
+                    <div class="col-md-4 text-md-end">
+                        <div class="stats-card d-inline-block">
+                            <div class="stats-number text-primary">{{ employees.count }}</div>
+                            <div class="stats-label">Active Employees</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Errors Display -->
+        {% if form.non_field_errors %}
+            <div class="container mb-4">
+                <div class="alert alert-danger" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <strong>Please correct the following errors:</strong>
+                    <ul class="mb-0 mt-2">
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="container mx-auto px-0">
+            <form method="post" id="bulkAttendanceForm" novalidate>
+                {% csrf_token %}
+
+                <div class="row">
+                    <!-- Main Form -->
+                    <div class="col-lg-8">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <i class="fas fa-cogs me-2"></i>Attendance Configuration
+                            </div>
+                            <div class="card-body">
+                                <!-- Date and Time Section -->
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <div class="mb-3">
+                                                <label for="{{ form.start_date.id_for_label }}" class="form-label">
+                                                    {{ form.start_date.label }}
+                                                </label>
+                                                {{ form.start_date|add_class:"form-control"|add_error_class:"error-field" }}
+
+                                                {% if form.start_date.errors %}
+                                                    <div class="field-errors">
+                                                        {% for error in form.start_date.errors %}
+                                                            <div>
+                                                                <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <div class="mb-3">
+                                                <label for="{{ form.end_date.id_for_label }}" class="form-label">
+                                                    {{ form.end_date.label }}
+                                                </label>
+
+                                                {{ form.end_date|add_class:"form-control"|add_error_class:"error-field" }}
+
+                                                {% if form.end_date.errors %}
+                                                    <div class="field-errors">
+                                                        {% for error in form.end_date.errors %}
+                                                            <div>
+                                                                <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row mb-4">
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <div class="mb-3">
+                                                <label for="{{ form.start_time.id_for_label }}" class="form-label">
+                                                    {{ form.start_time.label }}
+                                                </label>
+                                                {{ form.start_time|add_class:"form-control time-input"|add_error_class:"error-field" }}
+
+                                                {% if form.start_time.errors %}
+                                                    <div class="field-errors">
+                                                        {% for error in form.start_time.errors %}
+                                                            <div>
+                                                                <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <div class="mb-3">
+                                                <label for="{{ form.end_time.id_for_label }}" class="form-label">
+                                                    {{ form.end_time.label }}
+                                                </label>
+                                                {{ form.end_time|add_class:"form-control time-input"|add_error_class:"error-field" }}
+
+                                                {% if form.end_time.errors %}
+                                                    <div class="field-errors">
+                                                        {% for error in form.end_time.errors %}
+                                                            <div>
+                                                                <i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                                            </div>
+                                                        {% endfor %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Employee Selection -->
+                                <div class="mb-4">
+                                    <div class="d-flex align-items-center justify-content-between mb-3">
+                                        <label class="form-label fw-bold">
+                                            <i class="fas fa-users me-2"></i>{{ form.employees.label }}
+                                        </label>
+                                        <div class="form-check form-switch">
+                                            {{ form.select_all|add_class:"form-check-input" }}
+                                            <label class="form-check-label fw-bold text-success"
+                                                   for="{{ form.select_all.id_for_label }}">
+                                                {{ form.select_all.label }}
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {{ form.employees|add_class:"form-select"|attr:"data-placeholder:Choose employees..." }}
+
+                                    {% if form.employees.errors %}
+                                        <div class="field-errors mt-2">
+                                            {% for error in form.employees.errors %}
+                                                <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}</div>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+
+                                    <div class="form-text">
+                                        <i class="fas fa-info-circle me-1"></i>
+                                        {{ form.employees.help_text }}
+                                    </div>
+                                </div>
+
+                                <!-- Additional Options -->
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            {{ form.title_prefix|add_class:"form-control"|add_error_class:"error-field" }}
+                                            <label for="{{ form.title_prefix.id_for_label }}">
+                                                <i class="fas fa-tag me-2"></i>{{ form.title_prefix.label }}
+                                            </label>
+                                            {% if form.title_prefix.errors %}
+                                                <div class="field-errors">
+                                                    {% for error in form.title_prefix.errors %}
+                                                        <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                            <div class="form-text">{{ form.title_prefix.help_text }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            {{ form.reason|add_class:"form-control"|add_error_class:"error-field" }}
+                                            <label for="{{ form.reason.id_for_label }}">
+                                                <i class="fas fa-comment me-2"></i>{{ form.reason.label }}
+                                            </label>
+                                            {% if form.reason.errors %}
+                                                <div class="field-errors">
+                                                    {% for error in form.reason.errors %}
+                                                        <div><i class="fas fa-exclamation-circle me-1"></i>{{ error }}
+                                                        </div>
+                                                    {% endfor %}
+                                                </div>
+                                            {% endif %}
+                                            <div class="form-text">{{ form.reason.help_text }}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Preview Panel -->
+                    <div class="col-lg-4">
+                        <div class="card preview-card sticky-top">
+                            <div class="card-header bg-success text-white">
+                                <i class="fas fa-eye me-2"></i>Live Preview
+                            </div>
+                            <div class="card-body">
+                                <div id="preview-content">
+                                    <div class="text-center text-muted py-4">
+                                        <i class="fas fa-info-circle fs-3 mb-2 opacity-50"></i>
+                                        <p class="mb-0">Fill the form to see live preview</p>
+                                        <small class="text-muted">Preview updates automatically</small>
+                                    </div>
+                                </div>
+
+                                <div id="preview-data" style="display: none;">
+                                    <div class="duration-display mb-3">
+                                        <div class="fs-6 opacity-75">Total Duration</div>
+                                        <div class="fs-4 fw-bold" id="duration-hours">0 hours</div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <div class="fw-bold mb-2">
+                                            <i class="fas fa-calendar me-2"></i>Date Range
+                                        </div>
+                                        <div id="date-range" class="text-muted">-</div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <div class="fw-bold mb-2">
+                                            <i class="fas fa-clock me-2"></i>Time Range
+                                        </div>
+                                        <div id="time-range" class="text-muted">-</div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <div class="fw-bold mb-3">
+                                            <i class="fas fa-users me-2"></i>Target Employees
+                                        </div>
+                                        <span id="employee-count" class="employee-count-badge mb-3">0 selected</span>
+                                        <div id="sample-employees" class="mt-2"></div>
+                                    </div>
+
+                                    <div id="existing-records-warning" class="alert alert-warning py-2"
+                                         style="display: none;">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        <small id="existing-count">0</small> records may already exist
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-body text-center py-4">
+                                <div class="d-flex justify-content-center align-items-center gap-3 flex-wrap">
+                                    <button type="button" id="preview-btn" class="btn btn-outline-success btn-lg px-4">
+                                        <i class="fas fa-search me-2"></i>Quick Preview
+                                        <span class="loading-spinner ms-2">
+                                        <i class="fas fa-spinner fa-spin"></i>
+                                    </span>
+                                    </button>
+
+                                    <button type="button" id="validate-btn" class="btn btn-outline-info btn-lg px-4">
+                                        <i class="fas fa-check-double me-2"></i>Validate Form
+                                    </button>
+
+                                    <button type="submit" class="btn btn-primary btn-lg px-5">
+                                        <i class="fas fa-paper-plane me-2"></i>
+                                        Mark Attendance
+                                        <span class="badge bg-light text-primary ms-2" id="submit-count">0</span>
+                                    </button>
+
+                                    <button type="reset" class="btn btn-outline-secondary btn-lg px-4">
+                                        <i class="fas fa-undo me-2"></i>Reset Form
+                                    </button>
+                                </div>
+
+                                <div class="mt-3">
+                                    <small class="text-muted">
+                                        <i class="fas fa-shield-alt me-1"></i>
+                                        All attendance records will be automatically approved and marked as backend
+                                        regularized
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Attendance Statistics Widget -->
+            <div class="card my-4 stats-widget">
+                <div class="card-header bg-gradient-primary text-white d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-chart-line me-2"></i>
+                        <strong>Attendance Statistics</strong>
+                    </div>
+                    <button type="button" id="refreshStatsBtn" class="btn btn-light btn-sm">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <!-- Date Range Selector -->
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="stats_start_date" class="form-label fw-bold">
+                                <i class="fas fa-calendar me-1"></i>From Date
+                            </label>
+                            <input type="date" class="form-control form-control-sm" id="stats_start_date"
+                                   value="{{ today|date:'Y-m-d' }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="stats_end_date" class="form-label fw-bold">
+                                <i class="fas fa-calendar me-1"></i>To Date
+                            </label>
+                            <input type="date" class="form-control form-control-sm" id="stats_end_date"
+                                   value="{{ today|date:'Y-m-d' }}">
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="button" id="loadStatsBtn" class="btn btn-primary btn-sm w-100">
+                                <i class="fas fa-search me-1"></i>Load Stats
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div id="statsLoading" class="text-center py-4" style="display: none;">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Loading attendance statistics...</p>
+                    </div>
+
+                    <!-- Statistics Display -->
+                    <div id="statsContainer" style="display: none;">
+                        <!-- Date Range Info -->
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Period:</strong> <span id="statsDateRange">-</span>
+                        </div>
+
+                        <!-- Statistics Cards -->
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="stats-card bg-primary text-dark">
+                                    <div class="stats-card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="stats-card-title mb-1">
+                                                    <i class="fas fa-clipboard-list me-2"></i>Total Logs
+                                                </h6>
+                                                <h3 class="stats-number mb-0" id="totalLogsCount">0</h3>
+                                            </div>
+                                            <div class="stats-icon">
+                                                <i class="fas fa-list-ul fa-2x opacity-50"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <div class="stats-card bg-success text-dark">
+                                    <div class="stats-card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="stats-card-title mb-1">
+                                                    <i class="fas fa-check-circle me-2"></i>Present
+                                                </h6>
+                                                <h3 class="stats-number mb-0" id="presentLogsCount">0</h3>
+                                                <small class="opacity-75" id="presentPercentage">0%</small>
+                                            </div>
+                                            <div class="stats-icon">
+                                                <i class="fas fa-user-check fa-2x opacity-50"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-4 mb-3">
+                                <div class="stats-card bg-warning text-dark">
+                                    <div class="stats-card-body">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <h6 class="stats-card-title mb-1">
+                                                    <i class="fas fa-cogs me-2"></i>Backend Regularized
+                                                </h6>
+                                                <h3 class="stats-number mb-0" id="backendRegularizedCount">0</h3>
+                                                <small class="opacity-75" id="backendPercentage">0%</small>
+                                            </div>
+                                            <div class="stats-icon">
+                                                <i class="fas fa-tools fa-2x opacity-50"></i>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Additional Metrics -->
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted mb-2">Attendance Rate</h6>
+                                        <div class="progress mb-2" style="height: 20px;">
+                                            <div id="attendanceProgressBar" class="progress-bar bg-success"
+                                                 role="progressbar"
+                                                 style="width: 0%;" aria-valuenow="0" aria-valuemin="0"
+                                                 aria-valuemax="100">
+                                                <span id="attendanceRateText">0%</span>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">Present vs Total Logs</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card border-0 bg-light">
+                                    <div class="card-body text-center">
+                                        <h6 class="text-muted mb-2">Backend Regularization Rate</h6>
+                                        <div class="progress mb-2" style="height: 20px;">
+                                            <div id="regularizedProgressBar" class="progress-bar bg-warning"
+                                                 role="progressbar"
+                                                 style="width: 0%;" aria-valuenow="0" aria-valuemin="0"
+                                                 aria-valuemax="100">
+                                                <span id="regularizedRateText">0%</span>
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">Regularized vs Total Logs</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Quick Insights -->
+                        <div class="mt-3">
+                            <h6 class="fw-bold mb-2">
+                                <i class="fas fa-lightbulb me-2 text-warning"></i>Quick Insights
+                            </h6>
+                            <div id="insightsContainer">
+                                <!-- Dynamic insights will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error Display -->
+                    <div id="statsError" class="alert alert-danger" style="display: none;">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <span id="statsErrorMessage">Failed to load statistics</span>
+                    </div>
+
+                    <!-- No Data State -->
+                    <div id="noStatsData" class="text-center py-4 text-muted" style="display: none;">
+                        <i class="fas fa-chart-line fa-3x mb-3 opacity-25"></i>
+                        <h6>No Data Available</h6>
+                        <p>No attendance records found for the selected date range.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <!-- Include the reusable JavaScript module -->
+    <script src="{% static 'hrms_app/js/bulk_attendance.js' %}"></script>
+
+    <script>
+        $(document).ready(function () {
+            // Initialize Select2 for better employee selection (if Select2 is available)
+            if ($.fn.select2) {
+                $('#{{ form.employees.id_for_label }}').select2({
+                    placeholder: 'Select employees...',
+                    allowClear: true,
+                    width: '100%'
+                });
+            }
+
+            // Initialize the Bulk Attendance Manager
+            const bulkAttendance = new BulkAttendanceManager({
+                // Form selectors - using Django form field IDs
+                formSelector: '#bulkAttendanceForm',
+                employeeSelectSelector: '#{{ form.employees.id_for_label }}',
+                selectAllSelector: '#{{ form.select_all.id_for_label }}',
+                startDateSelector: '#{{ form.start_date.id_for_label }}',
+                endDateSelector: '#{{ form.end_date.id_for_label }}',
+                startTimeSelector: '#{{ form.start_time.id_for_label }}',
+                endTimeSelector: '#{{ form.end_time.id_for_label }}',
+
+                // Django URLs - use actual URL names from your urls.py
+                attendanceStatsUrl: '{% url "attendance_stats_ajax" %}',
+                attendancePreviewUrl: '{% url "attendance_preview_ajax" %}',
+                employeesAjaxUrl: '{% url "get_employees_ajax" %}',
+
+                // Configuration from Django context
+                totalEmployeeCount: {{ employees.count }},
+                autoSaveInterval: 30000, // 30 seconds
+                autoRefreshStatsInterval: 300000, // 5 minutes
+            });
+
+            // Initialize the manager
+            bulkAttendance.init();
+
+            // Cleanup on page unload
+            $(window).on('beforeunload', function () {
+                bulkAttendance.destroy();
+            });
+        });
+    </script>
+{% endblock %}

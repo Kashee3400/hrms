@@ -1,6 +1,8 @@
 from django.urls import path
-from django.shortcuts import render
-from hrms_app.views import views,api_views,auth_views,report_view,announcement
+from hrms_app.views import views, auth_views, report_view, announcement
+
+from ..views.attendance_view import BulkAttendanceView, AttendancePreviewAjaxView, GetEmployeesAjaxView, \
+    AttendanceStatsAjaxView
 
 
 class CustomSite:
@@ -15,7 +17,8 @@ class CustomSite:
         # sourcery skip: assign-if-exp, boolean-if-exp-identity, reintroduce-else
         if hasattr(view, 'permission_required'):
             permission = view.permission_required
-            if user.has_perm(permission) or user.groups.filter(permissions__codename=permission.split('.')[-1]).exists():
+            if user.has_perm(permission) or user.groups.filter(
+                    permissions__codename=permission.split('.')[-1]).exists():
                 return True
             return False
         return True
@@ -25,6 +28,7 @@ class CustomSite:
             # if not self.has_permission(request.user, view):
             #     return render(request, '403.html', status=403)
             return view.as_view()(request, *args, **kwargs)
+
         return view_wrapper
 
     def get_urls(self):
@@ -36,6 +40,7 @@ class CustomSite:
                 urlpatterns.append(path(url, view))
         return urlpatterns
 
+
 site = CustomSite()
 
 app_name = 'hrms'
@@ -45,7 +50,8 @@ site.register_view('logout/', auth_views.LogoutView, name='logout')
 site.register_view('reset-password/', auth_views.PasswordResetView, name='reset_password')
 site.register_view('reset-password-done/', auth_views.PasswordResetDoneView, name='password_reset_done')
 site.register_view('reset-password-complete/', auth_views.PasswordResetCompleteView, name='password_reset_complete')
-site.register_view('reset-password-confirm/<uidb64>/<token>/', auth_views.PasswordResetConfirmView, name='password_reset_confirm')
+site.register_view('reset-password-confirm/<uidb64>/<token>/', auth_views.PasswordResetConfirmView,
+                   name='password_reset_confirm')
 site.register_view('password-change/', views.ChangePasswordView, name='password_change')
 site.register_view('password-change-done/', auth_views.PasswordChangeDoneView, name='password_change_done')
 site.register_view('leave-tracker/', views.LeaveTrackerView, name='leave_tracker')
@@ -75,8 +81,14 @@ site.register_view('personal-detail-update/<int:pk>/', views.PersonalDetailUpdat
 ######                                Reports URLS                                        #####
 ###############################################################################################
 site.register_view('attendance-report/', report_view.MonthAttendanceReportView, name='attendance_report')
-site.register_view('detailed-attendance-report/', report_view.DetailedMonthlyPresenceView, name='detailed_attendance_report')
+site.register_view('detailed-attendance-report/', report_view.DetailedMonthlyPresenceView,
+                   name='detailed_attendance_report')
 site.register_view('leave-balance-report/', report_view.LeaveBalanceReportView, name='leave_balance_report')
 site.register_view('announcements/', announcement.AnnouncementView, name='announcements')
 site.register_view('announcements/<int:pk>', announcement.AnnouncementView, name='announcement-update')
+site.register_view('bulk-attendance/', BulkAttendanceView, name='bulk_attendance'),
 
+# Ajax endpoints for enhanced functionality
+site.register_view('ajax/employees/', GetEmployeesAjaxView, name='get_employees_ajax'),
+site.register_view('ajax/attendance-preview/', AttendancePreviewAjaxView, name='attendance_preview_ajax'),
+site.register_view('ajax/attendance-stats/', AttendanceStatsAjaxView, name='attendance_stats_ajax'),

@@ -35,8 +35,8 @@ def _unicode_ci_compare(s1, s2):
     2.11.2(B)(2).
     """
     return (
-        unicodedata.normalize("NFKC", s1).casefold()
-        == unicodedata.normalize("NFKC", s2).casefold()
+            unicodedata.normalize("NFKC", s1).casefold()
+            == unicodedata.normalize("NFKC", s2).casefold()
     )
 
 
@@ -170,8 +170,8 @@ class UserCreationForm(BaseUserCreationForm):
         """Reject usernames that differ only in case."""
         username = self.cleaned_data.get("username")
         if (
-            username
-            and self._meta.model.objects.filter(username__iexact=username).exists()
+                username
+                and self._meta.model.objects.filter(username__iexact=username).exists()
         ):
             self._update_errors(
                 ValidationError(
@@ -325,13 +325,13 @@ class PasswordResetForm(forms.Form):
     )
 
     def send_mail(
-        self,
-        subject_template_name,
-        email_template_name,
-        context,
-        from_email,
-        to_email,
-        html_email_template_name=None,
+            self,
+            subject_template_name,
+            email_template_name,
+            context,
+            from_email,
+            to_email,
+            html_email_template_name=None,
     ):
         """
         Send a django.core.mail.EmailMultiAlternatives to `to_email`.
@@ -373,20 +373,20 @@ class PasswordResetForm(forms.Form):
             u
             for u in active_users
             if u.has_usable_password()
-            and _unicode_ci_compare(email, getattr(u, email_field_name))
+               and _unicode_ci_compare(email, getattr(u, email_field_name))
         )
 
     def save(
-        self,
-        domain_override=None,
-        subject_template_name="registration/password_reset_subject.txt",
-        email_template_name="registration/password_reset_email.html",
-        use_https=False,
-        token_generator=default_token_generator,
-        from_email=None,
-        request=None,
-        html_email_template_name=None,
-        extra_email_context=None,
+            self,
+            domain_override=None,
+            subject_template_name="registration/password_reset_subject.txt",
+            email_template_name="registration/password_reset_email.html",
+            use_https=False,
+            token_generator=default_token_generator,
+            from_email=None,
+            request=None,
+            html_email_template_name=None,
+            extra_email_context=None,
     ):
         """
         Generate a one-use only link for resetting password and send it to the
@@ -572,7 +572,6 @@ from datetime import datetime, timedelta
 
 
 class SetPasswordForm(forms.Form):
-
     error_messages = {
         "password_mismatch": _("The two password fields didn’t match."),
     }
@@ -750,10 +749,10 @@ class TourForm(forms.ModelForm):
             if start_date > end_date:
                 raise ValidationError(_("End date must be after start date."))
             if (
-                start_date == end_date
-                and start_time
-                and end_time
-                and start_time >= end_time
+                    start_date == end_date
+                    and start_time
+                    and end_time
+                    and start_time >= end_time
             ):
                 raise ValidationError(
                     _("End time must be after start time on the same day.")
@@ -777,7 +776,6 @@ class BillForm(forms.ModelForm):
 
 
 class LeaveTypeForm(forms.ModelForm):
-
     class Meta:
         model = LeaveType
         fields = [
@@ -929,10 +927,10 @@ class LeaveApplicationForm(forms.ModelForm):
             self.add_error("reason", _("Reason is required."))
 
         if (
-            leaveTypeId
-            and leaveTypeId.leave_type_short_code == "SL"
-            and usedLeave
-            and int(usedLeave) > 3
+                leaveTypeId
+                and leaveTypeId.leave_type_short_code == "SL"
+                and usedLeave
+                and int(usedLeave) > 3
         ):
             if not attachment:
                 self.add_error(
@@ -965,7 +963,6 @@ class LeaveApplicationForm(forms.ModelForm):
 
 
 class HolidayForm(forms.ModelForm):
-
     class Meta:
         model = Holiday
         fields = "__all__"
@@ -1111,7 +1108,7 @@ class LeaveStatusUpdateForm(forms.ModelForm):
         is_rm = hasattr(user, "employees") and user.employees.exists()
         is_lwp = current_status.leave_type.leave_type_short_code == "LWP"
         is_admin_dept = (
-            user.personal_detail.designation.department.department == "admin"
+                user.personal_detail.designation.department.department == "admin"
         )
         print(is_admin_dept, is_lwp)
         # Case: Employee
@@ -1125,10 +1122,10 @@ class LeaveStatusUpdateForm(forms.ModelForm):
             ]
         if is_admin_dept and is_lwp:
             return [
-                    (status, label)
-                    for status, label in all_choices
-                    if status in [settings.APPROVED, settings.REJECTED]
-                ]
+                (status, label)
+                for status, label in all_choices
+                if status in [settings.APPROVED, settings.REJECTED]
+            ]
         # Case: Reporting Manager
         if is_rm:
             if not is_admin_dept and is_lwp:
@@ -1143,7 +1140,7 @@ class LeaveStatusUpdateForm(forms.ModelForm):
                     for status, label in all_choices
                     if status == settings.CANCELLED
                 ]
-            
+
             else:
                 return [
                     (status, label)
@@ -1153,6 +1150,7 @@ class LeaveStatusUpdateForm(forms.ModelForm):
 
         # Fallback to default
         return all_choices
+
 
 class TourStatusUpdateForm(forms.ModelForm):
     reason = forms.CharField(
@@ -1215,7 +1213,7 @@ class TourStatusUpdateForm(forms.ModelForm):
                     choice
                     for choice in settings.TOUR_STATUS_CHOICES
                     if choice[0]
-                    in [settings.APPROVED, settings.REJECTED, settings.CANCELLED]
+                       in [settings.APPROVED, settings.REJECTED, settings.CANCELLED]
                 ]
             else:
                 if current_status.status in [settings.CANCELLED, settings.REJECTED]:
@@ -1229,10 +1227,10 @@ class TourStatusUpdateForm(forms.ModelForm):
                         choice
                         for choice in settings.TOUR_STATUS_CHOICES
                         if choice[0]
-                        in [
-                            settings.EXTENDED,
-                            settings.PENDING_CANCELLATION,
-                        ]
+                           in [
+                               settings.EXTENDED,
+                               settings.PENDING_CANCELLATION,
+                           ]
                     ]
             self.fields["status"].widget = forms.Select(
                 choices=filtered_choices,
@@ -1819,7 +1817,6 @@ class AttendanceLogActionForm(forms.Form):
 
 
 class PopulateAttendanceForm(forms.Form):
-
     user = forms.ModelChoiceField(
         queryset=User.objects.all(),
         label=_("User"),
@@ -2120,7 +2117,7 @@ class LeaveBalanceForm(forms.Form):
 
         # Ensure at least one balance field is provided
         if not any(
-            [opening_balance, closing_balance, no_of_leaves, remaining_leave_balances]
+                [opening_balance, closing_balance, no_of_leaves, remaining_leave_balances]
         ):
             raise forms.ValidationError(
                 _(
@@ -2134,7 +2131,6 @@ from django import forms
 
 
 class HRAnnouncementAdminForm(forms.ModelForm):
-
     class Meta:
         model = HRAnnouncement
         fields = [
@@ -2197,7 +2193,6 @@ class HRAnnouncementAdminForm(forms.ModelForm):
 
 
 class AttendanceAggregationForm(forms.Form):
-
     start_date = forms.DateField(
         label=_("From Date"),
         required=True,
@@ -2255,3 +2250,176 @@ class MonthRangeForm(forms.Form):
             attrs={"class": "form-control"},
         ),
     )
+
+
+class BulkAttendanceForm(forms.Form):
+    """
+    Form for bulk attendance marking
+    """
+    start_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'required': True
+        }),
+        label='Start Date',
+        initial=timezone.now().date(),
+        help_text='Select the start date for attendance'
+    )
+
+    end_date = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control',
+            'required': True
+        }),
+        label='End Date',
+        initial=timezone.now().date(),
+        help_text='Select the end date for attendance'
+    )
+
+    start_time = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            'type': 'time',
+            'class': 'form-control',
+            'required': True
+        }),
+        label='Start Time',
+        initial='09:30',
+        help_text='Select the start time for attendance'
+    )
+
+    end_time = forms.TimeField(
+        widget=forms.TimeInput(attrs={
+            'type': 'time',
+            'class': 'form-control',
+            'required': True
+        }),
+        label='End Time',
+        initial='17:30',
+        help_text='Select the end time for attendance'
+    )
+
+    employees = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(is_active=True).order_by('first_name', 'last_name'),
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-select',
+            'multiple': True,
+            'data-placeholder': 'Choose employees...'
+        }),
+        label='Select Employees',
+        required=False,
+        help_text='Select specific employees (leave empty if selecting all)'
+    )
+
+    select_all = forms.BooleanField(
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input'
+        }),
+        label='Select All Employees',
+        required=False,
+        help_text='Check to select all active employees'
+    )
+
+    title_prefix = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Bulk Attendance'
+        }),
+        label='Title Prefix',
+        initial='Bulk Attendance',
+        help_text='Prefix for attendance log titles'
+    )
+
+    reason = forms.CharField(
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Bulk attendance marking'
+        }),
+        label='Reason',
+        initial='Bulk attendance marking',
+        help_text='Reason for marking attendance'
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+        employees = cleaned_data.get('employees')
+        select_all = cleaned_data.get('select_all')
+
+        # Validate date range
+        if start_date and end_date:
+            if start_date > end_date:
+                raise ValidationError('End date must be after or equal to start date.')
+
+        # Validate datetime combination
+        if start_date and end_date and start_time and end_time:
+            start_datetime = datetime.combine(start_date, start_time)
+            end_datetime = datetime.combine(end_date, end_time)
+
+            if start_datetime >= end_datetime:
+                raise ValidationError('End date/time must be after start date/time.')
+
+            # Check if duration is reasonable (not more than 24 hours per day)
+            duration = end_datetime - start_datetime
+            max_duration = timedelta(days=(end_date - start_date).days + 1)
+
+            if duration > max_duration:
+                raise ValidationError('Duration cannot exceed 24 hours per day.')
+
+        # Validate employee selection
+        if not select_all and not employees:
+            raise ValidationError('Please select at least one employee or check "Select All".')
+
+        # Validate future dates (optional - remove if you want to allow future dates)
+        today = timezone.now().date()
+        if start_date and start_date > today:
+            raise ValidationError('Start date cannot be in the future.')
+
+        return cleaned_data
+
+    def get_selected_employees(self):
+        """
+        Returns the selected employees based on form data
+        """
+        if self.cleaned_data.get('select_all'):
+            return User.objects.filter(is_active=True)
+        else:
+            return self.cleaned_data.get('employees', User.objects.none())
+
+    def get_duration(self):
+        """
+        Calculate and return the duration between start and end datetime
+        """
+        start_date = self.cleaned_data.get('start_date')
+        end_date = self.cleaned_data.get('end_date')
+        start_time = self.cleaned_data.get('start_time')
+        end_time = self.cleaned_data.get('end_time')
+
+        if all([start_date, end_date, start_time, end_time]):
+            start_datetime = datetime.combine(start_date, start_time)
+            end_datetime = datetime.combine(end_date, end_time)
+            return end_datetime - start_datetime
+
+        return timedelta(0)
+
+    def get_duration_as_time(self):
+        """
+        Return duration as time object for storing in TimeField
+        """
+        duration = self.get_duration()
+        total_seconds = int(duration.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+
+        # Cap at 23:59 for TimeField compatibility
+        if hours >= 24:
+            hours = 23
+            minutes = 59
+
+        return datetime.min.time().replace(hour=hours, minute=minutes)
