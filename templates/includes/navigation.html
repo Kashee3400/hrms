@@ -84,8 +84,12 @@
             <li class="nav-separator">|</li>
             {% if request.user.is_superuser %}
             {% url 'dashboard' as index_url %}
+            {% url 'bulk-attendance' as bulk_url %}
             <li class="nav-item {% if request.path == index_url %} active {% endif %}">
               <a class="nav-link text-white" href="{{ index_url }}">{% trans 'Admin Dashboard' %}</a>
+            </li>
+            <li class="nav-item {% if request.path == bulk_url %} active {% endif %}">
+              <a class="nav-link text-white" href="{{ bulk_url }}">{% trans 'Bulk Attendance' %}</a>
             </li>
             <li class="nav-separator">|</li>
             {% endif %}
