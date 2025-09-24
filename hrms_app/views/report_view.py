@@ -81,6 +81,8 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             )
             context["attendance_data"] = attendance_data
             context["employees"] = employees
+            context['from_date']=converted_to_datetime
+            
         else:
             context["error"] = "Please select a location and date range."
         context["form"] = form
@@ -174,7 +176,6 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
             response["Content-Disposition"] = f"attachment; filename={filename}"
             return response
 
-from django.core.cache import cache
 
 class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/leave_balance_report.html"

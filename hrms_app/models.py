@@ -7,7 +7,7 @@ import random
 import string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.db import transaction, IntegrityError
+from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta,time
 import uuid
@@ -3199,3 +3199,312 @@ class OfficeClosure(models.Model):
             return closure.is_closed_after_time(current_time) if current_time else True
         except cls.DoesNotExist:
             return False
+
+
+from django.db import models
+from django.core.validators import RegexValidator
+from django.utils import timezone
+
+
+class AttendanceCache(models.Model):
+    """
+    Pre-calculated attendance data cache for faster retrieval.
+    
+    This model stores processed attendance data to improve query performance
+    for dashboard views and reporting functionality.
+    """
+    
+    # Color hex validator
+    hex_color_validator = RegexValidator(
+        regex=r'^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$',
+        message='Enter a valid hex color code (e.g., #FF0000 or #F00)'
+    )
+    
+    employee = models.ForeignKey(
+        'CustomUser',
+        on_delete=models.CASCADE,
+        db_index=True,
+        verbose_name="Employee",
+        help_text="The employee this attendance record belongs to",
+        related_name="attendance_cache"
+    )
+    
+    date = models.DateField(
+        db_index=True,
+        verbose_name="Date",
+        help_text="The date for this attendance record"
+    )
+    
+    status = models.CharField(
+        max_length=10,
+        verbose_name="Attendance Status",
+        help_text="Current attendance status (present, absent, late, etc.)",
+        db_index=True
+    )
+    
+    color_hex = models.CharField(
+        max_length=7,
+        default="#000000",
+        validators=[hex_color_validator],
+        verbose_name="Status Color",
+        help_text="Hex color code for UI display of this status"
+    )
+    
+    # Additional metadata for flexibility
+    metadata = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Additional Metadata",
+        help_text="Extra data stored as JSON for future extensions"
+    )
+    
+    # Tracking fields
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Created At",
+        help_text="When this cache record was first created"
+    )
+    
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Updated At",
+        help_text="When this cache record was last modified"
+    )
+
+    class Meta:
+        verbose_name = "Attendance Cache"
+        verbose_name_plural = "Attendance Caches"
+        
+        # Database constraints
+        constraints = [
+            models.UniqueConstraint(
+                fields=['employee', 'date'],
+                name='unique_employee_date_attendance'
+            ),
+        ]
+        
+        # Optimized indexes for common query patterns
+        indexes = [
+            # Primary lookup pattern: employee + date range
+            models.Index(
+                fields=['employee', 'date'], 
+                name='idx_attendance_emp_date'
+            ),
+            # Date range queries for reporting
+            models.Index(
+                fields=['date'], 
+                name='idx_attendance_date'
+            ),
+            # Status filtering
+            models.Index(
+                fields=['status'], 
+                name='idx_attendance_status'
+            ),
+            # Recent records lookup
+            models.Index(
+                fields=['created_at'], 
+                name='idx_attendance_created'
+            ),
+            # Combined status + date for dashboard queries
+            models.Index(
+                fields=['status', 'date'], 
+                name='idx_attendance_status_date'
+            ),
+        ]
+        
+        # Default ordering
+        ordering = ['-date', 'employee__username']
+        
+        # Database table name
+        db_table = 'attendance_cache'
+    
+    def __str__(self):
+        return f"{self.employee.get_full_name() or self.employee.username} - {self.date} - {self.status}"
+    
+    def __repr__(self):
+        return f"<AttendanceCache: {self.employee_id} on {self.date}>"
+
+
+class AttendanceCacheLog(models.Model):
+    """
+    Track attendance cache processing logs and system operations.
+    
+    This model maintains an audit trail of all cache processing operations
+    including performance metrics and error tracking.
+    """
+    
+    PROCESS_TYPES = [
+        ('daily', 'Daily Processing'),
+        ('monthly', 'Monthly Recalculation'),
+        ('manual', 'Manual Trigger'),
+        ('correction', 'Data Correction'),
+        ('bulk_import', 'Bulk Import'),
+        ('system_sync', 'System Synchronization'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('processing', 'Processing'),
+        ('completed', 'Completed'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    
+    process_type = models.CharField(
+        max_length=20,
+        choices=PROCESS_TYPES,
+        verbose_name="Process Type",
+        help_text="Type of cache processing operation",
+        db_index=True
+    )
+    
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default='pending',
+        verbose_name="Processing Status",
+        help_text="Current status of the processing operation",
+        db_index=True
+    )
+    
+    start_date = models.DateField(
+        verbose_name="Start Date",
+        help_text="Beginning date of the processing period"
+    )
+    
+    end_date = models.DateField(
+        verbose_name="End Date",
+        help_text="End date of the processing period"
+    )
+    
+    # Processing metrics
+    employees_processed = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Employees Processed",
+        help_text="Total number of employees processed in this operation"
+    )
+    
+    records_created = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Records Created",
+        help_text="Number of new cache records created"
+    )
+    
+    records_updated = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Records Updated",
+        help_text="Number of existing cache records updated"
+    )
+    
+    processing_time_seconds = models.FloatField(
+        null=True,
+        blank=True,
+        verbose_name="Processing Time (seconds)",
+        help_text="Total time taken for processing in seconds"
+    )
+    
+    # Error tracking
+    error_message = models.TextField(
+        blank=True,
+        verbose_name="Error Message",
+        help_text="Detailed error message if processing failed"
+    )
+    
+    error_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Error Count",
+        help_text="Number of errors encountered during processing"
+    )
+    
+    # Additional context
+    triggered_by = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Triggered By",
+        help_text="User or system that initiated this process"
+    )
+    
+    notes = models.TextField(
+        blank=True,
+        verbose_name="Processing Notes",
+        help_text="Additional notes or context about this processing run"
+    )
+    
+    # Timestamps
+    started_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Started At",
+        help_text="When this processing operation began"
+    )
+    
+    completed_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Completed At",
+        help_text="When this processing operation finished"
+    )
+
+    class Meta:
+        verbose_name = "Attendance Cache Log"
+        verbose_name_plural = "Attendance Cache Logs"
+        
+        # Optimized indexes for common queries
+        indexes = [
+            # Status monitoring queries
+            models.Index(
+                fields=['status', 'started_at'], 
+                name='idx_cache_log_status_started'
+            ),
+            # Process type analysis
+            models.Index(
+                fields=['process_type', 'status'], 
+                name='idx_cache_log_type_status'
+            ),
+            # Date range processing history
+            models.Index(
+                fields=['start_date', 'end_date'], 
+                name='idx_cache_log_date_range'
+            ),
+            # Performance monitoring
+            models.Index(
+                fields=['processing_time_seconds'], 
+                name='idx_cache_log_processing_time'
+            ),
+            # Recent activity lookup
+            models.Index(
+                fields=['started_at'], 
+                name='idx_cache_log_started'
+            ),
+        ]
+        
+        # Default ordering - most recent first
+        ordering = ['-started_at']
+        
+        # Database table name
+        db_table = 'attendance_cache_log'
+    
+    def __str__(self):
+        return f"{self.get_process_type_display()} - {self.get_status_display()} ({self.started_at.date()})"
+    
+    def __repr__(self):
+        return f"<AttendanceCacheLog: {self.process_type} {self.status}>"
+    
+    @property
+    def duration(self):
+        """Calculate processing duration if completed."""
+        if self.completed_at and self.started_at:
+            return self.completed_at - self.started_at
+        return None
+    
+    @property
+    def is_completed(self):
+        """Check if processing is completed (success or failure)."""
+        return self.status in ['completed', 'failed', 'cancelled']
+    
+    @property
+    def success_rate(self):
+        """Calculate success rate based on records processed vs errors."""
+        total_records = self.records_created + self.records_updated
+        if total_records == 0:
+            return 0
+        return ((total_records - self.error_count) / total_records) * 100

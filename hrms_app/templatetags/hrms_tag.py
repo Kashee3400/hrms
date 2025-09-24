@@ -310,52 +310,204 @@ def user_summary_counts(context):
         "request": request,
     }
 
-
 @register.simple_tag
 def get_item(attendance_data, employee_id, date):
     """
     Get the attendance details (status and color) for a specific day from the provided attendance data,
     considering the statuses of the previous and next days.
+    
+    Logic:
+    - If current status is "OFF" or "FL" and it falls between:
+      - A and A (Absent-OFF-Absent) -> Mark as A
+      - A and P (Absent-OFF-Present) -> Mark as A  
+      - P and A (Present-OFF-Absent) -> Mark as A
+    - Otherwise return the original status
+    
+    Args:
+        attendance_data (dict): Dictionary containing attendance data
+        employee_id: ID of the employee
+        date: Date object for the current day
+        
+    Returns:
+        list: List containing status and color information
     """
-    from datetime import timedelta
-
-    # Fetch attendance for the current, previous, and next dates
-    employee_attendance = attendance_data.get(employee_id, {})
-    current_entries = employee_attendance.get(date.date(), [])
-    prev_date = date.date() - timedelta(days=1)
-    next_date = date.date() + timedelta(days=1)
-    prev_entries = employee_attendance.get(prev_date, [])
-    next_entries = employee_attendance.get(next_date, [])
-
-    # Ensure we handle `next_entries` as a list or compatible iterable
-    if isinstance(next_entries, list) and next_entries:
-        next_status = next_entries[-1].get("status", "A")
-    else:
-        next_status = "A"
-
-    # Ensure we handle `prev_entries` and `current_entries` similarly
-    if isinstance(prev_entries, list) and prev_entries:
-        prev_status = prev_entries[-1].get("status", "A")
-    else:
-        prev_status = "A"
-
-    if isinstance(current_entries, list) and current_entries:
-        current_status = current_entries[-1].get("status", "A")
-    else:
-        current_status = "A"
-
-    # Logic: If previous and next statuses are "A", and current status is "OFF" or "FL", mark current as "A"
-    if prev_status == "A" and next_status == "A" and current_status in ["OFF", "FL"]:
-        return [{"status": "A", "color": "#FF0000"}]
-    else:
-        # Return the current status or default to "A"
-        return (
-            current_entries
-            if current_entries
-            else [{"status": "A", "color": "#FF0000"}]
+    
+    def safe_get_status(entries, default_status="A", default_color="#FF0000"):
+        """
+        Safely extract status from attendance entries with proper fallback.
+        
+        Args:
+            entries: Attendance entries (could be list, dict, or None)
+            default_status: Default status if none found
+            default_color: Default color if none found
+            
+        Returns:
+            tuple: (status, color, full_entry)
+        """
+        if not entries:
+            return default_status, default_color, {"status": default_status, "color": default_color}
+        
+        # Handle different data structures
+        if isinstance(entries, list):
+            if entries:
+                # Get the last entry (most recent for the day)
+                entry = entries[-1]
+                if isinstance(entry, dict):
+                    status = entry.get("status", default_status)
+                    color = entry.get("color", default_color)
+                    return status, color, entry
+        elif isinstance(entries, dict):
+            # If entries is a single dict
+            status = entries.get("status", default_status)
+            color = entries.get("color", default_color)
+            return status, color, entries
+        
+        # Fallback
+        return default_status, default_color, {"status": default_status, "color": default_color}
+    
+    try:
+        # Safely get employee attendance data
+        employee_attendance = attendance_data.get(employee_id, {}) if attendance_data else {}
+        
+        # Calculate dates
+        current_date = date.date() if hasattr(date, 'date') else date
+        prev_date = current_date - timedelta(days=1)
+        next_date = current_date + timedelta(days=1)
+        
+        # Get attendance entries for all three days
+        current_entries = employee_attendance.get(current_date, [])
+        prev_entries = employee_attendance.get(prev_date, [])
+        next_entries = employee_attendance.get(next_date, [])
+        
+        # Extract statuses safely
+        current_status, current_color, current_entry = safe_get_status(current_entries)
+        prev_status, _, _ = safe_get_status(prev_entries)
+        next_status, _, _ = safe_get_status(next_entries)
+        
+        # Enhanced logic: Check if current status should be converted to "A"
+        should_convert_to_absent = (
+            current_status in ["OFF", "FL"] and
+            (
+                # Case 1: A-OFF-A (Absent-OFF-Absent)
+                (prev_status == "A" and next_status == "A") or
+                
+                # Case 2: A-OFF-P (Absent-OFF-Present) 
+                (prev_status == "A" and next_status == "P") or
+                
+                # Case 3: P-OFF-A (Present-OFF-Absent)
+                (prev_status == "P" and next_status == "A")
+                
+                # Add more patterns as needed:
+                # (prev_status == "P" and next_status == "P")  # P-OFF-P -> A
+            )
         )
+        
+        if should_convert_to_absent:
+            # Convert to Absent status
+            return [{"status": "A", "color": "#FF0000"}]
+        else:
+            # Return original entries or default
+            if current_entries:
+                # Ensure we return a list format
+                if isinstance(current_entries, list):
+                    return current_entries
+                else:
+                    return [current_entries]
+            else:
+                # Default to Absent if no entries found
+                return [{"status": "A", "color": "#FF0000"}]
+                
+    except (AttributeError, TypeError, KeyError) as e:
+        # Log the error if you have logging configured
+        # logger.error(f"Error in get_item template tag: {e}")
+        
+        # Return safe fallback
+        return [{"status": "A", "color": "#FF0000"}]
 
 
+@register.simple_tag  
+def get_item_with_context(attendance_data, employee_id, date, conversion_rules=None):
+    """
+    Extended version with configurable conversion rules.
+    
+    Args:
+        attendance_data (dict): Dictionary containing attendance data
+        employee_id: ID of the employee  
+        date: Date object for the current day
+        conversion_rules (dict): Custom rules for status conversion
+        
+    Example conversion_rules:
+    {
+        "OFF": {
+            ("A", "A"): "A",  # A-OFF-A -> A
+            ("A", "P"): "A",  # A-OFF-P -> A  
+            ("P", "A"): "A",  # P-OFF-A -> A
+            ("P", "P"): "P",  # P-OFF-P -> P
+        },
+        "FL": {
+            ("A", "A"): "A",  # A-FL-A -> A
+            ("A", "P"): "A",  # A-FL-P -> A
+        }
+    }
+    """
+    
+    # Default conversion rules
+    default_rules = {
+        "OFF": {
+            ("A", "A"): "A",  # Absent-OFF-Absent -> Absent
+            ("A", "P"): "A",  # Absent-OFF-Present -> Absent  
+            ("P", "A"): "A",  # Present-OFF-Absent -> Absent
+        },
+        "FL": {
+            ("A", "A"): "A",  # Absent-FL-Absent -> Absent
+            ("A", "P"): "A",  # Absent-FL-Present -> Absent
+            ("P", "A"): "A",  # Present-FL-Absent -> Absent
+        }
+    }
+    
+    # Use provided rules or defaults
+    rules = conversion_rules or default_rules
+    
+    def safe_get_status(entries, default_status="A"):
+        if not entries:
+            return default_status
+        if isinstance(entries, list) and entries:
+            return entries[-1].get("status", default_status) if isinstance(entries[-1], dict) else default_status
+        elif isinstance(entries, dict):
+            return entries.get("status", default_status)
+        return default_status
+    
+    try:
+        employee_attendance = attendance_data.get(employee_id, {}) if attendance_data else {}
+        
+        current_date = date.date() if hasattr(date, 'date') else date
+        prev_date = current_date - timedelta(days=1)
+        next_date = current_date + timedelta(days=1)
+        
+        current_entries = employee_attendance.get(current_date, [])
+        prev_entries = employee_attendance.get(prev_date, []) 
+        next_entries = employee_attendance.get(next_date, [])
+        
+        current_status = safe_get_status(current_entries)
+        prev_status = safe_get_status(prev_entries)
+        next_status = safe_get_status(next_entries)
+        
+        # Check if current status has conversion rules
+        if current_status in rules:
+            status_rules = rules[current_status]
+            pattern = (prev_status, next_status)
+            
+            if pattern in status_rules:
+                new_status = status_rules[pattern]
+                color = "#FF0000" if new_status == "A" else "#00FF00"
+                return [{"status": new_status, "color": color}]
+        
+        # Return original or default
+        return current_entries if current_entries else [{"status": "A", "color": "#FF0000"}]
+        
+    except Exception as e:
+        return [{"status": "A", "color": "#FF0000"}]
+    
 @register.filter
 def add_opacity(hex_color, opacity=0.5):
     """

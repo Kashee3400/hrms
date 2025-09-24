@@ -102,8 +102,8 @@ class BulkAttendanceView(LoginRequiredMixin, View):
                                 att_status_short_code='P',
                                 status=getattr(settings, 'APPROVED', 'approved'),
                                 reason=reason,
-                                is_submitted=True,
-                                regularized_backend=True,
+                                is_submitted=False,
+                                regularized_backend=False,
                                 color_hex='#28a745',
                             )
 

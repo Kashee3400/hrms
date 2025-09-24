@@ -3,18 +3,22 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.urls import reverse
 from celery import shared_task
-from django.core.mail import EmailMessage
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.mail import EmailMultiAlternatives
 import base64
-from decouple import config
 import os
 import subprocess
 import logging
 from django.utils.timezone import now, localtime
 from decouple import config
 from webpush import send_user_notification
+from django.utils import timezone
+from datetime import timedelta, date
+from .services import AttendanceCacheService
+import logging
+
+logger = logging.getLogger(__name__)
 
 DEBUG = config('DEBUG', default=False, cast=bool)
 USER = get_user_model()
@@ -449,3 +453,51 @@ def send_announcement_email_task(announcement_id, created):
         send_mass_mail([(subject, message, None, recipient_emails)], fail_silently=True)
     except HRAnnouncement.DoesNotExist:
         pass
+
+
+
+@shared_task(bind=True, max_retries=3)
+def calculate_daily_attendance_cache(self, days_back=1):
+    """
+    Daily task to calculate attendance cache
+    """
+    try:
+        end_date = date.today() - timedelta(days=1)  # Yesterday
+        start_date = end_date - timedelta(days=days_back - 1)
+        
+        result = AttendanceCacheService.calculate_and_store_attendance(
+            start_date=start_date,
+            end_date=end_date
+        )
+        
+        logger.info(f"Daily attendance cache completed: {result}")
+        return result
+        
+    except Exception as exc:
+        logger.error(f"Daily attendance cache failed: {str(exc)}")
+        raise self.retry(exc=exc, countdown=60 * 5)  # Retry after 5 minutes
+
+@shared_task
+def recalculate_monthly_attendance_cache(year, month):
+    """
+    Monthly task to recalculate entire month's attendance
+    """
+    try:
+        from calendar import monthrange
+        
+        start_date = date(year, month, 1)
+        _, last_day = monthrange(year, month)
+        end_date = date(year, month, last_day)
+        
+        result = AttendanceCacheService.calculate_and_store_attendance(
+            start_date=start_date,
+            end_date=end_date,
+            force_update=True
+        )
+        
+        logger.info(f"Monthly attendance cache recalculation completed: {result}")
+        return result
+        
+    except Exception as exc:
+        logger.error(f"Monthly attendance cache recalculation failed: {str(exc)}")
+        raise

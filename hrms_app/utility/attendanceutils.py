@@ -85,6 +85,7 @@ def get_month_start_end():
 
     return start_date, end_date
 
+
 # def map_attendance_data(
 #     attendance_logs,
 #     leave_logs,
@@ -109,6 +110,9 @@ def get_month_start_end():
 #         }
 #         for holiday in holidays
 #     }
+
+#     # Keep track of which employees have tours on which dates
+#     employee_tour_dates = defaultdict(set)
 
 #     # Process attendance logs
 #     for log in attendance_logs:
@@ -143,12 +147,15 @@ def get_month_start_end():
 #                     "color": "#06c1c4",
 #                 }
 #             ]
-#             holiday_days.pop(date, None)
+#             # Track that this employee has a tour on this date
+#             employee_tour_dates[employee_id].add(date)
 
-#     # Add holidays to attendance data
+#     # Add holidays to attendance data (but skip dates where employee has tour)
 #     for employee_id, employee_data in attendance_data.items():
 #         for holiday_date, holiday_info in holiday_days.items():
-#             employee_data[holiday_date] = [holiday_info]
+#             # Only add holiday if this employee doesn't have a tour on this date
+#             if holiday_date not in employee_tour_dates[employee_id]:
+#                 employee_data[holiday_date] = [holiday_info]
 
 #     # Process leave logs
 #     for log in leave_logs:
@@ -158,7 +165,6 @@ def get_month_start_end():
 #         leave_status = leave_type.leave_type_short_code
 #         half_status = leave_type.half_day_short_code
 
-#         # Handle "CL" leave type
 #         # Handle "CL" leave type
 #         if leave_status == "CL":
 #             if log_date in holiday_days:
@@ -355,7 +361,7 @@ def map_attendance_data(
                 }
             ]
 
-    # Add "OFF" status for Sundays without any entries
+    # Add "OFF" status for Sundays without any entries (initially)
     for employee_id in attendance_data.keys():
         for sunday in sundays:
             if not attendance_data[employee_id][sunday.date()]:
@@ -366,7 +372,154 @@ def map_attendance_data(
                     }
                 ]
 
+    # Apply smart Sunday logic - replace OFF with A when person is regularly absent
+    _apply_smart_sunday_logic(attendance_data, start_date_object, end_date_object)
+
     return attendance_data
+
+
+def _apply_smart_sunday_logic(attendance_data, start_date_object, end_date_object):
+    """
+    Apply smart Sunday logic:
+    - Keep OFF only when Sunday falls between working days (P, tours, leaves)
+    - Replace OFF with A when person is regularly absent
+    """
+    
+    def _get_status_for_date(employee_data, date):
+        """Get the primary status for a given date"""
+        if date not in employee_data or not employee_data[date]:
+            return "A"  # No entry means absent
+        
+        status = employee_data[date][0].get("status", "A")
+        return status if status else "A"
+    
+    def _is_working_status(status):
+        """Check if status indicates person was working/present"""
+        working_statuses = {"P", "L", "CL", "SL", "ML", "EL", "FL", "H", "T"}  # Add your leave codes
+        return status in working_statuses
+    
+    def _is_absent_status(status):
+        """Check if status indicates absence"""
+        absent_statuses = {"A", "LWP", "AWOL"}  # Add your absent status codes
+        return status in absent_statuses
+    
+    # Process each employee
+    for employee_id, employee_data in attendance_data.items():
+        # Get all dates in chronological order
+        current_date = start_date_object
+        
+        while current_date <= end_date_object:
+            # Check if current date is Sunday and has OFF status
+            if (current_date.weekday() == 6 and 
+                current_date in employee_data and 
+                _get_status_for_date(employee_data, current_date) == "OFF"):
+                
+                # Find previous working day status
+                prev_working_status = None
+                check_date = current_date - timedelta(days=1)
+                days_checked = 0
+                
+                while check_date >= start_date_object and days_checked < 7:  # Look back max 7 days
+                    if check_date.weekday() != 6:  # Skip other Sundays
+                        status = _get_status_for_date(employee_data, check_date)
+                        if status != "OFF":  # Found a non-Sunday status
+                            prev_working_status = status
+                            break
+                    check_date -= timedelta(days=1)
+                    days_checked += 1
+                
+                # Find next working day status
+                next_working_status = None
+                check_date = current_date + timedelta(days=1)
+                days_checked = 0
+                
+                while check_date <= end_date_object and days_checked < 7:  # Look ahead max 7 days
+                    if check_date.weekday() != 6:  # Skip other Sundays
+                        status = _get_status_for_date(employee_data, check_date)
+                        if status != "OFF":  # Found a non-Sunday status
+                            next_working_status = status
+                            break
+                    check_date += timedelta(days=1)
+                    days_checked += 1
+                
+                # Apply the logic
+                should_change_to_absent = False
+                
+                # Case 1: Both previous and next are absent
+                if (prev_working_status and next_working_status and 
+                    _is_absent_status(prev_working_status) and _is_absent_status(next_working_status)):
+                    should_change_to_absent = True
+                
+                # Case 2: Previous is absent and next is working (or no next)
+                elif (prev_working_status and _is_absent_status(prev_working_status) and 
+                      (not next_working_status or _is_working_status(next_working_status))):
+                    should_change_to_absent = True
+                
+                # Case 3: Previous is working and next is absent (or no previous)  
+                elif (next_working_status and _is_absent_status(next_working_status) and 
+                      (not prev_working_status or _is_working_status(prev_working_status))):
+                    should_change_to_absent = True
+                
+                # Case 4: Only one side has data and it's absent
+                elif ((prev_working_status and not next_working_status and _is_absent_status(prev_working_status)) or
+                      (next_working_status and not prev_working_status and _is_absent_status(next_working_status))):
+                    should_change_to_absent = True
+                
+                # Case 5: Check for continuous absence pattern (more comprehensive)
+                elif _is_continuous_absence_pattern(employee_data, current_date, start_date_object, end_date_object):
+                    should_change_to_absent = True
+                
+                # Change Sunday from OFF to A if conditions met
+                if should_change_to_absent:
+                    employee_data[current_date] = [
+                        {
+                            "status": "A",
+                            "color": "#FF0000",  # Red color for absent
+                        }
+                    ]
+            
+            current_date += timedelta(days=1)
+
+
+def _is_continuous_absence_pattern(employee_data, sunday_date, start_date_object, end_date_object):
+    """
+    Check if Sunday falls within a continuous absence pattern
+    Returns True if there are more absent days than working days in the surrounding week
+    """
+    
+    def _get_status_for_date(date):
+        if date not in employee_data or not employee_data[date]:
+            return "A"
+        status = employee_data[date][0].get("status", "A")
+        return status if status else "A"
+    
+    def _is_absent_status(status):
+        absent_statuses = {"A", "LWP", "AWOL"}
+        return status in absent_statuses
+    
+    # Check 3 days before and 3 days after Sunday (excluding other Sundays)
+    absent_count = 0
+    working_count = 0
+    
+    for i in range(-3, 4):  # -3 to +3 days around Sunday
+        check_date = sunday_date + timedelta(days=i)
+        
+        # Skip the Sunday itself and other Sundays, and dates outside range
+        if (check_date == sunday_date or 
+            check_date.weekday() == 6 or
+            check_date < start_date_object or 
+            check_date > end_date_object):
+            continue
+            
+        status = _get_status_for_date(check_date)
+        
+        if _is_absent_status(status):
+            absent_count += 1
+        elif status not in ["OFF"]:  # Count non-OFF statuses as working
+            working_count += 1
+    
+    # If more absent days than working days, consider it continuous absence
+    return absent_count > working_count and absent_count >= 2
 
 def aggregate_attendance_data(
     employee_ids,
@@ -525,7 +678,7 @@ def get_attendance_logs(employee_ids, start_date, end_date):
     )
 
 
-def get_leave_logs(employee_ids, start_date, end_date):
+def get_leave_logs(employee_ids, start_date=None, end_date=None):
     return LeaveDay.objects.filter(
         leave_application__appliedBy_id__in=employee_ids,
         date__range=[start_date, end_date],

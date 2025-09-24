@@ -54,5 +54,17 @@ CELERY_BEAT_SCHEDULE = {
     },
     'backup_database': {
         'task': 'hrms_app.tasks.backup_database',
-        'schedule': crontab(minute=0, hour=3),    },
+        'schedule': crontab(minute=0, hour=3),    
+        },
+        'calculate-daily-attendance-cache': {
+        'task': 'myapp.tasks.calculate_daily_attendance_cache',
+        'schedule': crontab(hour=2, minute=0),  # Run at 2:00 AM daily
+        'args': (1,)  # Process yesterday's data
+    },
+    'recalculate-monthly-attendance': {
+        'task': 'myapp.tasks.recalculate_monthly_attendance_cache',
+        'schedule': crontab(hour=3, minute=0, day_of_month=1),  # 1st of each month at 3 AM
+    },
+
+    
 }

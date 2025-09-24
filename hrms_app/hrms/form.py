@@ -997,12 +997,104 @@ class AttendanceLogFilterForm(forms.ModelForm):
         self.fields["is_submitted"].initial = True
 
 
+# class AttendanceLogForm(forms.ModelForm):
+#     class Meta:
+#         model = AttendanceLog
+#         fields = [
+#             "reg_status",
+#             "from_date",
+#             "to_date",
+#             "status",
+#             "reg_duration",
+#             "reason",
+#         ]
+#         widgets = {
+#             "reg_status": forms.RadioSelect(attrs={"class": "form-input"}),
+#             "duration": TimePickerInput(
+#                 attrs={"class": "form-control", "readonly": "readonly"}
+#             ),
+#             "reg_duration": forms.TextInput(
+#                 attrs={"class": "form-control", "readonly": "readonly"}
+#             ),
+#             "from_date": DateTimePickerInput(
+#                 options={
+#                     "showClear": True,
+#                     "showClose": True,
+#                     "useCurrent": False,
+#                 },
+#                 format="%Y-%m-%d %H:%M",
+#                 attrs={"class": "form-control"},
+#             ),
+#             "to_date": DateTimePickerInput(
+#                 options={
+#                     "showClear": True,
+#                     "showClose": True,
+#                     "useCurrent": False,
+#                 },
+#                 format="%Y-%m-%d %H:%M",
+#                 attrs={"class": "form-control"},
+#                 range_from="from_date",
+#             ),
+#             "reason": forms.Textarea(attrs={"class": "form-control"}),
+#             "status": forms.Select(attrs={"class": "form-control"}),
+#         }
+
+#     def __init__(self, *args, **kwargs):
+#         self.user = kwargs.pop("user", None)
+#         self.is_manager = kwargs.pop("is_manager", False)
+#         self.late_coming = kwargs.pop("late_coming", {})
+#         self.early_going = kwargs.pop("early_going", {})
+#         super(AttendanceLogForm, self).__init__(*args, **kwargs)
+
+#         self.fields["reg_status"].required = True
+
+#         current_value = None
+#         if self.instance and self.instance.pk:
+#             current_value = self.instance.reg_status
+
+#         if current_value == settings.MIS_PUNCHING:
+#             self.fields["reg_status"].choices = [
+#                 (settings.MIS_PUNCHING, _("Mis Punching")),
+#             ]
+#         else:
+#             choices = []
+#             if self.early_going:
+#                 choices.append((settings.EARLY_GOING, _("Early Going")))
+#             if self.late_coming:
+#                 choices.append((settings.LATE_COMING, _("Late Coming")))
+#             self.fields["reg_status"].choices = choices
+
+#             self.initial["reg_status"] = None
+
+#         # Manager/non-manager handling
+#         if not self.is_manager:
+#             self.fields.pop("status", None)
+#             self.fields["reason"].required = True
+#         else:
+#             self.fields["status"].required = True
+#             self.make_field_readonly("reason")
+
+#     def make_field_readonly(self, field_name):
+#         """Set a specific field to readonly by updating its widget attributes."""
+#         if field_name in self.fields:
+#             self.fields[field_name].widget.attrs["readonly"] = "readonly"
+
+#             # For Textarea, use disabled because `readonly` doesn't always work with styling.
+#             if isinstance(self.fields[field_name].widget, forms.Textarea):
+#                 self.fields[field_name].widget.attrs["disabled"] = "disabled"
+
+
 class AttendanceLogForm(forms.ModelForm):
+    """
+    Form for handling attendance log regularization requests.
+    Dynamically adjusts fields and choices based on user role and attendance events.
+    """
+    
     class Meta:
         model = AttendanceLog
         fields = [
             "reg_status",
-            "from_date",
+            "from_date", 
             "to_date",
             "status",
             "reg_duration",
@@ -1035,54 +1127,221 @@ class AttendanceLogForm(forms.ModelForm):
                 attrs={"class": "form-control"},
                 range_from="from_date",
             ),
-            "reason": forms.Textarea(attrs={"class": "form-control"}),
+            "reason": forms.Textarea(
+                attrs={
+                    "class": "form-control", 
+                    "rows": 3,
+                    "placeholder": _("Please provide reason for regularization...")
+                }
+            ),
             "status": forms.Select(attrs={"class": "form-control"}),
         }
 
     def __init__(self, *args, **kwargs):
+        # Extract custom parameters
         self.user = kwargs.pop("user", None)
         self.is_manager = kwargs.pop("is_manager", False)
         self.late_coming = kwargs.pop("late_coming", {})
         self.early_going = kwargs.pop("early_going", {})
-        super(AttendanceLogForm, self).__init__(*args, **kwargs)
+        
+        super().__init__(*args, **kwargs)
+        
+        # Initialize form based on context
+        self._setup_regularization_status_field()
+        self._setup_user_role_specific_fields()
+        self._setup_initial_values()
 
+    def _setup_regularization_status_field(self):
+        """Configure the reg_status field based on current instance and available events."""
         self.fields["reg_status"].required = True
-
-        current_value = None
-        if self.instance and self.instance.pk:
-            current_value = self.instance.reg_status
-
-        if current_value == settings.MIS_PUNCHING:
-            self.fields["reg_status"].choices = [
-                (settings.MIS_PUNCHING, _("Mis Punching")),
-            ]
+        
+        current_reg_status = getattr(self.instance, 'reg_status', None) if self.instance.pk else None
+        
+        if current_reg_status == settings.MIS_PUNCHING:
+            self._set_mis_punching_choices()
         else:
-            choices = []
-            if self.early_going:
-                choices.append((settings.EARLY_GOING, _("Early Going")))
-            if self.late_coming:
-                choices.append((settings.LATE_COMING, _("Late Coming")))
-            self.fields["reg_status"].choices = choices
+            self._set_attendance_event_choices()
 
+    def _set_mis_punching_choices(self):
+        """Set choices for mis punching scenario."""
+        self.fields["reg_status"].choices = [
+            (settings.MIS_PUNCHING, _("Mis Punching")),
+        ]
+
+    def _set_attendance_event_choices(self):
+        """Set choices based on available attendance events (late coming, early going)."""
+        choices = []
+        
+        if self.early_going:
+            choices.append((settings.EARLY_GOING, _("Early Going")))
+        if self.late_coming:
+            choices.append((settings.LATE_COMING, _("Late Coming")))
+            
+        if not choices:
+            # Fallback if no events detected
+            choices = [
+                (settings.LATE_COMING, _("Late Coming")),
+                (settings.EARLY_GOING, _("Early Going")),
+            ]
+            
+        self.fields["reg_status"].choices = choices
+        # Don't pre-select any option for new instances
+        if not self.instance.pk:
             self.initial["reg_status"] = None
 
-        # Manager/non-manager handling
-        if not self.is_manager:
-            self.fields.pop("status", None)
-            self.fields["reason"].required = True
+    def _setup_user_role_specific_fields(self):
+        """Configure fields based on whether user is manager or employee."""
+        if self.is_manager:
+            self._setup_manager_fields()
         else:
-            self.fields["status"].required = True
-            self.make_field_readonly("reason")
+            self._setup_employee_fields()
 
-    def make_field_readonly(self, field_name):
-        """Set a specific field to readonly by updating its widget attributes."""
-        if field_name in self.fields:
-            self.fields[field_name].widget.attrs["readonly"] = "readonly"
+    def _setup_manager_fields(self):
+        """Configure form for manager users."""
+        # Managers can update status but not reason
+        self.fields["status"].required = True
+        self._make_field_readonly("reason")
+        
+        # Optionally make other fields readonly for managers
+        readonly_fields = ["reg_status", "from_date", "to_date", "reg_duration"]
+        for field_name in readonly_fields:
+            if field_name in self.fields:
+                self._make_field_readonly(field_name)
 
-            # For Textarea, use disabled because `readonly` doesn't always work with styling.
-            if isinstance(self.fields[field_name].widget, forms.Textarea):
-                self.fields[field_name].widget.attrs["disabled"] = "disabled"
+    def _setup_employee_fields(self):
+        """Configure form for employee users."""
+        # Employees must provide reason but cannot change status
+        if "status" in self.fields:
+            self.fields.pop("status")
+        self.fields["reason"].required = True
 
+    def _setup_initial_values(self):
+        """Set initial values based on detected attendance events."""
+        if not self.instance.pk:
+            # Set initial values for new instances based on detected events
+            if self.late_coming and not self.early_going:
+                self._set_late_coming_defaults()
+            elif self.early_going and not self.late_coming:
+                self._set_early_going_defaults()
+
+    def _set_late_coming_defaults(self):
+        """Set default values for late coming scenario."""
+        if self.late_coming:
+            self.initial.update({
+                "reg_status": settings.LATE_COMING,
+                "from_date": self.late_coming.get("from_date"),
+                "to_date": self.late_coming.get("to_date"),
+                "reg_duration": self.late_coming.get("duration"),
+            })
+
+    def _set_early_going_defaults(self):
+        """Set default values for early going scenario."""
+        if self.early_going:
+            self.initial.update({
+                "reg_status": settings.EARLY_GOING,
+                "from_date": self.early_going.get("from_date"),
+                "to_date": self.early_going.get("to_date"), 
+                "reg_duration": self.early_going.get("duration"),
+            })
+
+    def _make_field_readonly(self, field_name):
+        """Make a specific field readonly with proper widget handling."""
+        if field_name not in self.fields:
+            return
+            
+        field = self.fields[field_name]
+        widget = field.widget
+        
+        # Add readonly attribute
+        widget.attrs["readonly"] = "readonly"
+        
+        # Handle specific widget types
+        if isinstance(widget, forms.Textarea):
+            # For textareas, disabled works better for styling
+            widget.attrs["disabled"] = "disabled"
+        elif isinstance(widget, forms.Select):
+            # For selects, disabled is more appropriate
+            widget.attrs["disabled"] = "disabled"
+        elif isinstance(widget, forms.RadioSelect):
+            # For radio buttons, disable all options
+            widget.attrs["disabled"] = "disabled"
+
+    def clean(self):
+        """Custom validation for the form."""
+        cleaned_data = super().clean()
+        
+        # Validate date range
+        self._validate_date_range(cleaned_data)
+        
+        # Validate reg_status specific requirements
+        self._validate_reg_status_requirements(cleaned_data)
+        
+        return cleaned_data
+
+    def _validate_date_range(self, cleaned_data):
+        """Validate that to_date is after from_date."""
+        from_date = cleaned_data.get("from_date")
+        to_date = cleaned_data.get("to_date")
+        
+        if from_date and to_date:
+            if to_date <= from_date:
+                raise forms.ValidationError(
+                    _("End date must be after start date.")
+                )
+            
+            # Validate duration is reasonable (e.g., not more than 24 hours)
+            duration_hours = (to_date - from_date).total_seconds() / 3600
+            if duration_hours > 24:
+                raise forms.ValidationError(
+                    _("Regularization duration cannot exceed 24 hours.")
+                )
+
+    def _validate_reg_status_requirements(self, cleaned_data):
+        """Validate requirements based on regularization status."""
+        reg_status = cleaned_data.get("reg_status")
+        reason = cleaned_data.get("reason")
+        
+        # Ensure reason is provided for non-managers
+        if not self.is_manager and not reason:
+            raise forms.ValidationError(
+                _("Reason is required for regularization requests.")
+            )
+        
+        # Additional validation based on reg_status
+        if reg_status == settings.MIS_PUNCHING:
+            self._validate_mis_punching(cleaned_data)
+
+    def _validate_mis_punching(self, cleaned_data):
+        """Additional validation for mis punching scenarios."""
+        # Add any specific validation for mis punching
+        pass
+
+    def save(self, commit=True):
+        """Override save to handle additional processing."""
+        instance = super().save(commit=False)
+        
+        # Calculate duration if from_date and to_date are provided
+        if instance.from_date and instance.to_date:
+            duration = instance.to_date - instance.from_date
+            # Format duration as HH:MM
+            hours, remainder = divmod(duration.total_seconds(), 3600)
+            minutes, _ = divmod(remainder, 60)
+            instance.reg_duration = f"{int(hours):02d}:{int(minutes):02d}"
+        
+        if commit:
+            instance.save()
+            
+        return instance
+
+    @property
+    def available_events(self):
+        """Return a summary of available events for this form."""
+        return {
+            'has_late_coming': bool(self.late_coming),
+            'has_early_going': bool(self.early_going),
+            'late_coming_duration': self.late_coming.get('duration') if self.late_coming else None,
+            'early_going_duration': self.early_going.get('duration') if self.early_going else None,
+        }
 
 class LeaveStatusUpdateForm(forms.ModelForm):
     class Meta:

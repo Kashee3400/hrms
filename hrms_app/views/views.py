@@ -903,6 +903,216 @@ class EventPageView(ModelPermissionRequiredMixin, TemplateView):
         return context
 
 
+# class EventDetailPageView(ModelPermissionRequiredMixin, UpdateView):
+#     model = AttendanceLog
+#     template_name = "hrms_app/event_detail.html"
+#     form_class = AttendanceLogForm
+#     slug_field = "slug"
+#     slug_url_kwarg = "slug"
+#     title = _("Attendance Log")
+#     permission_action = "change"
+
+#     def get_object(self, queryset=None):
+#         obj = super().get_object(queryset)
+#         user = self.request.user
+
+#         if self._can_user_access_log(user, obj):
+#             return obj
+#         raise PermissionDenied()
+
+#     def _can_user_access_log(self, user, log):
+#         return (
+#             log.applied_by == user
+#             or log.applied_by.reports_to == user
+#             or user.is_staff
+#             or user.is_superuser
+#             or getattr(user.personal_detail.designation.department, "department", None)
+#             == "admin"
+#         )
+
+#     def get_form_kwargs(self):
+#         kwargs = super().get_form_kwargs()
+#         log = self.get_object()
+#         early_going, late_coming = self.check_event(log)
+
+#         kwargs.update(
+#             {
+#                 "user": self.request.user,
+#                 "is_manager": self.request.user == log.applied_by.reports_to,
+#                 "early_going": early_going,
+#                 "late_coming": late_coming,
+#             }
+#         )
+#         return kwargs
+
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         log = self.get_object()
+#         early_going, late_coming = self.check_event(log)
+#         context.update(
+#             {
+#                 "is_manager": self.request.user == log.applied_by.reports_to,
+#                 "urls": self._get_breadcrumb_urls(log),
+#                 "action_form": AttendanceLogActionForm(),
+#                 "title": self.title,
+#                 "subtitle": log.slug,
+#                 "early_going": early_going,
+#                 "late_coming": late_coming,
+#                 "reg_count": self._get_regularization_count(log),
+#             }
+#         )
+#         return context
+
+#     def form_valid(self, form):
+#         if (
+#             self._is_beyond_policy_allowed()
+#             or not self._has_exceeded_regularization_limit()
+#         ):
+#             return self._process_submission(form)
+#         messages.error(
+#             self.request,
+#             _(
+#                 f"You have already applied for the maximum number of regularizations ({self._get_regularization_limit()} times)."
+#             ),
+#         )
+#         return self.form_invalid(form)
+
+#     def form_invalid(self, form):
+#         messages.error(
+#             self.request,
+#             _(
+#                 "There were errors in your submission. Please correct them and try again."
+#             ),
+#         )
+#         return self.render_to_response(self.get_context_data(form=form))
+
+#     def _get_app_setting(self, key, default=None):
+#         setting = AppSetting.objects.filter(key=key).first()
+#         return setting if setting else default
+
+#     def _get_regularization_limit(self):
+#         setting = self._get_app_setting("REGULARIZATION_LIMIT")
+#         return int(getattr(setting, "value", 3))
+
+#     def _is_beyond_policy_allowed(self):
+#         setting = self._get_app_setting("REGULARIZATION_LIMIT")
+#         return getattr(setting, "beyond_policy", False)
+
+#     def _has_exceeded_regularization_limit(self):
+#         current_log = self.get_object()
+#         return (
+#             self._get_regularization_count(current_log)
+#             >= self._get_regularization_limit()
+#         )
+
+#     def _get_regularization_count(self, log):
+#         return (
+#             AttendanceLog.objects.filter(
+#                 applied_by=log.applied_by,
+#                 start_date__year=log.start_date.year,
+#                 start_date__month=log.start_date.month,
+#             )
+#             .filter(Q(regularized=True) | Q(is_submitted=True)).exclude(regularized_backend = True)
+#             .count()
+#         )
+
+#     def _get_breadcrumb_urls(self, log):
+#         return [
+#             ("dashboard", {"label": "Dashboard"}),
+#             ("calendar", {"label": "Attendance"}),
+#             ("event_detail", {"label": log.title, "slug": log.slug}),
+#         ]
+
+#     def check_event(self, obj):
+#         """
+#         This function checks the events (Early Going and Late Coming)
+#         based on the user check-in and check-out time.
+#         """
+#         late_coming_case = {}
+#         early_going_case = {}
+
+#         user = obj.applied_by
+#         user_shift = user.shifts.last().shift_timing
+
+#         if not obj.regularized:
+#             check_in_datetime = localtime(obj.start_date)
+#             check_out_datetime = localtime(obj.end_date)
+#             grace_start_time = user_shift.grace_start_time
+#             grace_end_time = user_shift.grace_end_time
+#             grace_start_datetime = make_aware(
+#                 datetime.combine(check_in_datetime.date(), grace_start_time)
+#             )
+#             grace_end_datetime = make_aware(
+#                 datetime.combine(check_out_datetime.date(), grace_end_time)
+#             )
+#             check_in_plus_8hrs = check_in_datetime + timedelta(hours=8)
+
+#             if check_in_datetime > grace_start_datetime:
+#                 duration_td = check_in_datetime - grace_start_datetime
+#                 duration_str = str(duration_td)[:-3]  # Format: 'HH:MM'
+#                 late_coming_case = {
+#                     "case": "late_coming",
+#                     "from_date": grace_start_datetime,
+#                     "to_date": check_in_datetime,
+#                     "duration": duration_str,
+#                 }
+
+#             if (
+#                 check_out_datetime < check_in_plus_8hrs
+#                 or check_out_datetime < grace_end_datetime
+#             ):
+#                 duration_td = grace_end_datetime - check_out_datetime
+#                 duration_str = str(duration_td)[:-3]
+#                 early_going_case = {
+#                     "case": "early_going",
+#                     "from_date": check_out_datetime,
+#                     "to_date": grace_end_datetime,
+#                     "duration": duration_str,
+#                 }
+
+#         # Return the cases, or empty dictionaries if no event was found
+#         return early_going_case or {}, late_coming_case or {}
+
+#     def _process_submission(self, form):
+#         form.instance.is_submitted = True
+#         regularization_hr = (
+#             form.instance.to_date - form.instance.from_date
+#         ).total_seconds() / 3600
+#         if form.instance.reg_status != settings.MIS_PUNCHING:
+#             max_hr_setting = self._get_app_setting("REGULARIZATION_MAX_HR")
+#             max_hr = int(getattr(max_hr_setting, "value", 2))
+#             if (
+#                 not getattr(max_hr_setting, "beyond_policy", False)
+#                 and regularization_hr > max_hr
+#             ):
+#                 messages.error(
+#                     self.request, _(f"You can only regularize up to {max_hr}) hrs.")
+#                 )
+#                 return self.form_invalid(form)
+
+#         self.object = form.save()
+#         self.object.add_action(
+#             action="Submitted regularization",
+#             performed_by=self.request.user,
+#             comment=form.instance.reason,
+#         )
+#         messages.success(self.request, _("Regularization updated successfully."))
+#         self.send_notification(self.object)
+#         return HttpResponseRedirect(
+#             reverse("event_detail", kwargs={"slug": self.object.slug})
+#         )
+
+#     def send_notification(self, log):
+#         """Send notification for regularization."""
+#         current_site = Site.objects.get_current()
+#         protocol = "http"  # or 'https' if needed
+#         domain = current_site.domain
+#         try:
+#             send_regularization_notification.delay(log.id, protocol, domain)
+#         except Exception as e:
+#             pass
+
+
 class EventDetailPageView(ModelPermissionRequiredMixin, UpdateView):
     model = AttendanceLog
     template_name = "hrms_app/event_detail.html"
@@ -945,13 +1155,84 @@ class EventDetailPageView(ModelPermissionRequiredMixin, UpdateView):
         )
         return kwargs
 
+    def _get_attendance_display_data(self, log):
+        """
+        Prepare all attendance data for display in template.
+        This reduces template complexity and database hits.
+        """
+        # Get the last history record once
+        last_history = log.history.last() if hasattr(log, 'history') else None
+        
+        if last_history and hasattr(last_history, 'previous_data'):
+            prev_data = last_history.previous_data
+            return {
+                'has_history': True,
+                'login_time': prev_data.get('start_date'),
+                'logout_time': 'No Punch out' if prev_data.get('reg_status') == 'mis punching' 
+                             else prev_data.get('end_date'),
+                'working_hours': prev_data.get('duration'),
+                'status': prev_data.get('att_status'),
+                'regularized_info': {
+                    'from_time': prev_data.get('from_date'),
+                    'to_time': prev_data.get('to_date'),
+                    'duration': prev_data.get('reg_duration')
+                }
+            }
+        else:
+            return {
+                'has_history': False,
+                'login_time': log.start_date,
+                'logout_time': log.end_date,
+                'working_hours': f"{log.duration.hour} Hrs and {log.duration.minute} Mins" if hasattr(log, 'duration') else '',
+                'status': log.att_status,
+                'regularized_info': None
+            }
+
+    def _get_user_permissions(self, log):
+        """
+        Calculate user permissions once instead of in template.
+        """
+        user = self.request.user
+        is_manager = user == log.applied_by.reports_to
+        is_admin = getattr(user.personal_detail.designation.department, "department", None) == 'admin'
+        can_submit = log.att_status_short_code != 'P' and not log.regularized and log.status == 'pending'
+        can_take_action = user != log.applied_by and log.is_submitted
+        
+        return {
+            'is_manager': is_manager,
+            'is_admin': is_admin,
+            'can_submit_regularization': can_submit and not is_manager,
+            'can_take_action': can_take_action,
+            'available_actions': self._get_available_actions(is_admin) if can_take_action else []
+        }
+
+    def _get_available_actions(self, is_admin):
+        """
+        Get available actions based on user role.
+        """
+        if is_admin:
+            return [
+                {'name': 'approve', 'label': _('Approve'), 'class': 'btn-primary'},
+                {'name': 'reject', 'label': _('Reject'), 'class': 'btn-danger'}
+            ]
+        else:
+            return [
+                {'name': 'recommend', 'label': _('Recommend'), 'class': 'btn-success'},
+                {'name': 'notrecommend', 'label': _('Not Recommend'), 'class': 'btn-warning'}
+            ]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         log = self.get_object()
         early_going, late_coming = self.check_event(log)
+        
+        # Get all computed data
+        attendance_data = self._get_attendance_display_data(log)
+        user_permissions = self._get_user_permissions(log)
+        
         context.update(
             {
-                "is_manager": self.request.user == log.applied_by.reports_to,
+                # Existing context
                 "urls": self._get_breadcrumb_urls(log),
                 "action_form": AttendanceLogActionForm(),
                 "title": self.title,
@@ -959,33 +1240,23 @@ class EventDetailPageView(ModelPermissionRequiredMixin, UpdateView):
                 "early_going": early_going,
                 "late_coming": late_coming,
                 "reg_count": self._get_regularization_count(log),
+                
+                # New computed context
+                "attendance_data": attendance_data,
+                "user_permissions": user_permissions,
+                
+                # Additional computed values
+                "show_regularization_form": (
+                    log.att_status_short_code != 'P' and 
+                    not log.regularized
+                ),
+                "regularization_month_warning": f"Regularized Attendance {self._get_regularization_count(log)} times in {log.start_date.strftime('%B')}"
             }
         )
         return context
 
-    def form_valid(self, form):
-        if (
-            self._is_beyond_policy_allowed()
-            or not self._has_exceeded_regularization_limit()
-        ):
-            return self._process_submission(form)
-        messages.error(
-            self.request,
-            _(
-                f"You have already applied for the maximum number of regularizations ({self._get_regularization_limit()} times)."
-            ),
-        )
-        return self.form_invalid(form)
-
-    def form_invalid(self, form):
-        messages.error(
-            self.request,
-            _(
-                "There were errors in your submission. Please correct them and try again."
-            ),
-        )
-        return self.render_to_response(self.get_context_data(form=form))
-
+    # ... rest of your existing methods remain the same ...
+    
     def _get_app_setting(self, key, default=None):
         setting = AppSetting.objects.filter(key=key).first()
         return setting if setting else default
@@ -1012,7 +1283,8 @@ class EventDetailPageView(ModelPermissionRequiredMixin, UpdateView):
                 start_date__year=log.start_date.year,
                 start_date__month=log.start_date.month,
             )
-            .filter(Q(regularized=True) | Q(is_submitted=True)).exclude(regularized_backend = True)
+            .filter(Q(regularized=True) | Q(is_submitted=True))
+            .exclude(regularized_backend=True)
             .count()
         )
 
@@ -1112,6 +1384,28 @@ class EventDetailPageView(ModelPermissionRequiredMixin, UpdateView):
         except Exception as e:
             pass
 
+    def form_valid(self, form):
+        if (
+            self._is_beyond_policy_allowed()
+            or not self._has_exceeded_regularization_limit()
+        ):
+            return self._process_submission(form)
+        messages.error(
+            self.request,
+            _(
+                f"You have already applied for the maximum number of regularizations ({self._get_regularization_limit()} times)."
+            ),
+        )
+        return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        messages.error(
+            self.request,
+            _(
+                "There were errors in your submission. Please correct them and try again."
+            ),
+        )
+        return self.render_to_response(self.get_context_data(form=form))
 
 class AttendanceLogActionView(ModelPermissionRequiredMixin, View):
     model = AttendanceLog

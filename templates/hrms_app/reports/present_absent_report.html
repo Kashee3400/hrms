@@ -2,84 +2,284 @@
 {% load static hrms_tag humanize i18n %}
 
 {% block title %}
-  {% trans 'Report' %} | {{ title }}
+{% trans 'Attendance Report' %} | {{ title }}
 {% endblock %}
 
 {% block extrastyle %}
-
+<link rel="stylesheet" href="{% static 'hrms_app/css/present_absent_report.css' %}">
 {% endblock %}
 
 {% block content %}
+<!-- Loading Overlay -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-content">
+    <div class="spinner"></div>
+    <p>Loading attendance data...</p>
+  </div>
+</div>
+
+<!-- Breadcrumb Section -->
 {% render_breadcrumb 'Attendance Report' urls %}
 
-  <div class="bg-light my-2">
-    <form method="get">
-      <div class="row m-2">
-        <div class="col-md-3 col-12 mb-2">{{ form.location.label_tag }} {{ form.location }}</div>
 
-        <!-- From Date Filter -->
-        <div class="col-md-3 col-12 mb-2">{{ form.from_date.label_tag }} {{ form.from_date }}</div>
+<!-- Filter Card -->
+<div class="filter-card">
+  <div class="filter-header">
+    <h5 class="mb-0"><i class="fas fa-filter me-2"></i>Filter Options</h5>
+  </div>
+  <div class="filter-body">
+    <form method="get" id="filterForm">
+      <div class="row">
+        <div class="col-lg-3 col-md-6 col-12 mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-map-marker-alt me-1"></i>{{ form.location.label }}
+          </label>
+          {{ form.location }}
+        </div>
 
-        <!-- To Date Filter -->
-        <div class="col-md-3 col-12 mb-2">{{ form.to_date.label_tag }} {{ form.to_date }}</div>
+        <div class="col-lg-3 col-md-6 col-12 mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-calendar me-1"></i>{{ form.from_date.label }}
+          </label>
+          {{ form.from_date }}
+        </div>
 
-        <!-- Search Field -->
-        <div class="col-md-3 col-12 mb-2">{{ form.active.label_tag }} {{ form.active }}</div>
-        <!-- Buttons: Filter, Clear Filter, Apply Tour -->
-        <div class="col-md-3 col-12 mb-2">
-          <button type="submit" class="btn btn-sm btn-primary"><span class="mif-filter"></span> Filter</button>
-          <a class="btn btn-sm btn-secondary" href="{% url 'calendar' %}">Clear Filter</a>
-          <a class="btn btn-sm btn-warning" href="{% url 'detailed_attendance_report' %}">Detailed Report</a>
+        <div class="col-lg-3 col-md-6 col-12 mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-calendar me-1"></i>{{ form.to_date.label }}
+          </label>
+          {{ form.to_date }}
+        </div>
+
+        <div class="col-lg-3 col-md-6 col-12 mb-3">
+          <label class="form-label fw-bold">
+            <i class="fas fa-toggle-on me-1"></i>{{ form.active.label }}
+          </label>
+          {{ form.active }}
+        </div>
+
+        <div class="col-12">
+          <div class="btn-group-mobile d-flex flex-wrap gap-2">
+            <button type="submit" class="btn btn-filter">
+              <i class="fas fa-search me-2"></i>Apply Filter
+            </button>
+            <a class="btn btn-clear" href="{% url 'calendar' %}">
+              <i class="fas fa-times me-2"></i>Clear Filter
+            </a>
+            <a class="btn btn-detailed" href="{% url 'detailed_attendance_report' %}">
+              <i class="fas fa-chart-line me-2"></i>Detailed Report
+            </a>
+          </div>
         </div>
       </div>
     </form>
   </div>
+</div>
 
-  <div class="bg-white my-2 p-2">
-    <div class="table-responsive">
-      <table class="table table-bordered table-striped table-hover">
-        <thead class="table-primary">
-          <tr>
-            <th>Employee Code</th> <th>Employee Name</th> {% for day in days_in_month %}
-            <th>{{ day|date:"d-m" }}</th>
-            {% endfor %}
-          </tr>
-        </thead> <tbody>
-          {% for employee in employees %}
-            <tr>
-              <td>
-                {% format_emp_code employee.personal_detail.employee_code %}
-              </td>
-              <td>{{ employee.get_full_name }}</td>
-              {% for mdate in days_in_month %}
-                <td>
-                  {% get_item attendance_data employee.id mdate as statuses %}
-                  {% for status in statuses %}
-                    <span style="color: {{ status.color }};">{{ status.status }}</span>
-                    {% if not forloop.last %} {% endif %}
-                  {% endfor %}
-                </td>
-              {% endfor %}
-            </tr>
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item">
+    <span class="attendance-status status-P">P</span>
+    <small>Present</small>
+  </div>
+  <div class="legend-item">
+    <span class="attendance-status status-A">A</span>
+    <small>Absent</small>
+  </div>
+  <div class="legend-item">
+    <span class="attendance-status status-L">EL,SL,CL</span>
+    <small>Leaves</small>
+  </div>
+  <div class="legend-item">
+    <span class="attendance-status status-OFF">OFF</span>
+    <small>Week Off</small>
+  </div>
+  <div class="legend-item">
+    <span class="attendance-status status-FL">FL</span>
+    <small>Festival Leave</small>
+  </div>
+  <div class="legend-item">
+    <span class="attendance-status status-H">H</span>
+    <small>Half Day</small>
+  </div>
+</div>
+
+<!-- Report Table -->
+<div class="report-card px-3 py-3">
+  <div class="table-container">
+    <table class="table attendance-table" id="attendanceTable">
+      <thead>
+        <tr>
+          <th class="employee-info">
+            <i class="fas fa-user me-2"></i>Employee Details
+          </th>
+          {% for day in days_in_month %}
+          <th
+            class="day-header {% if day|date:'w' == '0' %}weekend{% endif %} {% if day|date:'Y-m-d' == today|date:'Y-m-d' %}today{% endif %}">
+            <div>{{ day|date:"d" }}</div>
+          </th>
           {% endfor %}
-        </tbody>
-      </table>
+        </tr>
+      </thead>
+      <tbody>
+        {% for employee in employees %}
+        <tr>
+          <td class="employee-info">
+            <div class="employee-name">{{ employee.get_full_name|default:"N/A" }}</div>
+            <span class="employee-code">
+              {% format_emp_code employee.personal_detail.employee_code %}
+            </span>
+          </td>
+          {% for mdate in days_in_month %}
+          <td
+            class="{% if mdate|date:'w' == '0' %}weekend{% endif %} {% if mdate|date:'Y-m-d' == today|date:'Y-m-d' %}today{% endif %}">
+            {% get_item_with_context attendance_data employee.id mdate as statuses %}
+            {% for status in statuses %}
+            <span class="attendance-status" title="{{ status.status }} - {{ mdate|date:'M d, Y' }}"
+              data-bs-toggle="tooltip" style="background-color: {{ status.color }}33; color: {{ status.color }};">
+              {{ status.status }}
+            </span>
+            {% if not forloop.last %}<br>{% endif %}
+            {% endfor %}
+
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Summary Stats (Optional) -->
+{% if employees %}
+<div class="mt-4">
+  <div class="row">
+    <div class="col-md-3 col-6 mb-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-users fa-2x text-primary mb-2"></i>
+          <h4 class="mb-1">{{ employees|length }}</h4>
+          <small class="text-muted">Total Employees</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-calendar-days fa-2x text-success mb-2"></i>
+          <h4 class="mb-1">{{ days_in_month|length }}</h4>
+          <small class="text-muted">Total Days</small>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-6 mb-3">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body text-center">
+          <i class="fas fa-chart-bar fa-2x text-warning mb-2"></i>
+          <h4 class="mb-1">{{ from_date|date:"M" }}</h4>
+          <small class="text-muted">Report Period</small>
+        </div>
+      </div>
     </div>
   </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block extra_js %}
-  <script>
-    $(document).ready(function () {
-      $('.table').DataTable({
-        paging: true,
-        searching: true,
-        ordering: false,
-        dom: 'Bfrtip',
-        buttons: ['copy', 'csv', 'excel'],
-        pageLength: 25,
-        lengthMenu: [10, 25, 50, 100] // Dropdown options for page sizes
-      });
+<script>
+  $(document).ready(function () {
+    // Initialize tooltips
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl);
     });
-  </script>
+
+    $('#attendanceTable').DataTable({
+      responsive: true,
+      paging: true,
+      searching: true,
+      info: true,
+      lengthChange: true,
+      pageLength: 25,
+      lengthMenu: [10, 25, 50, 100, -1],
+      dom: 'Bfrtip',
+      ordering: false,   // 🚀 disable sorting
+      buttons: [
+        {
+          extend: 'copy',
+          className: 'btn btn-sm btn-outline-primary',
+          text: '<i class="fas fa-copy"></i> Copy'
+        },
+        {
+          extend: 'csv',
+          className: 'btn btn-sm btn-outline-success',
+          text: '<i class="fas fa-file-csv"></i> CSV'
+        },
+        {
+          extend: 'excel',
+          className: 'btn btn-sm btn-outline-success',
+          text: '<i class="fas fa-file-excel"></i> Excel'
+        }
+      ],
+      language: {
+        lengthMenu: "Show _MENU_ employees per page",
+        zeroRecords: "No attendance records found",
+        info: "Showing _START_ to _END_ of _TOTAL_ employees",
+        infoEmpty: "No employees available",
+        infoFiltered: "(filtered from _MAX_ total employees)",
+        search: "Search employees:",
+        paginate: {
+          first: "First",
+          last: "Last",
+          next: "Next",
+          previous: "Previous"
+        }
+      },
+      columnDefs: [
+        {
+          targets: 0,
+          className: 'employee-info'
+        }
+      ]
+    });
+
+    // Form submission with loading overlay
+    $('#filterForm').on('submit', function () {
+      $('#loadingOverlay').fadeIn();
+    });
+
+    // Auto-hide loading overlay after page load
+    $(window).on('load', function () {
+      $('#loadingOverlay').fadeOut();
+    });
+
+    // Smooth scrolling for horizontal table
+    $('.table-container').on('scroll', function () {
+      // Add shadow effects based on scroll position
+      if ($(this).scrollLeft() > 0) {
+        $(this).addClass('scrolled-left');
+      } else {
+        $(this).removeClass('scrolled-left');
+      }
+    });
+
+    // Enhanced status hover effects
+    $('.attendance-status').hover(
+      function () {
+        $(this).css('transform', 'scale(1.1)');
+      },
+      function () {
+        $(this).css('transform', 'scale(1)');
+      }
+    );
+
+    // Print functionality
+    window.printReport = function () {
+      window.print();
+    };
+  });
+</script>
 {% endblock %}
