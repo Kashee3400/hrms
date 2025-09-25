@@ -119,8 +119,9 @@
           {% for day in days_in_month %}
           <th
             class="day-header {% if day|date:'w' == '0' %}weekend{% endif %} {% if day|date:'Y-m-d' == today|date:'Y-m-d' %}today{% endif %}">
-            <div>{{ day|date:"d" }}</div>
+            <div>{{ day|date:"d-M" }}</div>
           </th>
+
           {% endfor %}
         </tr>
       </thead>
