@@ -129,10 +129,12 @@
         {% for employee in employees %}
         <tr>
           <td class="employee-info">
-            <div class="employee-name">{{ employee.get_full_name|default:"N/A" }}</div>
+            {% format_emp_code employee.personal_detail.employee_code %}
+
           </td>
           <td class="employee-info">
-            {% format_emp_code employee.personal_detail.employee_code %}
+            <div class="employee-name">{{ employee.get_full_name|default:"N/A" }}</div>
+
           </td>
           {% for mdate in days_in_month %}
           <td
