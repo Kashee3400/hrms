@@ -111,7 +111,10 @@
       <thead>
         <tr>
           <th class="employee-info">
-            <i class="fas fa-user me-2"></i>Employee Details
+            <i class="fas fa-user me-2"></i>Emp Code
+          </th>
+          <th class="employee-info">
+            <i class="fas fa-user me-2"></i>Emp Name
           </th>
           {% for day in days_in_month %}
           <th
@@ -126,9 +129,9 @@
         <tr>
           <td class="employee-info">
             <div class="employee-name">{{ employee.get_full_name|default:"N/A" }}</div>
-            <span class="employee-code">
-              {% format_emp_code employee.personal_detail.employee_code %}
-            </span>
+          </td>
+          <td class="employee-info">
+            {% format_emp_code employee.personal_detail.employee_code %}
           </td>
           {% for mdate in days_in_month %}
           <td
