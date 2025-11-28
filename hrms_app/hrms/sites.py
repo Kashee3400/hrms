@@ -3,7 +3,7 @@ from hrms_app.views import views, auth_views, report_view, announcement
 
 from ..views.attendance_view import BulkAttendanceView, AttendancePreviewAjaxView, GetEmployeesAjaxView, \
     AttendanceStatsAjaxView
-
+from ..views.leave_bulk import BulkLeaveCreateView,BulkLeaveHistoryView
 
 class CustomSite:
     def __init__(self):
@@ -88,7 +88,15 @@ site.register_view('announcements/', announcement.AnnouncementView, name='announ
 site.register_view('announcements/<int:pk>', announcement.AnnouncementView, name='announcement-update')
 site.register_view('bulk-attendance/', BulkAttendanceView, name='bulk_attendance'),
 
+site.register_view('bulk-leave-create/', BulkLeaveCreateView, name='bulk_leave_create'),
+site.register_view('bulk-leave-history/', BulkLeaveHistoryView, name='bulk_leave_history'),
+
 # Ajax endpoints for enhanced functionality
 site.register_view('ajax/employees/', GetEmployeesAjaxView, name='get_employees_ajax'),
 site.register_view('ajax/attendance-preview/', AttendancePreviewAjaxView, name='attendance_preview_ajax'),
 site.register_view('ajax/attendance-stats/', AttendanceStatsAjaxView, name='attendance_stats_ajax'),
+site.register_view('ajax/attendance-stats/', AttendanceStatsAjaxView, name='attendance_stats_ajax'),
+
+
+
+

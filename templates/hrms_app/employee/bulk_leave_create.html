@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Bulk Leave Applications</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.13/css/select2.min.css" rel="stylesheet">
+    <link
+        href="https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.39.0/css/tempusdominus-bootstrap-4.min.css"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --secondary-color: #6c757d;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .container-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border: none;
+        }
+
+        .card-header h4 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.5rem;
+        }
+
+        .card-body {
+            padding: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 0.95rem;
+        }
+
+        .form-control,
+        .form-select {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.15);
+            background-color: #fff;
+        }
+
+        .form-control::placeholder {
+            color: #999;
+        }
+
+        .select2-container--bootstrap-5 .select2-selection {
+            border: 2px solid #e0e0e0 !important;
+            border-radius: 8px !important;
+            min-height: 38px !important;
+        }
+
+        .select2-container--bootstrap-5.select2-container--focus .select2-selection {
+            border-color: var(--primary-color) !important;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.15) !important;
+        }
+
+        .date-inputs-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .day-choice-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .employee-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        .employee-list-container {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .employee-checkbox {
+            margin-bottom: 10px;
+        }
+
+        .employee-checkbox label {
+            margin-bottom: 0;
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .employee-checkbox input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .employee-checkbox label:hover {
+            background-color: #f0f0f0;
+        }
+
+        .employee-info {
+            display: flex;
+            flex-direction: column;
+            margin-left: 5px;
+        }
+
+        .employee-name {
+            font-weight: 500;
+            color: #333;
+            font-size: 0.95rem;
+        }
+
+        .employee-email {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .select-all-wrapper {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .select-all-wrapper .form-check {
+            margin: 0;
+        }
+
+        .select-all-wrapper .form-check-input {
+            width: 20px;
+            height: 20px;
+            margin-top: 3px;
+            cursor: pointer;
+        }
+
+        .select-all-wrapper .form-check-label {
+            margin-left: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 12px 30px;
+            font-weight: 600;
+            font-size: 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            width: 100%;
+            height: 48px;
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            color: white;
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .alert-custom {
+            border: none;
+            border-radius: 8px;
+            border-left: 4px solid;
+            margin-bottom: 20px;
+        }
+
+        .alert-custom.alert-success {
+            border-left-color: var(--success-color);
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .alert-custom.alert-danger {
+            border-left-color: var(--danger-color);
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .alert-custom.alert-warning {
+            border-left-color: var(--warning-color);
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .spinner-border-sm {
+            width: 1.5rem;
+            height: 1.5rem;
+            margin-right: 8px;
+        }
+
+        .section-title {
+            font-weight: 600;
+            color: #333;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-size: 1.05rem;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .text-muted-small {
+            font-size: 0.85rem;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .error-text {
+            color: var(--danger-color);
+            font-size: 0.85rem;
+            margin-top: 5px;
+            display: none;
+        }
+
+        .success-result-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 90%;
+            z-index: 1000;
+            display: none;
+        }
+
+        .result-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            z-index: 999;
+        }
+
+        .success-result-modal.show,
+        .result-overlay.show {
+            display: block;
+        }
+
+        .result-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 6px;
+            background-color: #f8f9fa;
+            border-left: 3px solid var(--secondary-color);
+        }
+
+        .result-item.success {
+            background-color: #d4edda;
+            border-left-color: var(--success-color);
+            color: #155724;
+        }
+
+        .result-item.error {
+            background-color: #f8d7da;
+            border-left-color: var(--danger-color);
+            color: #721c24;
+        }
+
+        .result-item.skipped {
+            background-color: #fff3cd;
+            border-left-color: var(--warning-color);
+            color: #856404;
+        }
+
+        @media (max-width: 768px) {
+
+            .date-inputs-row,
+            .day-choice-row {
+                grid-template-columns: 1fr;
+            }
+
+            .card-body {
+                padding: 20px;
+            }
+
+            .card-header {
+                padding: 20px;
+            }
+
+            .card-header h4 {
+                font-size: 1.25rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-wrapper">
+        <div class="card">
+            <div class="card-header">
+                <h4>📋 Create Bulk Leave Applications</h4>
+            </div>
+            <div class="card-body">
+                <!-- Alert Messages -->
+                <div id="alertContainer"></div>
+
+                <!-- Form -->
+                <form id="bulkLeaveForm" method="POST" action="{% url 'bulk_leave_create' %}">
+                    {% csrf_token %}
+
+                    <div class="form-group">
+                        <label for="leaveType" class="form-label">Leave Type *</label>
+                        <select class="form-select" id="leaveType" name="leave_type_id" required>
+                            <option value="">-- Select Leave Type --</option>
+
+                            {% for lt in leave_types %}
+                            <option value="{{ lt.id }}">{{ lt.leave_type }}</option>
+                            {% endfor %}
+                        </select>
+
+                        <div class="text-muted-small">Select the type of leave to be applied</div>
+                    </div>
+
+                    <!-- Date Range Section -->
+                    <div class="date-inputs-row">
+                        <div class="form-group">
+                            <label for="startDate" class="form-label">Start Date *</label>
+                            <input type="date" class="form-control" id="startDate" name="start_date" required>
+                            <div class="text-muted-small">When does the leave begin?</div>
+                        </div>
+                        <div class="form-group">
+                            <label for="endDate" class="form-label">End Date *</label>
+                            <input type="date" class="form-control" id="endDate" name="end_date" required>
+                            <div class="text-muted-small">When does the leave end?</div>
+                        </div>
+                    </div>
+
+                    <!-- Day Choice Section -->
+                    <div class="day-choice-row">
+                        <div class="form-group">
+                            <label for="startDayChoice" class="form-label">Start Day Type</label>
+                            <select class="form-select" id="startDayChoice" name="start_day_choice">
+                                <option value="full_day">Full Day</option>
+                                <option value="first_half">First Half</option>
+                                <option value="second_half">Second Half</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="endDayChoice" class="form-label">End Day Type</label>
+                            <select class="form-select" id="endDayChoice" name="end_day_choice">
+                                <option value="full_day">Full Day</option>
+                                <option value="first_half">First Half</option>
+                                <option value="second_half">Second Half</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Section 2: Employee Selection -->
+                    <div class="section-title">Employee Selection</div>
+
+                    <div class="select-all-wrapper">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="selectAllEmployees"
+                                name="select_all_employees">
+                            <label class="form-check-label" for="selectAllEmployees">
+                                Select All Employees
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="employee-section" id="employeeSection">
+                        <label class="form-label">Select Employees *</label>
+                        <div class="employee-list-container" id="employeeListContainer">
+                            <div class="employee-checkbox">
+                                <label>
+                                    <input type="checkbox" name="employee_ids" value="1">
+                                    <div class="employee-info">
+                                        <span class="employee-name">John Doe</span>
+                                        <span class="employee-email">john.doe@company.com</span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="employee-checkbox">
+                                <label>
+                                    <input type="checkbox" name="employee_ids" value="2">
+                                    <div class="employee-info">
+                                        <span class="employee-name">Jane Smith</span>
+                                        <span class="employee-email">jane.smith@company.com</span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="employee-checkbox">
+                                <label>
+                                    <input type="checkbox" name="employee_ids" value="3">
+                                    <div class="employee-info">
+                                        <span class="employee-name">Bob Johnson</span>
+                                        <span class="employee-email">bob.johnson@company.com</span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="employee-checkbox">
+                                <label>
+                                    <input type="checkbox" name="employee_ids" value="4">
+                                    <div class="employee-info">
+                                        <span class="employee-name">Alice Brown</span>
+                                        <span class="employee-email">alice.brown@company.com</span>
+                                    </div>
+                                </label>
+                            </div>
+                            <div class="employee-checkbox">
+                                <label>
+                                    <input type="checkbox" name="employee_ids" value="5">
+                                    <div class="employee-info">
+                                        <span class="employee-name">Charlie Wilson</span>
+                                        <span class="employee-email">charlie.wilson@company.com</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="text-muted-small" style="margin-top: 10px;">Select at least one employee or check
+                            "Select All Employees"</div>
+                        <div class="error-text" id="employeeError">Please select at least one employee</div>
+                    </div>
+
+                    <!-- Section 3: Additional Information -->
+                    <div class="section-title">Additional Information</div>
+
+                    <div class="form-group">
+                        <label for="reason" class="form-label">Reason for Leave</label>
+                        <textarea class="form-control" id="reason" name="reason" rows="3"
+                            placeholder="Enter the reason for this bulk leave application..."></textarea>
+                        <div class="text-muted-small">Optional: Provide context for this leave</div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="form-group" style="margin-top: 30px;">
+                        <button type="submit" class="btn btn-submit" id="submitBtn">
+                            <span class="spinner" id="spinner" style="display: none;">
+                                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                            </span>
+                            <span id="submitBtnText">Create Bulk Leave Applications</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Result Modal -->
+    <div class="result-overlay" id="resultOverlay"></div>
+    <div class="success-result-modal" id="resultModal">
+        <h5 style="margin-bottom: 20px; color: #333;">Leave Applications Created</h5>
+
+        <div id="resultStats" style="margin-bottom: 20px;">
+            <div class="result-item success">
+                ✓ <strong>Success:</strong> <span id="successCount">0</span> applications created
+            </div>
+            <div class="result-item error" id="failedCountDiv" style="display: none;">
+                ✗ <strong>Failed:</strong> <span id="failedCount">0</span> applications
+            </div>
+            <div class="result-item skipped" id="skippedCountDiv" style="display: none;">
+                ⚠ <strong>Skipped:</strong> <span id="skippedCount">0</span> applications
+            </div>
+        </div>
+
+        <div id="skippedDetails" style="display: none; margin-bottom: 20px;">
+            <h6 style="color: #856404; margin-bottom: 10px;">Skipped Reasons:</h6>
+            <div id="skippedList" style="max-height: 200px; overflow-y: auto;"></div>
+        </div>
+
+        <div id="errorDetails" style="display: none; margin-bottom: 20px;">
+            <h6 style="color: #721c24; margin-bottom: 10px;">Errors:</h6>
+            <div id="errorList" style="max-height: 200px; overflow-y: auto;"></div>
+        </div>
+
+        <button type="button" class="btn btn-primary" onclick="closeResultModal()" style="width: 100%;">Close</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+        const today = new Date();
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+            .toISOString()
+            .split('T')[0];
+
+        // Set minimum start date to first day of month
+        document.getElementById('startDate').min = firstDayOfMonth;
+
+        // End date minimum should also not be before first day of month
+        document.getElementById('endDate').min = firstDayOfMonth;
+        // Update end date minimum when start date changes
+        document.getElementById('startDate').addEventListener('change', function () {
+            document.getElementById('endDate').min = this.value;
+        });
+
+        // Handle Select All Employees
+        document.getElementById('selectAllEmployees').addEventListener('change', function () {
+            const employeeCheckboxes = document.querySelectorAll('input[name="employee_ids"]');
+            const employeeSection = document.getElementById('employeeSection');
+
+            if (this.checked) {
+                employeeCheckboxes.forEach(checkbox => checkbox.checked = false);
+                employeeSection.style.display = 'none';
+            } else {
+                employeeSection.style.display = 'block';
+            }
+        });
+
+        // Form submission
+        document.getElementById('bulkLeaveForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            // Validation
+            const selectAll = document.getElementById('selectAllEmployees').checked;
+            const selectedEmployees = document.querySelectorAll('input[name="employee_ids"]:checked');
+
+            if (!selectAll && selectedEmployees.length === 0) {
+                showAlert('Please select at least one employee or check "Select All Employees"', 'danger');
+                document.getElementById('employeeError').style.display = 'block';
+                return;
+            }
+
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            const submitBtnText = document.getElementById('submitBtnText');
+            const spinner = document.getElementById('spinner');
+
+            submitBtn.disabled = true;
+            spinner.style.display = 'inline-block';
+            submitBtnText.textContent = 'Creating...';
+
+            // Submit form
+            const formData = new FormData(this);
+
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showResultModal(data.result);
+                        this.reset();
+                        document.getElementById('selectAllEmployees').checked = false;
+                        document.getElementById('employeeSection').style.display = 'block';
+                    } else {
+                        showAlert(data.message || 'An error occurred', 'danger');
+                    }
+                })
+                .catch(error => {
+                    showAlert('Error: ' + error.message, 'danger');
+                })
+                .finally(() => {
+                    submitBtn.disabled = false;
+                    spinner.style.display = 'none';
+                    submitBtnText.textContent = 'Create Bulk Leave Applications';
+                });
+        });
+
+        function showAlert(message, type) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-custom alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alertDiv);
+        }
+
+        function showResultModal(result) {
+            document.getElementById('successCount').textContent = result.success_count || 0;
+
+            if (result.failed_count > 0) {
+                document.getElementById('failedCountDiv').style.display = 'block';
+                document.getElementById('failedCount').textContent = result.failed_count;
+            }
+
+            if (result.skipped && result.skipped.length > 0) {
+                document.getElementById('skippedCountDiv').style.display = 'block';
+                document.getElementById('skippedCount').textContent = result.skipped.length;
+
+                let skippedHtml = '';
+                result.skipped.forEach(item => {
+                    skippedHtml += `<div class="result-item skipped">
+                        <strong>${item.employee_name}</strong><br>
+                        <small>${item.reason}</small>
+                    </div>`;
+                });
+                document.getElementById('skippedList').innerHTML = skippedHtml;
+                document.getElementById('skippedDetails').style.display = 'block';
+            }
+
+            if (result.errors && result.errors.length > 0) {
+                document.getElementById('errorDetails').style.display = 'block';
+
+                let errorHtml = '';
+                result.errors.forEach(item => {
+                    errorHtml += `<div class="result-item error">
+                        <strong>${item.employee_name}</strong><br>
+                        <small>${item.error}</small>
+                    </div>`;
+                });
+                document.getElementById('errorList').innerHTML = errorHtml;
+            }
+
+            document.getElementById('resultOverlay').classList.add('show');
+            document.getElementById('resultModal').classList.add('show');
+        }
+
+        function closeResultModal() {
+            document.getElementById('resultOverlay').classList.remove('show');
+            document.getElementById('resultModal').classList.remove('show');
+
+            // Reset result display
+            document.getElementById('failedCountDiv').style.display = 'none';
+            document.getElementById('skippedCountDiv').style.display = 'none';
+            document.getElementById('skippedDetails').style.display = 'none';
+            document.getElementById('errorDetails').style.display = 'none';
+        }
+
+        // Close modal on overlay click
+        document.getElementById('resultOverlay').addEventListener('click', closeResultModal);
+    </script>
+</body>
+
+</html>

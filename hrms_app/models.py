@@ -2093,7 +2093,6 @@ class NotificationSetting(models.Model):
             ),  # Index for faster lookups by user
         ]
 
-
 class Holiday(models.Model):
     title = models.CharField(max_length=100, verbose_name=_("Title"))
     short_code = models.CharField(
@@ -2105,6 +2104,17 @@ class Holiday(models.Model):
     color_hex = models.CharField(
         max_length=7, blank=True, null=True, verbose_name=_("Color Hex Code")
     )
+    
+    # NEW FIELD: Make holidays user-specific
+    applicable_users = models.ManyToManyField(
+        get_user_model(),
+        related_name="applicable_holidays",
+        blank=True,
+        verbose_name=_("Applicable Users"),
+        help_text=_("Leave blank to apply to all users")
+    )
+    
+    
     created_at = models.DateTimeField(auto_now=True, verbose_name=_("Created At"))
     created_by = models.ForeignKey(
         get_user_model(),
@@ -2129,7 +2139,6 @@ class Holiday(models.Model):
         if not self.pk:
             self.created_by = kwargs.pop("created_by", None)
         self.updated_by = kwargs.pop("updated_by", None)
-
         super(Holiday, self).save(*args, **kwargs)
 
     def clean(self):
@@ -2148,7 +2157,6 @@ class Holiday(models.Model):
             models.Index(fields=["start_date"]),
             models.Index(fields=["end_date"]),
         ]
-
 
 from datetime import datetime, timedelta
 from django.utils.timezone import make_aware, is_naive,now

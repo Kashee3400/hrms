@@ -3,7 +3,6 @@ from hrms_app.hrms.form import *
 from django.views.generic import (
     TemplateView,
 )
-from django.db.models.functions import Round
 from collections import defaultdict
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
@@ -11,96 +10,152 @@ from django.contrib.auth.mixins import (
 from django.utils.translation import gettext_lazy as _
 import logging
 from django.db.models import Q
-
-logger = logging.getLogger(__name__)
 User = get_user_model()
 from django.http import HttpResponse
 import pandas as pd
-from django.utils.timezone import make_aware, localtime, utc
-from datetime import datetime, timedelta
-from itertools import chain
-from hrms_app.utility.report_utils import *
-from hrms_app.utility import attendanceutils as at
+from django.utils.timezone import make_aware
+from datetime import datetime
+
+from hrms_app.utility.attendanceutils import (
+    get_attendance_logs,
+    get_leave_logs,
+    get_tour_logs,
+    get_holiday_logs,
+    get_days_in_month,
+)
+from ..utility.report_utils import get_monthly_presence_html_table
+
+from ..utility.attendance_mapper import AttendanceMapper
+logger = logging.getLogger(__name__)
+
 
 class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/present_absent_report.html"
-    permission_denied_message = _("U are not authorized to access the page")
+    permission_denied_message = _("You are not authorized to access this page")
     title = _("Attendance Report")
 
-
-    def _get_filtered_employees(self, location, active):
-        employees = CustomUser.objects.filter(is_active=active)
-        if location:
-            employees = employees.filter(device_location_id=location)
-        return employees.order_by("first_name")
-
     def get_context_data(self, **kwargs):
+        """Main method - orchestrates data fetching and processing"""
         context = super().get_context_data(**kwargs)
         form = AttendanceReportFilterForm(self.request.GET)
 
         if form.is_valid():
-            location = self.request.GET.get("location")
-            from_date = self.request.GET.get("from_date")
-            to_date = self.request.GET.get("to_date")
-            active = self.request.GET.get("active")
             try:
-                converted_from_datetime, converted_to_datetime = self._get_date_range(
-                    from_date, to_date
-                )
-            except ValueError:
-                context["error"] = "Invalid date format. Please use YYYY-MM-DD."
-                return context
-
-            active = True if active == "on" else False
-            employees = self._get_filtered_employees(location, active)
-            employee_ids = employees.values_list("id",flat=True)
-            attendance_logs = at.get_attendance_logs(
-                employee_ids, converted_from_datetime, converted_to_datetime
-            )
-            leave_logs = at.get_leave_logs(
-                employee_ids, converted_from_datetime, converted_to_datetime
-            )
-            tour_logs = at.get_tour_logs(
-                employee_ids, converted_from_datetime, converted_to_datetime
-            )
-            holidays = at.get_holiday_logs(
-                converted_from_datetime, converted_to_datetime
-            )
-
-            attendance_data = at.map_attendance_data(
-                attendance_logs=attendance_logs,
-                leave_logs=leave_logs,
-                holidays=holidays,
-                tour_logs=tour_logs,
-                start_date_object=converted_from_datetime,
-                end_date_object=converted_to_datetime,
-            )
-
-            context["days_in_month"] = at.get_days_in_month(
-                converted_from_datetime, converted_to_datetime
-            )
-            context["attendance_data"] = attendance_data
-            context["employees"] = employees
-            context['from_date']=converted_to_datetime
-            
+                context.update(self._process_valid_form(form))
+            except Exception as e:
+                logger.error(f"Error processing attendance report: {str(e)}")
+                context["error"] = "An error occurred while generating the report."
+                context["form"] = form
         else:
             context["error"] = "Please select a location and date range."
-        context["form"] = form
+            context["form"] = form
+
         context["title"] = self.title
         context["urls"] = self._get_breadcrumb_urls()
         return context
 
+    def _process_valid_form(self, form):
+        """Process valid form and return context data"""
+        
+        # 1. Extract and validate date range
+        from_date = self.request.GET.get("from_date")
+        to_date = self.request.GET.get("to_date")
+        converted_from_datetime, converted_to_datetime = self._get_date_range(
+            from_date, to_date
+        )
+        
+        # 2. Get filter parameters
+        location = self.request.GET.get("location")
+        active = self.request.GET.get("active") == "on"
+        
+        # 3. Get filtered employees
+        employees = self._get_filtered_employees(location, active)
+        employee_ids = list(employees.values_list("id", flat=True))
+        
+        if not employee_ids:
+            return {
+                "form": form,
+                "error": "No employees found with the selected filters.",
+                "attendance_data": {},
+                "days_in_month": [],
+                "employees": [],
+            }
+        
+        # 4. Fetch all required data (optimized queries)
+        attendance_data = self._get_attendance_data(
+            employee_ids,
+            converted_from_datetime,
+            converted_to_datetime,
+        )
+        
+        # 5. Build context
+        return {
+            "form": form,
+            "attendance_data": attendance_data,
+            "days_in_month": get_days_in_month(
+                converted_from_datetime, converted_to_datetime
+            ),
+            "employees": employees,
+            "from_date": converted_from_datetime,
+            "to_date": converted_to_datetime,
+            "location": location,
+        }
+
+    def _get_attendance_data(self, employee_ids, start_date, end_date):
+        """
+        Fetch and process all attendance data using optimized mapper.
+        This replaces the old map_attendance_data call.
+        """
+        
+        # Fetch all data with optimized queries
+        attendance_logs = get_attendance_logs(employee_ids, start_date, end_date)
+        leave_logs = get_leave_logs(employee_ids, start_date, end_date)
+        tour_logs = get_tour_logs(employee_ids, start_date, end_date)
+        holidays = get_holiday_logs(start_date, end_date, employee_ids)
+        
+        # Convert start_date and end_date to date objects if they're datetime
+        start_date_obj = start_date.date() if hasattr(start_date, 'date') else start_date
+        end_date_obj = end_date.date() if hasattr(end_date, 'date') else end_date
+        mapper = AttendanceMapper(start_date_obj, end_date_obj)
+        attendance_data = mapper.map_attendance_data(
+            attendance_logs=attendance_logs,
+            leave_logs=leave_logs,
+            holidays=holidays,
+            tour_logs=tour_logs,
+        )
+        
+        return attendance_data
+
+    def _get_filtered_employees(self, location, active):
+        """Get employees based on filters"""
+        employees = CustomUser.objects.filter(is_active=active)
+        
+        if location:
+            employees = employees.filter(device_location_id=location)
+        
+        return employees.order_by("first_name")
+
+    def _get_date_range(self, from_date, to_date):
+        """Convert string dates to datetime objects"""
+        try:
+            converted_from_datetime = make_aware(
+                datetime.strptime(from_date, "%Y-%m-%d")
+            )
+            converted_to_datetime = make_aware(
+                datetime.strptime(to_date, "%Y-%m-%d")
+            )
+            return converted_from_datetime, converted_to_datetime
+        except ValueError as e:
+            logger.error(f"Date parsing error: {str(e)}")
+            raise ValueError("Invalid date format. Please use YYYY-MM-DD.")
+
     def _get_breadcrumb_urls(self):
-        """Generate breadcrumb URLs for the template."""
+        """Generate breadcrumb URLs for the template"""
         return [
             ("dashboard", {"label": "Dashboard"}),
             ("attendance_report", {"label": "Attendance Report"}),
         ]
 
-    def _get_date_range(self, from_date, to_date):
-        converted_from_datetime = make_aware(datetime.strptime(from_date, "%Y-%m-%d"))
-        converted_to_datetime = make_aware(datetime.strptime(to_date, "%Y-%m-%d"))
-        return converted_from_datetime, converted_to_datetime
 
 
 class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):

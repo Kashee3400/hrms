@@ -3,12 +3,14 @@ from .tasks import send_leave_application_notifications
 from django.contrib.sites.models import Site
 from .models import LeaveApplication, UserTour, Notification,LeaveBalanceOpenings,CustomUser,AttendanceLog
 from django.contrib.contenttypes.models import ContentType
-from django.db.models.signals import post_save,pre_delete,pre_init,pre_migrate,post_delete,post_init,post_migrate,pre_save
+from django.db.models.signals import post_save,pre_delete,pre_save
 from django.dispatch import receiver
 from django.conf import settings
 from hrms_app.models import *
 from django.core.exceptions import ImproperlyConfigured
 from hrms_app.hrms.utils import check_lock_status
+from hrms_app.models import OfficeLocation
+# from .utility.detailed_attendance_mapper import export_attendance_to_excel
 
 @receiver(post_save, sender=CustomUser)
 def initialize_leave_balance(sender, instance, created, **kwargs):
@@ -187,3 +189,4 @@ from .tasks import send_announcement_email_task
 @receiver(post_save, sender=HRAnnouncement)
 def send_announcement_signal(sender, instance, created, **kwargs):
     send_announcement_email_task.delay(instance.id, created)
+

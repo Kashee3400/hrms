@@ -3,19 +3,15 @@ from collections import defaultdict
 from django.utils.translation import gettext_lazy as _
 from django.db.models import Prefetch
 from hrms_app.models import (
-    Holiday,
     AttendanceLog,
     AttendanceLogHistory,
     LeaveDay,
     UserTour,
     OfficeClosure,
 )
-
 User = get_user_model()
-import pandas as pd
 from django.utils.timezone import make_aware, localtime, utc
 from datetime import datetime, timedelta
-from itertools import chain
 from django.conf import settings
 
 
@@ -194,8 +190,9 @@ def generate_monthly_presence_data_detailed(
         applied_by__in=employees.values_list("id", flat=True),
         status=settings.APPROVED,
     ).select_related("applied_by__personal_detail")
-
-    holidays = get_payroll_date_holidays(converted_from_datetime, converted_to_datetime)
+    from .attendance_mapper import get_holiday_logs
+    
+    holidays = get_holiday_logs(converted_from_datetime, converted_to_datetime)
 
     process_sundays_and_holidays(
         employees,
@@ -210,6 +207,73 @@ def generate_monthly_presence_data_detailed(
     process_tours(all_tours, monthly_presence_data)
 
     return monthly_presence_data
+
+def process_sundays_and_holidays(
+    employees,
+    holidays,
+    monthly_presence_data,
+    converted_from_datetime,
+    converted_to_datetime,
+):
+    # -------------------------
+    # 1️⃣ Identify all Sundays
+    # -------------------------
+    sundays = {
+        (converted_from_datetime + timedelta(days=day)).strftime("%Y-%m-%d")
+        for day in range((converted_to_datetime - converted_from_datetime).days + 1)
+        if (converted_from_datetime + timedelta(days=day)).weekday() == 6
+    }
+
+    # -------------------------
+    # 2️⃣ Preload holiday applicability
+    # -------------------------
+    holiday_map = {}  # {holiday_date: (holiday_obj, [applicable_user_ids] or None)}
+
+    for holiday in holidays:
+        holiday_date = holiday.start_date.strftime("%Y-%m-%d")
+
+        # Get users this holiday applies to
+        applicable_users = list(
+            holiday.applicable_users.values_list("id", flat=True)
+        )
+
+        # If empty -> applies to everyone
+        holiday_map[holiday_date] = (
+            holiday,
+            applicable_users if applicable_users else None
+        )
+
+    # -------------------------
+    # 3️⃣ Apply Sunday + Holidays employee wise
+    # -------------------------
+    for employee in employees:
+        emp_code = employee.personal_detail_cache.employee_code
+        emp_id = employee.id
+
+        # ----- Sundays (global OFF unless already filled) -----
+        for sunday in sundays:
+            if sunday not in monthly_presence_data[emp_code]:
+                monthly_presence_data[emp_code][sunday]["sunday"] = {
+                    "status": "OFF",
+                    "in_time": None,
+                    "out_time": None,
+                    "total_duration": None,
+                }
+
+        # ----- Holidays (user-specific) -----
+        for holiday_date, (holiday, applicable_users) in holiday_map.items():
+
+            # only apply if:
+            # applicable_users is None OR emp_id is in applicable_users
+            if applicable_users is None or emp_id in applicable_users:
+
+                if holiday_date not in monthly_presence_data[emp_code]:
+                    monthly_presence_data[emp_code][holiday_date]["holiday"] = {
+                        "status": holiday.short_code,
+                        "in_time": None,
+                        "out_time": None,
+                        "total_duration": None,
+                    }
 
 
 def process_logs(logs, monthly_presence_data):
@@ -312,6 +376,24 @@ def process_tours(all_tours, monthly_presence_data):
             }
 
 
+
+def get_office_closers(start_date, end_date):
+    """
+    Fetch office closure records within a date range (inclusive),
+    returning only date and short_code fields as dictionaries.
+    
+    Returns:
+        List[Dict]: [{'date': ..., 'short_code': ...}, ...]
+    """
+    return list(
+        OfficeClosure.objects.filter(
+            date__range=(start_date, end_date)
+        )
+        .order_by('-date')
+        .values('date', 'short_code')
+    )
+
+
 def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
     # Combine date and time into datetime objects
     start_datetime = datetime.combine(start_date, start_time or datetime.min.time())
@@ -352,59 +434,6 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
     return daily_durations
 
 
-def process_sundays_and_holidays(
-    employees,
-    holidays,
-    monthly_presence_data,
-    converted_from_datetime,
-    converted_to_datetime,
-):
-    sundays = {
-        (converted_from_datetime + timedelta(days=day)).strftime("%Y-%m-%d")
-        for day in range((converted_to_datetime - converted_from_datetime).days + 1)
-        if (converted_from_datetime + timedelta(days=day)).weekday() == 6
-    }
-    for employee in employees:
-        emp_code = employee.personal_detail_cache.employee_code
-        for sunday in sundays:
-            if sunday not in monthly_presence_data[emp_code]:
-                monthly_presence_data[emp_code][sunday]["sunday"] = {
-                    "status": "OFF",
-                    "in_time": None,
-                    "out_time": None,
-                    "total_duration": None,
-                }
-        for holiday in holidays:
-            holiday_date = holiday.start_date.strftime("%Y-%m-%d")
-            if holiday_date not in monthly_presence_data[emp_code]:
-                monthly_presence_data[emp_code][holiday_date]["holiday"] = {
-                    "status": holiday.short_code,
-                    "in_time": None,
-                    "out_time": None,
-                    "total_duration": None,
-                }
-
-
-def get_payroll_date_holidays(start_date, end_date):
-    holidays = Holiday.objects.filter(start_date__range=[start_date, end_date])
-    return list(holidays)
-
-
-def get_office_closers(start_date, end_date):
-    """
-    Fetch office closure records within a date range (inclusive),
-    returning only date and short_code fields as dictionaries.
-    
-    Returns:
-        List[Dict]: [{'date': ..., 'short_code': ...}, ...]
-    """
-    return list(
-        OfficeClosure.objects.filter(
-            date__range=(start_date, end_date)
-        )
-        .order_by('-date')
-        .values('date', 'short_code')
-    )
 
 def mark_leave_attendance(current_date, att, day_entry_start):
     if current_date == att.startDate:
