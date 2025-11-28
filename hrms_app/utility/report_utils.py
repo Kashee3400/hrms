@@ -323,7 +323,7 @@ def process_logs(logs, monthly_presence_data):
             "total_duration": duration,
             "reg": "R" if log.regularized else office_closer['short_code'] if office_closer else "",
         }
-
+from datetime import timedelta
 
 def process_leaves(leaves, monthly_presence_data):
     for leave in leaves:
@@ -333,26 +333,29 @@ def process_leaves(leaves, monthly_presence_data):
             if leave.is_full_day
             else leave.leave_application.leave_type.half_day_short_code
         )
-        # Fetch attendance for the current, previous, and next dates
+
         employee_attendance = monthly_presence_data.get(emp_code, {})
         date_key = leave.date.strftime("%Y-%m-%d")
         current_entry = (
             employee_attendance.get(date_key, {}) if employee_attendance else None
         )
-        # Check if current_entry contains FL or OFF and remove them
-        if not code == "CL":
+
+        # Remove OFF/FL only if not CL
+        if code != "CL":
             if current_entry and (
                 current_entry.get("sunday", {}).get("status") == "OFF"
                 or current_entry.get("holiday", {}).get("status") == "FL"
             ):
                 current_entry.pop("sunday", None)
                 current_entry.pop("holiday", None)
-        # Add the leave entry
+
+        # Ensure structure exists
         if emp_code not in monthly_presence_data:
             monthly_presence_data[emp_code] = {}
         if date_key not in monthly_presence_data[emp_code]:
             monthly_presence_data[emp_code][date_key] = {}
 
+        # Add leave for this date
         monthly_presence_data[emp_code][date_key]["leave"] = {
             "leave": code,
             "in_time": None,
@@ -360,6 +363,23 @@ def process_leaves(leaves, monthly_presence_data):
             "total_duration": None,
         }
 
+        # ----------------------------------------------------------
+        #   ⭐ OVERRIDE SUNDAY IF SATURDAY HAS LWP (your requirement)
+        # ----------------------------------------------------------
+        if leave.date.weekday() == 5 and code == "LWP":   # Saturday = 5
+            sunday_date = (leave.date + timedelta(days=1)).strftime("%Y-%m-%d")
+
+            # Ensure Sunday section exists
+            if sunday_date not in monthly_presence_data[emp_code]:
+                monthly_presence_data[emp_code][sunday_date] = {}
+
+            # OVERRIDE SUNDAY → LWP (remove OFF or existing keys)
+            monthly_presence_data[emp_code][sunday_date]["sunday"] = {
+                "status": "LWP",
+                "in_time": None,
+                "out_time": None,
+                "total_duration": None,
+            }
 
 def process_tours(all_tours, monthly_presence_data):
     for tour in all_tours:
