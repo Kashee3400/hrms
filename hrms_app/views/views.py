@@ -197,7 +197,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return f"{int(hours):02}h : {int(minutes):02}m"
 
     def get_attendance(self, employees, from_datetime, to_datetime):
-        """Fetch attendance logs and process attendance data."""
+        """
+        Fetch and process all attendance data using optimized mapper.
+        This replaces the old map_attendance_data call.
+        """
+        from ..utility.attendance_mapper import AttendanceMapper
         employee_ids = list(employees.values_list("id", flat=True))
 
         # Fetch attendance-related logs
@@ -207,17 +211,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         leave_logs = at.get_leave_logs(employee_ids, from_datetime, to_datetime)
         tour_logs = at.get_tour_logs(employee_ids, from_datetime, to_datetime)
         holidays = at.get_holiday_logs(from_datetime, to_datetime)
-
-        # Map attendance data
-        return at.map_attendance_data(
+        
+        # Convert start_date and end_date to date objects if they're datetime
+        start_date_obj = from_datetime.date() if hasattr(from_datetime, 'date') else from_datetime
+        end_date_obj = to_datetime.date() if hasattr(to_datetime, 'date') else to_datetime
+        mapper = AttendanceMapper(start_date_obj, end_date_obj)
+        attendance_data = mapper.map_attendance_data(
             attendance_logs=attendance_logs,
             leave_logs=leave_logs,
             holidays=holidays,
             tour_logs=tour_logs,
-            start_date_object=from_datetime,
-            end_date_object=to_datetime,
         )
-
+        
+        return attendance_data
 
 class EmployeeProfileView(LoginRequiredMixin, DetailView):
     template_name = "hrms_app/profile.html"
