@@ -1,7 +1,5 @@
 from hrms_app.utility.common_imports import *
 from django.utils.translation import gettext_lazy as _
-from hrms_app.tasks import send_reminder_email
-
 
 def custom_permission_denied(request, exception=None):
     error_message = (
@@ -468,7 +466,8 @@ class LeaveTrackerView(ModelPermissionRequiredMixin, SingleTableMixin, TemplateV
             )
         return context
 
-from django.urls import reverse, NoReverseMatch
+from django.urls import reverse, reverse_lazy, NoReverseMatch
+
 
 @method_decorator(login_required, name="dispatch")
 class ApplyOrUpdateLeaveView(
@@ -477,16 +476,35 @@ class ApplyOrUpdateLeaveView(
     model = LeaveApplication
     form_class = LeaveApplicationForm
     template_name = "hrms_app/apply-leave.html"
+
     success_message_create = _("Leave applied successfully.")
     success_message_update = _("Leave updated successfully.")
+
     permission_action_create = "add"
     permission_action_update = "change"
+
     title = _("Create Update Leave Application")
 
+    # ------------------------------------------------------------------
+    # 🔑 CENTRAL YEAR RESOLUTION (QUERY PARAM BASED)
+    # ------------------------------------------------------------------
+    def get_selected_year(self):
+        """
+        Resolve leave year from query param.
+        Fallback to current year.
+        """
+        try:
+            return int(self.request.GET.get("year", timezone.now().year))
+        except (TypeError, ValueError):
+            return timezone.now().year
+
+    # ------------------------------------------------------------------
+    # DISPATCH — PERMISSION CHECK
+    # ------------------------------------------------------------------
     def dispatch(self, request, *args, **kwargs):
-        """Check if the user has permission dynamically for the model."""
         self.object = None
-        if "slug" in kwargs:  # 'slug' determines update vs. create
+
+        if "slug" in kwargs:
             self.object = self.get_object()
             permission_action = self.permission_action_update
         else:
@@ -494,102 +512,150 @@ class ApplyOrUpdateLeaveView(
 
         opts = self.model._meta
         perm = f"{opts.app_label}.{permission_action}_{opts.model_name}"
+
         if not request.user.has_perm(perm):
             raise PermissionDenied("You do not have permission to perform this action.")
+
         return super().dispatch(request, *args, **kwargs)
 
-    def get_form(self, form_class=None):
-        """Retrieve the form instance with the correct data."""
-        if form_class is None:
-            form_class = self.get_form_class()
-        return form_class(**self.get_form_kwargs())
-
+    # ------------------------------------------------------------------
+    # FORM KWARGS
+    # ------------------------------------------------------------------
     def get_form_kwargs(self):
-        """Pass additional data to the form."""
         kwargs = super().get_form_kwargs()
         kwargs["user"] = self.request.user
         kwargs["leave_type"] = (
             self.object.leave_type.id if self.object else self.kwargs.get("leave_type")
         )
-
         return kwargs
 
+    # ------------------------------------------------------------------
+    # FORM VALID
+    # ------------------------------------------------------------------
     def form_valid(self, form):
-        """Handle successful form submission with probation check."""
         user = self.request.user
+        selected_year = self.get_selected_year()
+
+        leave_application = form.save(commit=False)
+        leave_type = form.cleaned_data.get("leave_type")
+
+        # --------------------------------------------------------------
+        # PROBATION CHECK (EL)
+        # --------------------------------------------------------------
         if hasattr(user, "personal_detail") and user.personal_detail.doj:
             doj = user.personal_detail.doj
             probation_period_end = doj + timedelta(days=180)
-            leave_type = form.cleaned_data.get("leave_type")
+
             if (
                 leave_type
                 and leave_type.leave_type_short_code == "EL"
-                and now().date() < probation_period_end
+                and timezone.now().date() < probation_period_end
             ):
                 messages.error(
                     self.request,
                     "You are still in the probation period and cannot apply for Earned Leave (EL).",
                 )
                 return self.form_invalid(form)
-        leave_application = form.save(commit=False)
-        stats = LeaveStatsManager(user=user, leave_type=leave_application.leave_type)
-        remaining_balance = stats.get_remaining_balance(year=timezone.now().year)
-        if leave_application.usedLeave > remaining_balance and leave_type.leave_type_short_code != "LWP":
-            form.add_error("usedLeave", _("Total days exceeds your remaining balance."))
+
+        # --------------------------------------------------------------
+        # YEAR-AWARE BALANCE VALIDATION
+        # --------------------------------------------------------------
+        stats = LeaveStatsManager(
+            user=user,
+            leave_type=leave_application.leave_type,
+        )
+
+        remaining_balance = stats.get_remaining_balance(year=selected_year)
+
+        if (
+            leave_application.usedLeave > remaining_balance
+            and leave_type.leave_type_short_code != "LWP"
+        ):
+            form.add_error(
+                "usedLeave",
+                _(f"Total days exceeds your remaining balance for {selected_year}."),
+            )
             return self.form_invalid(form)
+
+        # --------------------------------------------------------------
+        # SAVE
+        # --------------------------------------------------------------
         leave_application.appliedBy = user
         leave_application.attachment = self.request.FILES.get("attachment")
         leave_application.save()
-        success_message = (
-            self.success_message_update if self.object else self.success_message_create
+
+        messages.success(
+            self.request,
+            self.success_message_update if self.object else self.success_message_create,
         )
-        messages.success(self.request, success_message)
-        next_url = self.request.POST.get("next")
-        leave_url = reverse('leave_application_detail', kwargs={'slug': leave_application.slug})
-        if not leave_url :
-            leave_url = next_url
+
+        # --------------------------------------------------------------
+        # REDIRECT
+        # --------------------------------------------------------------
         try:
-            # Try to construct the leave URL
-            leave_url = reverse('leave_application_detail', kwargs={'slug': leave_application.slug})
-            return redirect(leave_url)
+            return redirect(
+                reverse(
+                    "leave_application_detail",
+                    kwargs={"slug": leave_application.slug},
+                )
+            )
         except NoReverseMatch:
-            # Fallback to `next` if `leave_url` fails
             next_url = self.request.POST.get("next")
             if next_url and urlparse(next_url).netloc == "":
                 return redirect(next_url)
             return redirect(reverse_lazy("leave_tracker"))
 
+    # ------------------------------------------------------------------
+    # FORM INVALID
+    # ------------------------------------------------------------------
     def form_invalid(self, form):
-        """Handle form submission failure."""
-        context = self.get_context_data(form=form)
-        return self.render_to_response(context)
+        return self.render_to_response(self.get_context_data(form=form))
 
+    # ------------------------------------------------------------------
+    # CONTEXT DATA (YEAR-AWARE)
+    # ------------------------------------------------------------------
     def get_context_data(self, **kwargs):
-        """Prepare context data for the template."""
         context = super().get_context_data(**kwargs)
+
+        selected_year = self.get_selected_year()
+
         leave_type_id = (
             self.object.leave_type.id if self.object else self.kwargs.get("leave_type")
         )
+
         leave_balance = LeaveBalanceOpenings.objects.filter(
             user=self.request.user,
             leave_type_id=leave_type_id,
-            year=timezone.now().year,
+            year=selected_year,
         ).first()
-        stats = LeaveStatsManager(
-            user=self.request.user, leave_type=leave_balance.leave_type
-        )
-        el_count = stats.get_el_applied_times()
-        rem_bal = stats.get_remaining_balance(year=timezone.now().year)
+
+        el_count = 0
+        rem_bal = 0
+
+        if leave_balance:
+            stats = LeaveStatsManager(
+                user=self.request.user,
+                leave_type=leave_balance.leave_type,
+            )
+            el_count = stats.get_el_applied_times()
+            rem_bal = stats.get_remaining_balance(year=selected_year)
+
         context.update(
             {
                 "leave_balance": leave_balance,
-                "rem_bal":int(rem_bal) if leave_balance.leave_type.leave_type_short_code == "EL" else rem_bal,
+                "rem_bal": (
+                    int(rem_bal)
+                    if leave_balance
+                    and leave_balance.leave_type.leave_type_short_code == "EL"
+                    else rem_bal
+                ),
+                "leave_year": selected_year,
                 "object": self.object,
                 "el_count": el_count,
                 "form": kwargs.get(
                     "form",
                     LeaveApplicationForm(
-                        instance=self.object,  # Ensure instance is passed
+                        instance=self.object,
                         user=self.request.user,
                         leave_type=leave_type_id,
                     ),
@@ -601,13 +667,157 @@ class ApplyOrUpdateLeaveView(
                 ],
             }
         )
+
         return context
 
+    # ------------------------------------------------------------------
+    # GET OBJECT
+    # ------------------------------------------------------------------
     def get_object(self):
-        """Retrieve the object for update."""
         if "slug" in self.kwargs:
             return LeaveApplication.objects.get(slug=self.kwargs["slug"])
         return None
+
+# from django.urls import reverse, NoReverseMatch
+
+# @method_decorator(login_required, name="dispatch")
+# class ApplyOrUpdateLeaveView(
+#     LoginRequiredMixin, SuccessMessageMixin, ModelFormMixin, FormView
+# ):
+#     model = LeaveApplication
+#     form_class = LeaveApplicationForm
+#     template_name = "hrms_app/apply-leave.html"
+#     success_message_create = _("Leave applied successfully.")
+#     success_message_update = _("Leave updated successfully.")
+#     permission_action_create = "add"
+#     permission_action_update = "change"
+#     title = _("Create Update Leave Application")
+
+#     def dispatch(self, request, *args, **kwargs):
+#         """Check if the user has permission dynamically for the model."""
+#         self.object = None
+#         if "slug" in kwargs:  # 'slug' determines update vs. create
+#             self.object = self.get_object()
+#             permission_action = self.permission_action_update
+#         else:
+#             permission_action = self.permission_action_create
+
+#         opts = self.model._meta
+#         perm = f"{opts.app_label}.{permission_action}_{opts.model_name}"
+#         if not request.user.has_perm(perm):
+#             raise PermissionDenied("You do not have permission to perform this action.")
+#         return super().dispatch(request, *args, **kwargs)
+
+#     def get_form(self, form_class=None):
+#         """Retrieve the form instance with the correct data."""
+#         if form_class is None:
+#             form_class = self.get_form_class()
+#         return form_class(**self.get_form_kwargs())
+
+#     def get_form_kwargs(self):
+#         """Pass additional data to the form."""
+#         kwargs = super().get_form_kwargs()
+#         kwargs["user"] = self.request.user
+#         kwargs["leave_type"] = (
+#             self.object.leave_type.id if self.object else self.kwargs.get("leave_type")
+#         )
+
+#         return kwargs
+
+#     def form_valid(self, form):
+#         """Handle successful form submission with probation check."""
+#         user = self.request.user
+#         if hasattr(user, "personal_detail") and user.personal_detail.doj:
+#             doj = user.personal_detail.doj
+#             probation_period_end = doj + timedelta(days=180)
+#             leave_type = form.cleaned_data.get("leave_type")
+#             if (
+#                 leave_type
+#                 and leave_type.leave_type_short_code == "EL"
+#                 and now().date() < probation_period_end
+#             ):
+#                 messages.error(
+#                     self.request,
+#                     "You are still in the probation period and cannot apply for Earned Leave (EL).",
+#                 )
+#                 return self.form_invalid(form)
+#         leave_application = form.save(commit=False)
+#         stats = LeaveStatsManager(user=user, leave_type=leave_application.leave_type)
+#         remaining_balance = stats.get_remaining_balance(year=timezone.now().year)
+#         if leave_application.usedLeave > remaining_balance and leave_type.leave_type_short_code != "LWP":
+#             form.add_error("usedLeave", _("Total days exceeds your remaining balance."))
+#             return self.form_invalid(form)
+#         leave_application.appliedBy = user
+#         leave_application.attachment = self.request.FILES.get("attachment")
+#         leave_application.save()
+#         success_message = (
+#             self.success_message_update if self.object else self.success_message_create
+#         )
+#         messages.success(self.request, success_message)
+#         next_url = self.request.POST.get("next")
+#         leave_url = reverse('leave_application_detail', kwargs={'slug': leave_application.slug})
+#         if not leave_url :
+#             leave_url = next_url
+#         try:
+#             # Try to construct the leave URL
+#             leave_url = reverse('leave_application_detail', kwargs={'slug': leave_application.slug})
+#             return redirect(leave_url)
+#         except NoReverseMatch:
+#             # Fallback to `next` if `leave_url` fails
+#             next_url = self.request.POST.get("next")
+#             if next_url and urlparse(next_url).netloc == "":
+#                 return redirect(next_url)
+#             return redirect(reverse_lazy("leave_tracker"))
+
+#     def form_invalid(self, form):
+#         """Handle form submission failure."""
+#         context = self.get_context_data(form=form)
+#         return self.render_to_response(context)
+
+#     def get_context_data(self, **kwargs):
+#         """Prepare context data for the template."""
+#         context = super().get_context_data(**kwargs)
+#         leave_type_id = (
+#             self.object.leave_type.id if self.object else self.kwargs.get("leave_type")
+#         )
+#         leave_balance = LeaveBalanceOpenings.objects.filter(
+#             user=self.request.user,
+#             leave_type_id=leave_type_id,
+#             year=timezone.now().year,
+#         ).first()
+#         stats = LeaveStatsManager(
+#             user=self.request.user, leave_type=leave_balance.leave_type
+#         )
+#         el_count = stats.get_el_applied_times()
+#         rem_bal = stats.get_remaining_balance(year=timezone.now().year)
+#         context.update(
+#             {
+#                 "leave_balance": leave_balance,
+#                 "rem_bal":int(rem_bal) if leave_balance.leave_type.leave_type_short_code == "EL" else rem_bal,
+#                 "object": self.object,
+#                 "el_count": el_count,
+#                 "form": kwargs.get(
+#                     "form",
+#                     LeaveApplicationForm(
+#                         instance=self.object,  # Ensure instance is passed
+#                         user=self.request.user,
+#                         leave_type=leave_type_id,
+#                     ),
+#                 ),
+#                 "title": self.title,
+#                 "urls": [
+#                     ("home", {"label": "Home"}),
+#                     ("leave_tracker", {"label": "Leave Tracker"}),
+#                 ],
+#             }
+#         )
+#         return context
+
+#     def get_object(self):
+#         """Retrieve the object for update."""
+#         if "slug" in self.kwargs:
+#             return LeaveApplication.objects.get(slug=self.kwargs["slug"])
+#         return None
 
 
 class GenericDeleteView(LoginRequiredMixin, SuccessMessageMixin, DeleteView):

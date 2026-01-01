@@ -1,6 +1,13 @@
 $(document).ready(function () {
     $('select').select2('destroy');
     $(document).on('dp.change', function () {
+        var startDate = $('#id_startDate').val();
+        const selectedYear = new Date(startDate).getFullYear();
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('year') !== String(selectedYear)) {
+            url.searchParams.set('year', selectedYear);
+            window.location.href = url.toString();
+        }
         updateDateHandling();
     })
     updateDateHandling();
@@ -128,7 +135,7 @@ $(document).ready(function () {
         const day = String(d.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     }
-    
+
 
     function generateDateOptions(startDate, endDate) {
         var currentDate = new Date(startDate);
