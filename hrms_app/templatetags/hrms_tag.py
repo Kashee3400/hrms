@@ -150,49 +150,94 @@ def render_employee_navigation(context):
 
 from django.db.models import Sum
 
+from django.utils.timezone import now
+from django.urls import reverse
 
 @register.inclusion_tag("leave_balances/leave_balance_list.html")
 def get_leave_balances(user, request):
-    """Fetch leave balances for the user, including used leave."""
+    """Fetch leave balances for the user for the CURRENT YEAR only."""
     try:
+        current_year = now().year
+
         leave_types = LeaveType.objects.all()
+
+        # ✅ Current year opening balances
         leave_balances = LeaveBalanceOpenings.objects.filter(
-            user=user, leave_type__in=leave_types
+            user=user,
+            year=current_year,
+            leave_type__in=leave_types,
         )
+
         leave_balances_dict = {lb.leave_type: lb for lb in leave_balances}
+
+        # ✅ Pending leaves (current year)
         user_pending_leaves = LeaveApplication.objects.filter(
-            appliedBy=user, status=settings.PENDING
+            appliedBy=user,
+            status=settings.PENDING,
+            endDate__year=current_year,
         )
 
         leave_balances_list = []
+
         for lb in leave_balances:
-            # Calculate used leave for this leave type
+            # ✅ Approved leaves used in current year
             used_leave = (
                 LeaveApplication.objects.filter(
-                    appliedBy=user, leave_type=lb.leave_type, status=settings.APPROVED
+                    appliedBy=user,
+                    leave_type=lb.leave_type,
+                    status=settings.APPROVED,
+                    endDate__year=current_year,
                 ).aggregate(Sum("usedLeave"))["usedLeave__sum"]
                 or 0
-            )  # Default to 0 if None
+            )
 
+            # ✅ Pending (on-hold) leaves for current year
             on_hold_leave = sum(
                 leave.usedLeave
                 for leave in user_pending_leaves
                 if leave.leave_type == lb.leave_type
             )
+
             total_balance = lb.remaining_leave_balances - on_hold_leave
+
             leave_balances_list.append(
                 {
                     "pk": lb.pk,
-                    "balance": int(lb.remaining_leave_balances) if lb.leave_type.leave_type_short_code == 'EL' else lb.remaining_leave_balances,
-                    "used_leave": int(used_leave) if lb.leave_type.leave_type_short_code == 'EL' else used_leave,
-                    "on_hold": int(on_hold_leave) if lb.leave_type.leave_type_short_code == 'EL' else on_hold_leave,
-                    "total_balance": int(total_balance) if lb.leave_type.leave_type_short_code == 'EL' else total_balance,
+                    "balance": (
+                        int(lb.remaining_leave_balances)
+                        if lb.leave_type.leave_type_short_code == "EL"
+                        else lb.remaining_leave_balances
+                    ),
+                    "used_leave": (
+                        int(used_leave)
+                        if lb.leave_type.leave_type_short_code == "EL"
+                        else used_leave
+                    ),
+                    "on_hold": (
+                        int(on_hold_leave)
+                        if lb.leave_type.leave_type_short_code == "EL"
+                        else on_hold_leave
+                    ),
+                    "total_balance": (
+                        int(total_balance)
+                        if lb.leave_type.leave_type_short_code == "EL"
+                        else total_balance
+                    ),
                     "leave_type": lb.leave_type,
-                    "url": reverse("apply_leave_with_id", args=[lb.leave_type.pk]),
+                    "url": reverse(
+                        "apply_leave_with_id",
+                        args=[lb.leave_type.pk],
+                    ),
                     "color": lb.leave_type.color_hex,
                 }
             )
-        if user.personal_detail and user.personal_detail.gender.gender == "Female":
+
+        # ✅ Female-only ML logic (current year)
+        if (
+            hasattr(user, "personal_detail")
+            and user.personal_detail
+            and user.personal_detail.gender.gender == "Female"
+        ):
             ml_balance = leave_balances_dict.get(settings.ML)
             if ml_balance:
                 used_leave = (
@@ -200,37 +245,40 @@ def get_leave_balances(user, request):
                         appliedBy=user,
                         leave_type=ml_balance.leave_type,
                         status=settings.APPROVED,
+                        endDate__year=current_year,
                     ).aggregate(Sum("usedLeave"))["usedLeave__sum"]
                     or 0
                 )
+
                 on_hold_leave = sum(
                     leave.usedLeave
                     for leave in user_pending_leaves
                     if leave.leave_type == ml_balance.leave_type
                 )
+
                 leave_balances_list.append(
                     {
                         "pk": ml_balance.pk,
                         "balance": ml_balance.remaining_leave_balances,
                         "used_leave": used_leave,
                         "on_hold": on_hold_leave,
-                        "total_balance": ml_balance.remaining_leave_balances
-                        - used_leave
-                        - on_hold_leave,
+                        "total_balance": (
+                            ml_balance.remaining_leave_balances
+                            - used_leave
+                            - on_hold_leave
+                        ),
                         "leave_type": ml_balance.leave_type.leave_type,
                         "url": reverse(
-                            "apply_leave_with_id", args=[ml_balance.leave_type.id]
+                            "apply_leave_with_id",
+                            args=[ml_balance.leave_type.id],
                         ),
-                        "color": "#ff9447",  # Special color for ML leave
+                        "color": "#ff9447",
                     }
                 )
 
         return {"leave_balances": leave_balances_list, "request": request}
 
-    except LeaveBalanceOpenings.DoesNotExist:
-        return {"leave_balances": []}
-    except Exception as e:
-        # Log the error if necessary
+    except Exception:
         return {"leave_balances": []}
 
 
@@ -627,7 +675,7 @@ def str_to_date(value):
 
 @register.inclusion_tag(filename="leave_balances/holidays.html")
 def get_holidays():
-    return {"holidays": Holiday.objects.filter(year=now().year).order_by("start_date")}
+    return {"holidays": Holiday.objects.filter(start_date__year=now().year).order_by("start_date")}
 
 
 @register.inclusion_tag(filename="leave_balances/announcement.html")
