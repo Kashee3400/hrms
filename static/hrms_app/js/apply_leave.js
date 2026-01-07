@@ -1,13 +1,13 @@
 $(document).ready(function () {
     $('select').select2('destroy');
     $(document).on('dp.change', function () {
-        var startDate = $('#id_startDate').val();
-        const selectedYear = new Date(startDate).getFullYear();
-        const url = new URL(window.location.href);
-        if (url.searchParams.get('year') !== String(selectedYear)) {
-            url.searchParams.set('year', selectedYear);
-            window.location.href = url.toString();
-        }
+        // var startDate = $('#id_startDate').val();
+        // const selectedYear = new Date(startDate).getFullYear();
+        // const url = new URL(window.location.href);
+        // if (url.searchParams.get('year') !== String(selectedYear)) {
+        //     url.searchParams.set('year', selectedYear);
+        //     window.location.href = url.toString();
+        // }
         updateDateHandling();
     })
     updateDateHandling();
