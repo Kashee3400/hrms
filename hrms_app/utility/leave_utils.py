@@ -11,6 +11,13 @@ from hrms_app.models import (
 from hrms_app.hrms.utils import get_non_working_days
 from django.conf import settings
 from hrms_app.hrms.utils import *
+import logging
+
+from django.db.models import Sum
+from django.db.models.functions import TruncMonth
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_employee_requested_leave(user, status=None):
@@ -101,15 +108,12 @@ def get_regularization_requests(user, status=None):
 
 
 def format_date(date):
-    from django.utils.timezone import make_aware, make_naive
-
+    from django.utils.timezone import  make_naive
     naive_date = make_naive(date)
     output_format = "%Y-%m-%d"
     formatted_date = naive_date.strftime(output_format)
     return formatted_date
 
-
-logger = logging.getLogger(__name__)
 
 
 def filter_leaves(queryset, form):
@@ -389,10 +393,6 @@ def get_current_financial_year():
     return fy_start, fy_end
 
 
-from django.db.models import Sum
-from django.db.models.functions import TruncMonth
-
-
 class LeaveStatsManager:
     def __init__(self, user, leave_type):
         self.user = user
@@ -401,15 +401,15 @@ class LeaveStatsManager:
     def get_on_hold_leave(self):
         return (
             LeaveApplication.objects.filter(
-                appliedBy=self.user, status="PENDING", leave_type=self.leave_type
+                appliedBy=self.user, status="pending", leave_type=self.leave_type
             ).aggregate(total=Sum("usedLeave"))["total"]
             or 0
         )
 
-    def get_approved_leave_total(self):
+    def get_approved_leave_total(self,year):
         return (
             LeaveApplication.objects.filter(
-                appliedBy=self.user, status="pending", leave_type=self.leave_type
+                appliedBy=self.user, status="approved", leave_type=self.leave_type,startDate__year = year
             ).aggregate(total=Sum("usedLeave"))["total"]
             or 0
         )
@@ -435,7 +435,7 @@ class LeaveStatsManager:
         return record.remaining_leave_balances if record else 0
 
     def get_remaining_balance(self, year):
-        return self.get_opening_balance(year=year) - self.get_approved_leave_total()
+        return self.get_opening_balance(year=year) - self.get_approved_leave_total(year=year)
 
     def get_monthly_report(self, year):
         qs = (
