@@ -2271,6 +2271,36 @@ class UserTour(models.Model):
     def __str__(self):
         return f"Tour {self.id} by {self.applied_by.username}"
 
+    @property
+    def formatted_duration(self):
+        """
+        Returns total duration as a string: '2 Days : 5 Hrs'
+        """
+        if not (self.start_date and self.start_time):
+            return "N/A"
+
+        # 1. Construct Start DateTime
+        start_dt = datetime.combine(self.start_date, self.start_time)
+
+        # 2. Construct End DateTime (Prioritize Extended)
+        if self.extended_end_date and self.extended_end_time:
+            end_dt = datetime.combine(self.extended_end_date, self.extended_end_time)
+        elif self.end_date and self.end_time:
+            end_dt = datetime.combine(self.end_date, self.end_time)
+        else:
+            return "N/A"
+
+        # 3. Calculate Duration
+        duration = end_dt - start_dt
+        
+        # 4. Extract Days and Hours
+        days = duration.days
+        # duration.seconds only holds the "remainder" seconds (0 to 86399)
+        # so we convert that remainder into hours
+        hours = duration.seconds // 3600 
+
+        return f"{days}d : {hours}h"
+
     def save(self, *args, **kwargs):
         """
         Override the save method to calculate the total duration.
@@ -2304,7 +2334,7 @@ class UserTour(models.Model):
                 seconds = int(total_seconds % 60)
                 self.total = time(hour=hours % 24, minute=minutes, second=seconds)
             else:
-                self.total = None  # No duration if end_datetime isn't defined
+                self.total = None 
 
         # Call the parent class's save method to save the object
         super().save(*args, **kwargs)
