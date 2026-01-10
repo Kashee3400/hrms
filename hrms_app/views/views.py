@@ -2087,6 +2087,14 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
     success_url = reverse_lazy("tour_tracker")
     permission_action = "add"
 
+    def get_form_kwargs(self):
+        """
+        Inject the current user into the form for validation logic.
+        """
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         urls = [
@@ -2101,76 +2109,16 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
         return context
 
     def form_valid(self, form):
-        tour = form.save(commit=False)
-        user = self.request.user
-        attendance_log = AttendanceLog.objects.filter(
-            applied_by=user, start_date__date=tour.start_date, regularized=True
-        ).last()
-        log_history = AttendanceLogHistory.objects.filter(
-            attendance_log=attendance_log
-        ).last()
-        if log_history:
-            data = log_history.previous_data
-            from_date = localtime(at.str_to_date(data["from_date"]))
-            to_date = localtime(at.str_to_date(data["to_date"]))
-            status = data["reg_status"]
-            if status == "late coming" and tour.end_time > from_date.time():
-                messages.error(
-                    self.request,
-                    f"Tour end time on {tour.start_date.strftime('%d %b %Y')} conflicts with regularization time.",
-                )
-                return self.form_invalid(form)
-            if status == "early going" and tour.start_time < to_date.time():
-                messages.error(
-                    self.request,
-                    f"Tour start time on {tour.start_date.strftime('%d %b %Y')} conflicts with regularization time.",
-                )
-                return self.form_invalid(form)
-        overlapping_leaves = LeaveApplication.objects.filter(
-            appliedBy=user,
-            status__in=[
-                settings.APPROVED,
-                settings.PENDING,
-                settings.PENDING_CANCELLATION,
-            ],
-            startDayChoice=settings.FULL_DAY,
-            endDayChoice=settings.FULL_DAY,
-            startDate__lte=tour.end_date,
-            endDate__gte=tour.start_date,
-        )
-        if overlapping_leaves:
-            shifts = getattr(user, "shifts", None)
-            if not shifts:
-                messages.error(self.request, "Shift details not found.")
-                return self.form_invalid(form)
-            shift = shifts.last().shift_timing
-            shift_start = shift.start_time
-            shift_end = shift.end_time
-            for leave in overlapping_leaves:
-                leave_dates = [
-                    localtime(leave.startDate) + timedelta(days=i)
-                    for i in range((leave.endDate - leave.startDate).days + 1)
-                ]
-                for leave_date in leave_dates:
-                    if tour.end_date == leave_date.date():
-                        if tour.end_time >= shift_start:
-                            messages.error(
-                                self.request,
-                                f"Tour end time on {leave_date.date().strftime('%d %b %Y')} conflicts with full-day leave.",
-                            )
-                            return self.form_invalid(form)
-                    if tour.start_date == leave_date.date():
-                        if tour.start_time <= shift_end:
-                            messages.error(
-                                self.request,
-                                f"Tour start time on {leave_date.date().strftime('%d %b %Y')} conflicts with full-day leave.",
-                            )
-                            return self.form_invalid(form)
+        """
+        If valid, save and notify.
+        """
+        messages.success(self.request, "Tour applied Successfully")
+        tour = form.save(commit=False)        
+        tour.applied_by = self.request.user
 
-        tour.applied_by = user
         tour.save()
-        messages.success(self.request, "Tour Applied Successfully")
-        self.send_tour_notification(obj=tour)
+        self.send_tour_notification(tour)
+        
         return super().form_valid(form)
 
     def form_invalid(self, form):

@@ -654,11 +654,14 @@ class ChangeUserPasswordForm(SetPasswordForm):
 class ExcelUploadForm(forms.Form):
     file = forms.FileField()
 
+from hrms_app.utility import attendanceutils as at
+from django.utils.timezone import localtime
+from hrms_app.utility.leave_utils import get_non_working_days
 
 class TourForm(forms.ModelForm):
     approval_type = forms.ChoiceField(
         choices=settings.APPROVAL_TYPE_CHOICES,
-        widget=forms.Select(),
+        widget=forms.Select(attrs={"class": "form-control"}),
         label=_("Approval Type"),
         required=True,
     )
@@ -666,59 +669,29 @@ class TourForm(forms.ModelForm):
     class Meta:
         model = UserTour
         fields = [
-            "approval_type",
-            "from_destination",
-            "start_date",
-            "start_time",
-            "to_destination",
-            "end_date",
-            "end_time",
-            "remarks",
+            "approval_type", "from_destination", "start_date", "start_time",
+            "to_destination", "end_date", "end_time", "remarks",
         ]
         widgets = {
-            "from_destination": forms.TextInput(
-                attrs={"class": "form-control"},
-            ),
+            "from_destination": forms.TextInput(attrs={"class": "form-control"}),
             "start_date": DatePickerInput(
-                options={
-                    "format": "DD MMM, YYYY",
-                    "showClear": True,
-                    "showClose": True,
-                    "useCurrent": False,
-                },
+                options={"format": "DD MMM, YYYY", "showClear": True, "showClose": True, "useCurrent": False},
                 attrs={"class": "form-control"},
             ),
             "start_time": TimePickerInput(
-                options={
-                    "format": "hh:mm A",
-                    "showClear": True,
-                    "showClose": True,
-                    "useCurrent": False,
-                },
+                options={"format": "hh:mm A", "showClear": True, "showClose": True, "useCurrent": False},
                 attrs={"class": "form-control"},
             ),
             "end_date": DatePickerInput(
-                options={
-                    "format": "DD MMM, YYYY",
-                    "showClear": True,
-                    "showClose": True,
-                    "useCurrent": False,
-                },
+                options={"format": "DD MMM, YYYY", "showClear": True, "showClose": True, "useCurrent": False},
                 range_from="start_date",
                 attrs={"class": "form-control"},
             ),
             "end_time": TimePickerInput(
-                options={
-                    "format": "hh:mm A",
-                    "showClear": True,
-                    "showClose": True,
-                    "useCurrent": False,
-                },
+                options={"format": "hh:mm A", "showClear": True, "showClose": True, "useCurrent": False},
                 attrs={"class": "form-control"},
             ),
-            "to_destination": forms.TextInput(
-                attrs={"class": "form-control"},
-            ),
+            "to_destination": forms.TextInput(attrs={"class": "form-control"}),
             "remarks": CKEditor5Widget(config_name="extends"),
         }
         labels = {
@@ -732,6 +705,8 @@ class TourForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        # Extract user safely to use in validation
+        self.user = kwargs.pop('user', None)
         super(TourForm, self).__init__(*args, **kwargs)
 
         for field_name, field in self.fields.items():
@@ -745,28 +720,203 @@ class TourForm(forms.ModelForm):
         end_time = cleaned_data.get("end_time")
         approval_type = cleaned_data.get("approval_type")
 
+        # 1. Basic Date Logic
         if start_date and end_date:
             if start_date > end_date:
                 raise ValidationError(_("End date must be after start date."))
-            if (
-                    start_date == end_date
-                    and start_time
-                    and end_time
-                    and start_time >= end_time
-            ):
-                raise ValidationError(
-                    _("End time must be after start time on the same day.")
-                )
+            if start_date == end_date and start_time and end_time and start_time >= end_time:
+                raise ValidationError(_("End time must be after start time on the same day."))
         today = now().date()
-        if approval_type == settings.PRE_APPROVAL and start_date < today:
-            raise ValidationError(
-                _("For Pre Approval, the start date must be today or a future date.")
-            )
-        if approval_type == settings.POST_APPROVAL and start_date >= today:
-            raise ValidationError(
-                _("For Post Approval, the start date must be in the past.")
-            )
+        if approval_type == settings.PRE_APPROVAL and start_date and start_date < today:
+            raise ValidationError(_("For Pre Approval, the start date must be today or a future date."))
+        
+        if approval_type == settings.POST_APPROVAL and start_date and start_date >= today:
+            raise ValidationError(_("For Post Approval, the start date must be in the past."))
+        
+        if self.user and start_date and end_date:
+            self._validate_attendance_conflict(start_date, end_time, start_time)
+            self._validate_leave_conflict(start_date, end_date, start_time, end_time)
+        self._apply_tour_policy(end_date)
+
         return cleaned_data
+    
+    def _apply_tour_policy(self,end_date):
+        current_date = timezone.now().date()
+        non_working_days = get_non_working_days(start=end_date,end=current_date)
+        gap = (current_date - end_date).days + 1
+        gap = gap - non_working_days
+        app_setting = AppSetting.objects.filter(key="TOUR_LIMIT").first()
+        if app_setting and app_setting.beyond_policy:
+            return
+        if gap > int(app_setting.value):
+            raise ValidationError(f"Tour application denied.You can apply within {app_setting.value} working days.")
+
+
+    def _validate_attendance_conflict(self, start_date, tour_end_time, tour_start_time):
+        """Checks conflict with Regularized Attendance (Late Coming / Early Going)"""
+        history = AttendanceLogHistory.objects.filter(
+            attendance_log__applied_by=self.user,
+            attendance_log__start_date__date=start_date,
+            attendance_log__regularized=True
+        ).select_related('attendance_log').order_by('-id').first()
+
+        if history:
+            data = history.previous_data
+            from_date = localtime(at.str_to_date(data["from_date"])) 
+            to_date = localtime(at.str_to_date(data["to_date"]))
+            status = data["reg_status"]
+            if status == "late coming" and tour_end_time > from_date.time():
+                raise ValidationError(f"Tour end time on {start_date} conflicts with regularization time.")
+            if status == "early going" and tour_start_time < to_date.time():
+                raise ValidationError(f"Tour start time on {start_date} conflicts with regularization time.")
+            pass
+
+    def _validate_leave_conflict(self, start_date, end_date, start_time, end_time):
+        """Checks conflict with Approved/Pending Leaves"""
+        overlapping_leaves = LeaveApplication.objects.filter(
+            appliedBy=self.user,
+            status__in=[settings.APPROVED, settings.PENDING, settings.PENDING_CANCELLATION],
+            startDayChoice=settings.FULL_DAY,
+            endDayChoice=settings.FULL_DAY,
+            startDate__lte=end_date,
+            endDate__gte=start_date,
+        )
+
+        if overlapping_leaves.exists():
+            shifts = getattr(self.user, "shifts", None)
+            if not shifts:
+                raise ValidationError("Shift details not found for leave conflict check.")
+            
+            # Optimized: Get shift once
+            shift = shifts.last().shift_timing
+            shift_start = shift.start_time
+            shift_end = shift.end_time
+
+            for leave in overlapping_leaves:
+                # Check overlap logic
+                leave_range = (leave.endDate - leave.startDate).days + 1
+                for i in range(leave_range):
+                    leave_day = leave.startDate + timedelta(days=i)
+                    
+                    if end_date == leave_day and end_time >= shift_start:
+                        raise ValidationError(f"Tour end time on {leave_day} conflicts with full-day leave.")
+                    
+                    if start_date == leave_day and start_time <= shift_end:
+                        raise ValidationError(f"Tour start time on {leave_day} conflicts with full-day leave.")
+
+
+# class TourForm(forms.ModelForm):
+#     approval_type = forms.ChoiceField(
+#         choices=settings.APPROVAL_TYPE_CHOICES,
+#         widget=forms.Select(),
+#         label=_("Approval Type"),
+#         required=True,
+#     )
+
+#     class Meta:
+#         model = UserTour
+#         fields = [
+#             "approval_type",
+#             "from_destination",
+#             "start_date",
+#             "start_time",
+#             "to_destination",
+#             "end_date",
+#             "end_time",
+#             "remarks",
+#         ]
+#         widgets = {
+#             "from_destination": forms.TextInput(
+#                 attrs={"class": "form-control"},
+#             ),
+#             "start_date": DatePickerInput(
+#                 options={
+#                     "format": "DD MMM, YYYY",
+#                     "showClear": True,
+#                     "showClose": True,
+#                     "useCurrent": False,
+#                 },
+#                 attrs={"class": "form-control"},
+#             ),
+#             "start_time": TimePickerInput(
+#                 options={
+#                     "format": "hh:mm A",
+#                     "showClear": True,
+#                     "showClose": True,
+#                     "useCurrent": False,
+#                 },
+#                 attrs={"class": "form-control"},
+#             ),
+#             "end_date": DatePickerInput(
+#                 options={
+#                     "format": "DD MMM, YYYY",
+#                     "showClear": True,
+#                     "showClose": True,
+#                     "useCurrent": False,
+#                 },
+#                 range_from="start_date",
+#                 attrs={"class": "form-control"},
+#             ),
+#             "end_time": TimePickerInput(
+#                 options={
+#                     "format": "hh:mm A",
+#                     "showClear": True,
+#                     "showClose": True,
+#                     "useCurrent": False,
+#                 },
+#                 attrs={"class": "form-control"},
+#             ),
+#             "to_destination": forms.TextInput(
+#                 attrs={"class": "form-control"},
+#             ),
+#             "remarks": CKEditor5Widget(config_name="extends"),
+#         }
+#         labels = {
+#             "from_destination": _("Boarding"),
+#             "start_date": _("Start Date"),
+#             "start_time": _("Start Time"),
+#             "end_date": _("End Date"),
+#             "end_time": _("End Time"),
+#             "to_destination": _("Destination"),
+#             "remarks": _("Remark"),
+#         }
+
+#     def __init__(self, *args, **kwargs):
+#         super(TourForm, self).__init__(*args, **kwargs)
+
+#         for field_name, field in self.fields.items():
+#             field.required = True
+
+#     def clean(self):
+#         cleaned_data = super().clean()
+#         start_date = cleaned_data.get("start_date")
+#         end_date = cleaned_data.get("end_date")
+#         start_time = cleaned_data.get("start_time")
+#         end_time = cleaned_data.get("end_time")
+#         approval_type = cleaned_data.get("approval_type")
+
+#         if start_date and end_date:
+#             if start_date > end_date:
+#                 raise ValidationError(_("End date must be after start date."))
+#             if (
+#                     start_date == end_date
+#                     and start_time
+#                     and end_time
+#                     and start_time >= end_time
+#             ):
+#                 raise ValidationError(
+#                     _("End time must be after start time on the same day.")
+#                 )
+#         today = now().date()
+#         if approval_type == settings.PRE_APPROVAL and start_date < today:
+#             raise ValidationError(
+#                 _("For Pre Approval, the start date must be today or a future date.")
+#             )
+#         if approval_type == settings.POST_APPROVAL and start_date >= today:
+#             raise ValidationError(
+#                 _("For Post Approval, the start date must be in the past.")
+#             )
+#         return cleaned_data
 
 
 class BillForm(forms.ModelForm):
