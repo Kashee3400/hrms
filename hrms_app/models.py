@@ -1120,10 +1120,64 @@ class LeaveApplication(models.Model):
     )
 
     is_leave_deducted = models.BooleanField(default=False)
-    
-    def is_short_leave(self):
-        return self.leave_type.leave_type_short_code == "STL"
-    
+    def is_short_leave(self) -> bool:
+        return (
+            self.leave_type is not None
+            and getattr(self.leave_type, "leave_type_short_code", None) == "STL"
+        )
+    def get_short_leave_duration_hours(self) -> float:
+        duration = self.get_short_leave_duration()
+        if not duration:
+            return 0.0
+
+        return round(duration.total_seconds() / 3600, 2)
+    def get_short_leave_duration_display(self) -> str:
+        duration = self.get_short_leave_duration()
+        if not duration:
+            return "0 min"
+
+        total_minutes = int(duration.total_seconds() / 60)
+        hours, minutes = divmod(total_minutes, 60)
+
+        if hours:
+            return f"{hours}h {minutes}m"
+        return f"{minutes}m"
+
+    def get_short_leave_datetime_range(self):
+        """
+        Returns (from_datetime, to_datetime) or (None, None)
+        """
+        if not self.is_short_leave():
+            return None, None
+
+        if not self.from_time or not self.to_time:
+            return None, None
+
+        base_date = self.startDate.date()
+
+        from_dt = datetime.combine(base_date, self.from_time)
+        to_dt = datetime.combine(base_date, self.to_time)
+
+        # Make timezone-aware if needed
+        if timezone.is_aware(self.startDate):
+            from_dt = timezone.make_aware(from_dt)
+            to_dt = timezone.make_aware(to_dt)
+
+        return from_dt, to_dt
+    def get_short_leave_duration(self):
+        """
+        Returns timedelta or None
+        """
+        from_dt, to_dt = self.get_short_leave_datetime_range()
+
+        if not from_dt or not to_dt:
+            return None
+
+        if to_dt <= from_dt:
+            return None
+
+        return to_dt - from_dt
+
     def save(self, *args, **kwargs):
         if self.startDate and self.endDate and self.startDate > self.endDate:
             raise ValidationError(_("Start date cannot be after end date."))

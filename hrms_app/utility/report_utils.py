@@ -340,8 +340,8 @@ def process_leaves(leaves, monthly_presence_data):
             employee_attendance.get(date_key, {}) if employee_attendance else None
         )
 
-        # Remove OFF/FL only if not CL
-        if code != "CL":
+        # Remove OFF/FL only if not CL SL
+        if code != "CL" or code != "SL":
             if current_entry and (
                 current_entry.get("sunday", {}).get("status") == "OFF"
                 or current_entry.get("holiday", {}).get("status") == "FL"
@@ -366,7 +366,7 @@ def process_leaves(leaves, monthly_presence_data):
         # ----------------------------------------------------------
         #   ⭐ OVERRIDE SUNDAY IF SATURDAY HAS LWP (your requirement)
         # ----------------------------------------------------------
-        if leave.date.weekday() == 5 and code == "LWP":   # Saturday = 5
+        if leave.date.weekday() == 5 and code == "LWP":
             sunday_date = (leave.date + timedelta(days=1)).strftime("%Y-%m-%d")
 
             # Ensure Sunday section exists
@@ -452,7 +452,6 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
             current_datetime.date() + timedelta(days=1), datetime.min.time()
         )
     return daily_durations
-
 
 
 def mark_leave_attendance(current_date, att, day_entry_start):

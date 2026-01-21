@@ -152,8 +152,8 @@ class AttendanceMapper:
             # Determine leave duration status
             status = leave_status if log.is_full_day else half_status
             
-            # CL (Casual Leave) has special handling
-            if leave_status == "CL":
+            # CL/SL (Casual/Sick Leave) has special handling
+            if leave_status in ["CL","SL"]:
                 existing_status = self._get_status_for_date(
                     self.attendance_data[employee_id], log_date
                 )
