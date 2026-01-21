@@ -242,7 +242,7 @@
 
       // 🔹 Short Leave is always single-day
       $('#summaryDate').text(startDate);
-      this.setBalance(this.totalBal,1)
+      this.setBalance(this.totalBal, 1)
       // 🔹 Fetch attendance summary for the selected date
       await this.fetchAttendanceSummary(this.formatDateToYMD(startDate));
     }
@@ -261,23 +261,21 @@
     }
 
     async fetchAttendanceSummary(date) {
-      try {
-        const response = await fetch(
-          `/api/v1/attendance/summary/?date=${date}&leave_type=STL`,
-          { credentials: 'same-origin' }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch attendance summary");
-        }
-
-        const data = await response.json();
-        this.updateAttendanceUI(data);
-      } catch (error) {
-        console.error(error);
-        alert("Unable to fetch attendance summary.");
-        this.resetAttendanceUI();
-      }
+      return new Promise((resolve, reject) => {
+        $.ajax({
+          url: `/api/v1/attendance/summary/?date=${date}&leave_type=STL`,
+          type: "GET",
+          success: (response) => {
+            this.updateAttendanceUI(response);
+            resolve(response);
+          },
+          error: (xhr, status, error) => {
+            console.error("Error fetching attendance summary", error);
+            this.resetAttendanceUI();
+            resolve({}); // resolve empty to avoid breaking flow
+          }
+        });
+      });
     }
 
     updateAttendanceUI(data) {
@@ -330,14 +328,14 @@
       $('#attendanceMissing').text('--:--');
       $('#applyLeaveButton').prop('disabled', true);
     }
-        /**
-     * Updates Input Fields and Validates Submit Button based on Balance
-     */
+    /**
+ * Updates Input Fields and Validates Submit Button based on Balance
+ */
     setBalance(typeBal, totalDays) {
-        $('#currentlyBooked').text(totalDays);
-        $('#remainingBal').text(typeBal - totalDays);
-        $('#id_usedLeave').val(totalDays);
-        $('#id_balanceLeave').val(typeBal - totalDays);
+      $('#currentlyBooked').text(totalDays);
+      $('#remainingBal').text(typeBal - totalDays);
+      $('#id_usedLeave').val(totalDays);
+      $('#id_balanceLeave').val(typeBal - totalDays);
     }
 
     updateShortLeaveSummary() {
