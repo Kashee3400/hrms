@@ -1,0 +1,21 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block after_related_objects %}
+<hr>
+
+<div class="leave-help-box">
+    <h3>📘 Leave Type Rules Summary</h3>
+
+    <ul>
+        <li><strong>Day-based Leave:</strong> Supports full-day and half-day.</li>
+        <li><strong>Short Leave:</strong> Hour/Minute based, expires monthly.</li>
+        <li><strong>Monthly Accrual:</strong> Leave resets automatically.</li>
+        <li><strong>Carry Forward:</strong> Applies only to yearly leaves.</li>
+    </ul>
+
+    <p class="hint">
+        ⚠ Make sure duration and accrual rules are configured correctly.
+    </p>
+</div>
+{% endblock %}

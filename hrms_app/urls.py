@@ -1,5 +1,4 @@
-from django.contrib import admin
-from django.urls import path, include,re_path
+from django.urls import path, include
 from hrms_app.views.api_views import *
 from hrms_app.views.leave_balance_view import ForwardLeaveBalanceView,CreditELLeaveView,UserAttendanceAggregation
 from rest_framework_simplejwt.views import (
@@ -28,8 +27,6 @@ urlpatterns = [
     path('personal-details/', PersonalDetailsView.as_view(), name='personal-details'),
     path('employee-shifts/', EmployeeShiftView.as_view(), name='employee-shifts'),
     path('attendance-choices/', AttendanceChoicesView.as_view(), name='attendance-choices'),
-    path('current_user/', CurrentUserAPIView.as_view(), name='current_user'),
-    path('users/<int:pk>/', CustomUserDetailAPIView.as_view(), name='custom_user_detail'),
     path('notifications/', UserMonthlyNotificationsListView.as_view(), name='user_notifications'),
     path('notifications/<int:id>/', UpdateNotificationStatusView.as_view(), name='update-notification-status'),
     path("execute-populate-attendance/", ExecutePopulateAttendanceView.as_view(), name="execute_populate_attendance"),
@@ -40,5 +37,12 @@ urlpatterns = [
     path('forward-leave-balances/', ForwardLeaveBalanceView.as_view(), name='forward-leave-balances'),
     path("credit-el-leaves/", CreditELLeaveView.as_view(), name="credit_el_leaves"),
     path("attendance-aggregation-count/", UserAttendanceAggregation.as_view(), name="attendance-aggregation-count"),
+    path('leave-balances/initialize/', InitializeLeaveBalancesView.as_view(), 
+         name='initialize-leave-balances'),
+    path(
+        "attendance/summary/",
+        AttendanceSummaryAPIView.as_view(),
+        name="attendance-summary",
+    ),
 
 ]

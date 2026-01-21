@@ -63,8 +63,14 @@ CELERY_BEAT_SCHEDULE = {
     },
     'recalculate-monthly-attendance': {
         'task': 'myapp.tasks.recalculate_monthly_attendance_cache',
-        'schedule': crontab(hour=3, minute=0, day_of_month=1),  # 1st of each month at 3 AM
+        'schedule': crontab(hour=3, minute=0, day_of_month=1),
     },
-
-    
+    "refresh-short-leave-monthly": {
+        "task": "leave.tasks.refresh_short_leave_task",
+        "schedule": crontab(
+            minute=5,
+            hour=0,
+            day_of_month=1,
+        ),
+    },
 }

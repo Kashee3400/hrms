@@ -1,6 +1,4 @@
 from django.core.management.base import BaseCommand
-from django.conf import settings
-from django.utils import timezone
 from hrms_app.models import CustomUser, LeaveType, LeaveBalanceOpenings
 from django.db import transaction
 
@@ -14,7 +12,7 @@ class Command(BaseCommand):
         year = options['year']
         users = CustomUser.objects.all()
         leave_types = LeaveType.objects.all()
-        created_by = None  # Set this to the appropriate user if needed
+        created_by = None
 
         leave_balances = []
         for user in users:

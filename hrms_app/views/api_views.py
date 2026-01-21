@@ -7,11 +7,8 @@ from hrms_app.hrms.serializers import *
 from rest_framework import status
 from django.utils.translation import gettext_lazy as _
 from rest_framework.generics import (
-    RetrieveAPIView,
     ListAPIView,
     UpdateAPIView,
-    CreateAPIView,
-    DestroyAPIView,
 )
 from rest_framework.exceptions import ValidationError
 
@@ -24,6 +21,7 @@ from rest_framework.decorators import action
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
 from django.db.models import Q
+from rest_framework.authentication import SessionAuthentication
 
 
 ###########################################################################
@@ -269,19 +267,6 @@ class UserViewSet(viewsets.ModelViewSet):
     lookup_field = "id"
 
 
-class CustomUserDetailAPIView(RetrieveAPIView):
-    queryset = CustomUser.objects.all()
-    serializer_class = CustomUserSerializer
-
-
-class CurrentUserAPIView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        serializer = CustomUserSerializer(user)
-        return Response(serializer.data)
-
 
 class PersonalDetailsView(APIView):
     permission_classes = [IsAuthenticated]
@@ -525,7 +510,7 @@ class UserLeaveOpeningsViewSet(viewsets.ModelViewSet):
     """
     A viewset for managing user-specific Leave Balance Openings.
     """
-
+    authentication_classes = [SessionAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = LeaveBalanceOpeningSerializer
 
@@ -622,7 +607,7 @@ class HolidayViewSet(viewsets.ModelViewSet):
     queryset = Holiday.objects.all()
     serializer_class = HolidaySerializer
     permission_classes = [AllowAny]
-    filter_backends = [filters.OrderingFilter]  # Add other filter backends if needed
+    filter_backends = [filters.OrderingFilter]
     ordering_fields = ["start_date", "end_date"]  # Fields that can be used for ordering
     pagination_class = HolidaysPagination
 
@@ -1529,3 +1514,372 @@ class VerifyOTPView(APIView):
                 )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class InitializeLeaveBalancesView(APIView):
+    """
+    API endpoint to initialize leave balances for active employees.
+    
+    Business Logic:
+    - CL (Casual Leave): No carryforward, creates fresh balances
+    - SL (Sick Leave): Carries forward previous year's remaining balance
+    
+    POST /api/leave-balances/initialize/
+    {
+        "leave_type_id": 1,
+        "year": 2024,
+        "preview_only": true,  // Optional: defaults to false
+        "user_ids": [1, 2, 3]  // Optional: if empty, applies to all active users
+    }
+    """
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = InitializeLeaveBalanceSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response({
+                'success': False,
+                'errors': serializer.errors,
+                'message': 'Validation failed'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        validated_data = serializer.validated_data
+        leave_type_id = validated_data['leave_type_id']
+        year = validated_data['year']
+        preview_only = validated_data.get('preview_only', False)
+        user_ids = validated_data.get('user_ids', [])
+        
+        try:
+            # Fetch leave type
+            leave_type = LeaveType.objects.select_related().get(id=leave_type_id)
+            
+            # Validate leave type has required configurations
+            if not leave_type.leave_type_short_code:
+                return Response({
+                    'success': False,
+                    'message': 'Leave type must have a short code configured'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if leave_type.default_allocation is None:
+                return Response({
+                    'success': False,
+                    'message': 'Leave type must have a default allocation configured'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get active employees
+            active_users = CustomUser.objects.filter(is_active=True)
+            if user_ids:
+                active_users = active_users.filter(id__in=user_ids)
+                # Check if all requested users exist
+                found_ids = set(active_users.values_list('id', flat=True))
+                missing_ids = set(user_ids) - found_ids
+                if missing_ids:
+                    return Response({
+                        'success': False,
+                        'message': f'Users not found or inactive: {list(missing_ids)}'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not active_users.exists():
+                return Response({
+                    'success': False,
+                    'message': 'No active employees found'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if balances already exist
+            existing_balances = LeaveBalanceOpenings.objects.filter(
+                leave_type=leave_type,
+                year=year,
+                user__in=active_users
+            ).select_related('user')
+            
+            existing_user_ids = set(existing_balances.values_list('user_id', flat=True))
+            
+            # Process based on leave type
+            short_code = leave_type.leave_type_short_code.upper()
+            is_carryforward_type = short_code in ('SL', 'EL')
+
+            
+            preview_data = []
+            operations_log = {
+                'to_create': [],
+                'to_update': [],
+                'skipped': [],
+                'errors': []
+            }
+            
+            for user in active_users:
+                try:
+                    user_preview = self._process_user_balance(
+                        user=user,
+                        leave_type=leave_type,
+                        year=year,
+                        is_carryforward_type=is_carryforward_type,
+                        exists_for_user=(user.id in existing_user_ids),
+                        existing_balance=existing_balances.filter(user=user).first()
+                    )
+                    
+                    preview_data.append(user_preview)
+                    
+                    if user_preview['action'] == 'create':
+                        operations_log['to_create'].append(user.id)
+                    elif user_preview['action'] == 'update':
+                        operations_log['to_update'].append(user.id)
+                    
+                except Exception as e:
+                    operations_log['errors'].append({
+                        'user_id': user.id,
+                        'user_name': user.get_full_name(),
+                        'error': str(e)
+                    })
+            
+            # If preview only, return preview data
+            if preview_only:
+                return Response({
+                    'success': True,
+                    'preview': True,
+                    'leave_type': {
+                        'id': leave_type.id,
+                        'name': leave_type.leave_type,
+                        'short_code': leave_type.leave_type_short_code,
+                        'default_allocation': leave_type.default_allocation
+                    },
+                    'year': year,
+                    'summary': {
+                        'total_employees': active_users.count(),
+                        'to_create': len(operations_log['to_create']),
+                        'to_update': len(operations_log['to_update']),
+                        'errors': len(operations_log['errors']),
+                        'is_carryforward_type': is_carryforward_type
+                    },
+                    'operations': operations_log,
+                    'data': preview_data
+                }, status=status.HTTP_200_OK)
+            
+            # Execute the operation
+            created_count, updated_count = self._execute_balance_initialization(
+                preview_data=preview_data,
+                leave_type=leave_type,
+                year=year,
+                created_by=request.user
+            )
+            
+            return Response({
+                'success': True,
+                'preview': False,
+                'message': f'Successfully initialized leave balances for {leave_type.leave_type}',
+                'leave_type': {
+                    'id': leave_type.id,
+                    'name': leave_type.leave_type,
+                    'short_code': leave_type.leave_type_short_code
+                },
+                'year': year,
+                'summary': {
+                    'total_employees': active_users.count(),
+                    'created': created_count,
+                    'updated': updated_count,
+                    'errors': len(operations_log['errors'])
+                },
+                'errors': operations_log['errors'] if operations_log['errors'] else None
+            }, status=status.HTTP_201_CREATED)
+            
+        except LeaveType.DoesNotExist:
+            return Response({
+                'success': False,
+                'message': 'Leave type not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        except Exception as e:
+            return Response({
+                'success': False,
+                'message': f'An unexpected error occurred: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _process_user_balance(self, user, leave_type, year, is_carryforward_type, 
+                             exists_for_user, existing_balance):
+        """Process balance calculation for a single user"""
+        warnings = []
+        default_allocation = float(leave_type.default_allocation or 0)
+        
+        if is_carryforward_type:
+            # SL: Carry forward previous year's remaining balance
+            previous_year = year - 1
+            previous_balance = LeaveBalanceOpenings.objects.filter(
+                user=user,
+                leave_type=leave_type,
+                year=previous_year
+            ).first()
+            
+            if previous_balance and previous_balance.remaining_leave_balances:
+                carryforward_amount = float(previous_balance.remaining_leave_balances)                
+                opening_balance = carryforward_amount + default_allocation
+                no_of_leaves = default_allocation
+                remaining_balance = carryforward_amount + default_allocation
+                closing_balance = carryforward_amount
+                carryforward_from_year = previous_year
+            else:
+                # No previous balance found
+                if not previous_balance:
+                    warnings.append(f'No leave balance found for {previous_year}. Starting fresh.')
+                else:
+                    warnings.append(f'No remaining balance from {previous_year}. Starting fresh.')
+                
+                opening_balance = default_allocation
+                no_of_leaves = default_allocation
+                remaining_balance = default_allocation
+                closing_balance = 0.0
+                carryforward_amount = 0
+                carryforward_from_year = None
+        else:
+            # CL: Fresh allocation, no carryforward
+            opening_balance = default_allocation
+            no_of_leaves = default_allocation
+            remaining_balance = default_allocation
+            closing_balance = 0
+            carryforward_amount = None
+            carryforward_from_year = None
+            
+            if exists_for_user:
+                warnings.append('Existing balance will be reset to default allocation.')
+        employee_code = (
+            user.personal_detail.employee_code
+            if user and hasattr(user, "personal_detail") and user.personal_detail
+            else None
+        )
+
+        return {
+            'user_id': user.id,
+            'user_name': user.get_full_name(),
+            'employee_code':format_emp_code(employee_code),
+
+            'leave_type': leave_type.leave_type_short_code,
+            'year': year,
+
+            # 🔹 Existing
+            'current_balance': float(existing_balance.remaining_leave_balances) if existing_balance else None,
+
+            # 🔹 NEW: explicit split
+            'carryforward_amount': carryforward_amount,           # from previous year
+            'current_year_allocation': default_allocation,        # THIS year entitlement
+
+            # 🔹 Calculated totals
+            'new_opening_balance': opening_balance,
+            'new_no_of_leaves': default_allocation,
+            'new_remaining_balance': remaining_balance,
+            'new_closing_balance': closing_balance,
+            'no_of_leaves':no_of_leaves,
+            'is_carryforward': is_carryforward_type,
+            'carryforward_from_year': carryforward_from_year,
+            'default_allocation': default_allocation,
+
+            'action': 'update' if exists_for_user else 'create',
+            'warnings': warnings
+        }
+
+    def _execute_balance_initialization(self, preview_data, leave_type, year, created_by):
+        """
+        Execute DB operations:
+        - Create / update current year opening
+        - Update previous year closing balance (for carryforward types)
+        """
+
+        created_count = 0
+        updated_count = 0
+
+        previous_year = year - 1
+        prev_year_updates = []
+
+        with transaction.atomic():
+            for item in preview_data:
+                # 1️⃣ Update / create CURRENT YEAR opening
+                balance, created = LeaveBalanceOpenings.objects.update_or_create(
+                    user_id=item['user_id'],
+                    leave_type=leave_type,
+                    year=year,
+                    defaults={
+                        # Current year data
+                        'opening_balance': item['new_opening_balance'],
+                        'no_of_leaves': item['new_no_of_leaves'],  # current year only
+                        'remaining_leave_balances': item['new_remaining_balance'],
+                        'updated_by': created_by,
+                        'created_by': created_by,
+                    }
+                )
+
+                if created:
+                    created_count += 1
+                else:
+                    updated_count += 1
+
+                # 2️⃣ Prepare PREVIOUS YEAR closing update (carryforward only)
+                if item.get("is_carryforward") and item.get("closing_balance"):
+                    prev_year_balance = LeaveBalanceOpenings.objects.filter(
+                        user_id=item['user_id'],
+                        leave_type=leave_type,
+                        year=previous_year,
+                    ).first()
+
+                    if prev_year_balance:
+                        prev_year_balance.closing_balance = item['closing_balance']
+                        prev_year_balance.updated_by = created_by
+                        prev_year_updates.append(prev_year_balance)
+
+            # 3️⃣ Bulk update previous year closings
+            if prev_year_updates:
+                LeaveBalanceOpenings.objects.bulk_update(
+                    prev_year_updates,
+                    fields=["closing_balance", "updated_by"]
+                )
+
+        return created_count, updated_count
+
+def format_emp_code(emp_code):
+    length = len(emp_code)
+    if length == 1:
+        return f"KMPCL-00{emp_code}"
+    elif length == 2:
+        return f"KMPCL-0{emp_code}"
+    else:
+        return f"KMPCL-{emp_code}"
+    
+from ..utility.attendanceutils import get_attendance_summary
+
+class AttendanceSummaryAPIView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Get attendance summary for Short Leave.
+        Params:
+          - date (YYYY-MM-DD)
+          - leave_type (id)
+        """
+
+        date_str = request.GET.get("date")
+        leave_type_code = request.GET.get("leave_type")
+
+        if not date_str or not leave_type_code:
+            return Response(
+                {"error": "date and leave_type are required"},
+                status=400,
+            )
+
+        try:
+            date = timezone.datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response(
+                {"error": "Invalid date format. Use YYYY-MM-DD"},
+                status=400,
+            )
+
+        leave_type = get_object_or_404(LeaveType, leave_type_short_code=leave_type_code)
+
+        summary = get_attendance_summary(
+            user=request.user,
+            date=date,
+            leave_type=leave_type,
+        )
+
+        return Response(summary)

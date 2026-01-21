@@ -1,10 +1,88 @@
-<ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
-  {% for holiday in holidays %}
-    <li class="list-group-item d-flex align-items-center">
-      <div class="user-info d-flex flex-column">
-        <div class="fw-bold text-truncate">{{holiday.title}}</div>
-        <div class="email text-truncate">{{holiday.start_date}}</div>
+<style>
+  /* Scoped CSS for the holiday widget */
+  .holiday-list {
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .holiday-item {
+    border-left: 4px solid transparent;
+    /* Placeholder for status color */
+    transition: background-color 0.2s;
+  }
+
+  .holiday-item:hover {
+    background-color: #f8f9fa;
+  }
+
+  .holiday-date-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
+    color: #fff;
+    font-weight: bold;
+    line-height: 1;
+    flex-shrink: 0;
+    /* Prevent shrinking */
+  }
+
+  .holiday-date-badge .month {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .holiday-date-badge .day {
+    font-size: 1.2rem;
+  }
+
+  .holiday-day-name {
+    font-size: 0.85rem;
+    color: #6c757d;
+    /* Bootstrap text-muted */
+  }
+</style>
+
+<div class="card shadow-sm">
+  <div class="list-group list-group-flush holiday-list">
+    {% for holiday in holidays %}
+    <div class="list-group-item d-flex align-items-center py-3 holiday-item">
+
+      <div class="holiday-date-badge me-3 shadow-sm"
+        style="background-color: {{ holiday.color_hex|default:'#0d6efd' }};">
+        <span class="month">{{ holiday.start_date|date:"M" }}</span>
+        <span class="day">{{ holiday.start_date|date:"d" }}</span>
       </div>
-    </li>
-  {% endfor %}
-</ul>
+
+      <div class="flex-grow-1">
+        <h6 class="mb-0 fw-bold text-dark">{{ holiday.title }}</h6>
+        <div class="holiday-day-name">
+          <i class="bi bi-clock me-1"></i>{{ holiday.start_date|date:"l" }}
+
+          {% now "Y" as current_year %}
+          {% if holiday.start_date|date:"Y" != current_year %}
+          <span class="badge bg-light text-dark border ms-1">{{ holiday.start_date|date:"Y" }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if holiday.start_date != holiday.end_date and holiday.end_date %}
+      <div class="text-end ms-2">
+        <span class="badge bg-secondary rounded-pill" title="Multi-day holiday">
+          Multi-day
+        </span>
+      </div>
+      {% endif %}
+    </div>
+    {% empty %}
+    <div class="text-center py-4 text-muted">
+      <i class="bi bi-calendar-x fs-2 mb-2"></i>
+      <p class="mb-0">No upcoming holidays found.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>

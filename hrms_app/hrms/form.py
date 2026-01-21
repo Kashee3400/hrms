@@ -21,8 +21,6 @@ from bootstrap_datepicker_plus.widgets import (
     DatePickerInput,
     TimePickerInput,
     DateTimePickerInput,
-    MonthPickerInput,
-    YearPickerInput,
 )
 
 User = get_user_model()
@@ -804,121 +802,6 @@ class TourForm(forms.ModelForm):
                     if start_date == leave_day and start_time <= shift_end:
                         raise ValidationError(f"Tour start time on {leave_day} conflicts with full-day leave.")
 
-
-# class TourForm(forms.ModelForm):
-#     approval_type = forms.ChoiceField(
-#         choices=settings.APPROVAL_TYPE_CHOICES,
-#         widget=forms.Select(),
-#         label=_("Approval Type"),
-#         required=True,
-#     )
-
-#     class Meta:
-#         model = UserTour
-#         fields = [
-#             "approval_type",
-#             "from_destination",
-#             "start_date",
-#             "start_time",
-#             "to_destination",
-#             "end_date",
-#             "end_time",
-#             "remarks",
-#         ]
-#         widgets = {
-#             "from_destination": forms.TextInput(
-#                 attrs={"class": "form-control"},
-#             ),
-#             "start_date": DatePickerInput(
-#                 options={
-#                     "format": "DD MMM, YYYY",
-#                     "showClear": True,
-#                     "showClose": True,
-#                     "useCurrent": False,
-#                 },
-#                 attrs={"class": "form-control"},
-#             ),
-#             "start_time": TimePickerInput(
-#                 options={
-#                     "format": "hh:mm A",
-#                     "showClear": True,
-#                     "showClose": True,
-#                     "useCurrent": False,
-#                 },
-#                 attrs={"class": "form-control"},
-#             ),
-#             "end_date": DatePickerInput(
-#                 options={
-#                     "format": "DD MMM, YYYY",
-#                     "showClear": True,
-#                     "showClose": True,
-#                     "useCurrent": False,
-#                 },
-#                 range_from="start_date",
-#                 attrs={"class": "form-control"},
-#             ),
-#             "end_time": TimePickerInput(
-#                 options={
-#                     "format": "hh:mm A",
-#                     "showClear": True,
-#                     "showClose": True,
-#                     "useCurrent": False,
-#                 },
-#                 attrs={"class": "form-control"},
-#             ),
-#             "to_destination": forms.TextInput(
-#                 attrs={"class": "form-control"},
-#             ),
-#             "remarks": CKEditor5Widget(config_name="extends"),
-#         }
-#         labels = {
-#             "from_destination": _("Boarding"),
-#             "start_date": _("Start Date"),
-#             "start_time": _("Start Time"),
-#             "end_date": _("End Date"),
-#             "end_time": _("End Time"),
-#             "to_destination": _("Destination"),
-#             "remarks": _("Remark"),
-#         }
-
-#     def __init__(self, *args, **kwargs):
-#         super(TourForm, self).__init__(*args, **kwargs)
-
-#         for field_name, field in self.fields.items():
-#             field.required = True
-
-#     def clean(self):
-#         cleaned_data = super().clean()
-#         start_date = cleaned_data.get("start_date")
-#         end_date = cleaned_data.get("end_date")
-#         start_time = cleaned_data.get("start_time")
-#         end_time = cleaned_data.get("end_time")
-#         approval_type = cleaned_data.get("approval_type")
-
-#         if start_date and end_date:
-#             if start_date > end_date:
-#                 raise ValidationError(_("End date must be after start date."))
-#             if (
-#                     start_date == end_date
-#                     and start_time
-#                     and end_time
-#                     and start_time >= end_time
-#             ):
-#                 raise ValidationError(
-#                     _("End time must be after start time on the same day.")
-#                 )
-#         today = now().date()
-#         if approval_type == settings.PRE_APPROVAL and start_date < today:
-#             raise ValidationError(
-#                 _("For Pre Approval, the start date must be today or a future date.")
-#             )
-#         if approval_type == settings.POST_APPROVAL and start_date >= today:
-#             raise ValidationError(
-#                 _("For Post Approval, the start date must be in the past.")
-#             )
-#         return cleaned_data
-
-
 class BillForm(forms.ModelForm):
     class Meta:
         model = Bill
@@ -1104,7 +987,7 @@ class LeaveApplicationForm(forms.ModelForm):
                     start_day_choice=startDayChoice,
                     end_day_choice=endDayChoice,
                     bookedLeave=usedLeave,
-                    exclude_application_id=exclude_application_id,  # Not needed for new leave
+                    exclude_application_id=exclude_application_id,
                 )
                 policy_manager.validate_policies()
             except ValidationError as e:
@@ -1145,93 +1028,6 @@ class AttendanceLogFilterForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields["is_submitted"].initial = True
-
-
-# class AttendanceLogForm(forms.ModelForm):
-#     class Meta:
-#         model = AttendanceLog
-#         fields = [
-#             "reg_status",
-#             "from_date",
-#             "to_date",
-#             "status",
-#             "reg_duration",
-#             "reason",
-#         ]
-#         widgets = {
-#             "reg_status": forms.RadioSelect(attrs={"class": "form-input"}),
-#             "duration": TimePickerInput(
-#                 attrs={"class": "form-control", "readonly": "readonly"}
-#             ),
-#             "reg_duration": forms.TextInput(
-#                 attrs={"class": "form-control", "readonly": "readonly"}
-#             ),
-#             "from_date": DateTimePickerInput(
-#                 options={
-#                     "showClear": True,
-#                     "showClose": True,
-#                     "useCurrent": False,
-#                 },
-#                 format="%Y-%m-%d %H:%M",
-#                 attrs={"class": "form-control"},
-#             ),
-#             "to_date": DateTimePickerInput(
-#                 options={
-#                     "showClear": True,
-#                     "showClose": True,
-#                     "useCurrent": False,
-#                 },
-#                 format="%Y-%m-%d %H:%M",
-#                 attrs={"class": "form-control"},
-#                 range_from="from_date",
-#             ),
-#             "reason": forms.Textarea(attrs={"class": "form-control"}),
-#             "status": forms.Select(attrs={"class": "form-control"}),
-#         }
-
-#     def __init__(self, *args, **kwargs):
-#         self.user = kwargs.pop("user", None)
-#         self.is_manager = kwargs.pop("is_manager", False)
-#         self.late_coming = kwargs.pop("late_coming", {})
-#         self.early_going = kwargs.pop("early_going", {})
-#         super(AttendanceLogForm, self).__init__(*args, **kwargs)
-
-#         self.fields["reg_status"].required = True
-
-#         current_value = None
-#         if self.instance and self.instance.pk:
-#             current_value = self.instance.reg_status
-
-#         if current_value == settings.MIS_PUNCHING:
-#             self.fields["reg_status"].choices = [
-#                 (settings.MIS_PUNCHING, _("Mis Punching")),
-#             ]
-#         else:
-#             choices = []
-#             if self.early_going:
-#                 choices.append((settings.EARLY_GOING, _("Early Going")))
-#             if self.late_coming:
-#                 choices.append((settings.LATE_COMING, _("Late Coming")))
-#             self.fields["reg_status"].choices = choices
-
-#             self.initial["reg_status"] = None
-
-#         # Manager/non-manager handling
-#         if not self.is_manager:
-#             self.fields.pop("status", None)
-#             self.fields["reason"].required = True
-#         else:
-#             self.fields["status"].required = True
-#             self.make_field_readonly("reason")
-
-#     def make_field_readonly(self, field_name):
-#         """Set a specific field to readonly by updating its widget attributes."""
-#         if field_name in self.fields:
-#             self.fields[field_name].widget.attrs["readonly"] = "readonly"
-
-#             # For Textarea, use disabled because `readonly` doesn't always work with styling.
-#             if isinstance(self.fields[field_name].widget, forms.Textarea):
-#                 self.fields[field_name].widget.attrs["disabled"] = "disabled"
 
 
 class AttendanceLogForm(forms.ModelForm):

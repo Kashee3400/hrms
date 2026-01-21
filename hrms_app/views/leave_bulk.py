@@ -122,3 +122,26 @@ class BulkLeaveHistoryView(LoginRequiredMixin, ListView):
         ).select_related(
             'appliedBy', 'leave_type'
         ).order_by('-applyingDate')
+
+
+
+from django.views.generic import TemplateView
+from django.utils.timezone import now
+
+from hrms_app.models import LeaveType
+
+
+class LeaveBalanceInitializerView(TemplateView):
+    template_name = 'hrms_app/components/leave_initializer.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # 🔹 Leave Types
+        context["leave_types"] = LeaveType.objects.all().order_by("leave_type")
+
+        # 🔹 Year range (example: current year ± 5)
+        current_year = now().year
+        context["years"] = list(range(current_year - 2, current_year + 2))
+
+        return context

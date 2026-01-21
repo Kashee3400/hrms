@@ -2,267 +2,230 @@
 {% load static hrms_tag i18n %}
 {{ form.media }}
 {% block title %}
-  {{ request.user.get_short_name }} | {{ title }}
+{{ request.user.get_short_name }} | {{ title }}
 {% endblock %}
 {% block extrastyle %}
-  <link rel="stylesheet" href="{% static 'js/select.dataTables.min.css' %}" />
-  <style>
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-    @keyframes pulse {
-      0% {
-        transform: scale(1);
-      }
-      50% {
-        transform: scale(1.1);
-      }
-      100% {
-        transform: scale(1);
-      }
-    }
-    
-    .flex-head1.pulse {
-      animation: pulse 1.5s infinite;
-    }
-    .separtor {
-      width: 2px;
-      background: repeating-linear-gradient(to bottom, #007bff, #007bff 5px, transparent 5px, transparent 10px);
-      height: 50px;
-      align-self: center;
-      box-shadow: 0px 0px 5px rgba(0, 123, 255, 0.7);
-    }
-    .count-card {
-      transition: all 0.3s ease-in-out;
-      border-radius: 10px;
-    }
-    
-    .count-card:hover {
-      transform: translateY(-5px); /* Lifts the card slightly */
-      box-shadow: 0px 8px 20px rgba(0, 0, 0, 0.2); /* Adds a stronger shadow */
-      background-color: rgb(8, 174, 215); /* Subtle color change */
-    }
-    
-    .count-card:hover .icon {
-      color: rgb(7, 205, 255);
-    }
-    
-    .count-card:hover h5,
-    .count-card:hover h2 {
-      color: #007bff; /* Change text color on hover */
-    }
-  </style>
+<link rel="stylesheet" href="{% static 'js/select.dataTables.min.css' %}" />
+<link rel="stylesheet" href="{% static 'hrms_app/css/home.css' %}" />
+
 {% endblock %}
 
 {% block content %}
-  <div class="my-2">
-    <div class="row">
-      <div class="{% if request.user.is_rm or request.user.is_superuser %} col-lg-4 {% else %}col-lg-6 {% endif %} d-flex flex-column px-1">
-        <div class="row flex-grow">
-          <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
-            <div class="card card-rounded pt-3 px-0">
-              <div class="d-sm-flex justify-content-between align-items-start">
-                <h4 class="card-title card-title-dash text-success px-3">{% trans "Every great day starts with a single punch. Let's make today count!" %}</h4>
-              </div>
-              <div class="mt-2">
-                <div class="container py-0 px-3">
-                  <div class="sub-flex1">
-                    <div class="flex-head1">{{ current_date }}</div>
-                    <div class="flex-head">
-                      {% trans 'Shift Timing' %}: ({{ request.user.shifts.first }})
-                    </div>
-                  </div>
-                  <hr />
-                  <div class="d-flex flex-row" style="gap: 2.5rem;">
-                    <div class="sub-flex">
-                      <div class="flex-head">
-                        <i class="fas fa-sign-in-alt"></i> {% trans 'Punch In' %}
-                      </div>
-                      <div class="flex-head1 pulse">{{ check_in_time }}</div>
-                    </div>
-                    <div class="separtor"></div>
-                    <div class="sub-flex">
-                      <div class="flex-head">
-                        <i class="fas fa-sign-out-alt"></i> {% trans 'Punch out' %}
-                      </div>
-                      <div class="flex-head1 pulse">{{ check_out_time }}</div>
-                    </div>
-                    <div class="separtor"></div>
-                    <div class="sub-flex">
-                      <div class="flex-head">
-                        {% trans 'Total Hours' %}
-                      </div>
-                      <div class="flex-head1 pulse">{{ total_hours }}</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {% if request.user.is_rm or request.user.is_superuser %}
-        <div class="col-lg-4 d-flex flex-column px-1">
-          <div class="row flex-grow">
-            <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
-              <div class="card card-rounded pt-3">
-                <h4 class="card-title card-title-dash text-danger px-3">{% trans 'Request Pending For Approvals' %}</h4>
-                <div class="container mt-4 px-3">
-                  <div class="scroll-container d-flex flex-row overflow-auto py-2">
-                    {% for item in count_list %}
-                      <div class="pending-data flex-shrink-0" style="min-width: 150px; max-width: 150px;">
-                        <a href="{{ item.link }}" class="text-decoration-none h-100">
-                          <div class="card count-card shadow-sm h-100 d-flex flex-column">
-                            <div class="card-body text-center d-flex flex-column justify-content-center">
-                              <i class="{{ item.icon }} icon"></i>
-                              <p class="card-title mt-2 text-dark text-truncate">{{ item.title }}</p>
-                              <h2 class="count-number">{{ item.count }}</h2>
-                            </div>
-                          </div>
-                        </a>
-                      </div>
-                    {% endfor %}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      {% endif %}
-      <div class="{% if request.user.is_rm or request.user.is_superuser %} col-lg-4 {% else %}col-lg-6 {% endif %} d-flex flex-column px-1">
-        <div class="row flex-grow">
-          <div class="col-12 col-lg-4 col-lg-12 grid-margin stretch-card">
-            <div class="card card-rounded pt-3">
-              <h4 class="card-title card-title-dash text-info px-3">{% trans 'Waiting for approval...' %}</h4>
-              <div class="container mt-4 px-3">
-                <div class="scroll-container d-flex flex-row overflow-auto py-2">
-                  {% user_summary_counts %}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      {% get_leave_balances request.user request %}
-    </div>
-    <div class="row">
-      {% if request.user.employees.exists %}
-        <div class="col-lg-4 d-flex flex-column px-1">
-          <div class="card card-rounded shadow-sm flex-grow-1">
-            <div class="card-body px-1 py-1">
-              <div class="card shadow-sm">
-                <div class="card-header fw-bold">
-                  {% trans 'Assigned Employees' %}
-                </div>
-                <ul class="list-group list-group-flush" style="max-height: 200px; overflow-y: auto;">
-                  {% for user in request.user.employees.all %}
-                    <li class="list-group-item d-flex align-items-center">
-                      <img src="{% if user.personal_detail.avatar %}
-                          {{ user.personal_detail.get_avatar_url }}
-                        {% else %}
-                          {% static 'source/images/user1-128x128.jpg' %}
-                        {% endif %}"
-                        class="rounded-circle me-2"
-                        width="40"
-                        height="40" />
-                      <div class="user-info d-flex flex-column">
-                        <div class="fw-bold text-truncate">{{ user.get_full_name }} ({{ user.personal_detail.designation }})</div>
-                        <div class="email text-truncate">{{ user.official_email }}</div>
-                      </div>
-                    </li>
-                  {% endfor %}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      {% endif %}
+<div class="py-4">
 
-      <!-- HR Announcement -->
-      <div class="col-lg-5 d-flex flex-column px-1">
-        <div class="card card-rounded shadow-sm flex-grow-1">
-          <div class="card-body px-1 py-1">
-            <div class="card shadow-sm">
-              <div class="card-header bg-info fw-bold">
-                {% trans 'HR Announcement' %}
-              </div>
-              {% get_announcement user request %}
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="row g-4 mb-4">
 
-      <!-- Holidays -->
-      <div class="col-lg-3 d-flex flex-column px-1">
-        <div class="card card-rounded shadow-sm flex-grow-1">
-          <div class="card-body px-1 py-1">
-            <div class="card shadow-sm">
-              <div class="card-header bg-warning fw-bold">
-                {% trans 'Holidays' %}
+    <div class="col-12 col-xl-5">
+      <div class="dashboard-card h-100">
+        <div class="card-header-clean">
+          <div>
+            <span class="text-muted small d-block mb-1">{{ current_date }}</span>
+            <h5 class="mb-0">{% trans "Hello," %} {{ request.user.first_name }}! 👋</h5>
+          </div>
+          <span class="badge bg-light text-dark border">
+            <i class="mdi mdi-clock-outline me-1"></i> {{ request.user.shifts.first|default:"General Shift" }}
+          </span>
+        </div>
+        <div class="card-body">
+          <p class="text-muted small mb-4">
+            "{% trans "Every great day starts with a single punch. Let's make today count!" %}"
+          </p>
+
+          <div class="row g-3">
+            <div class="col-4">
+              <div class="stat-box" style="background: var(--success-soft); border-color: var(--success-soft);">
+                <i class="fas fa-sign-in-alt text-success mb-2"></i>
+                <div class="label text-success-emphasis">{% trans 'In' %}</div>
+                <div class="value text-success">{{ check_in_time|default:"--" }}</div>
               </div>
-              {% get_holidays %}
+            </div>
+            <div class="col-4">
+              <div class="stat-box" style="background: var(--warning-soft); border-color: var(--warning-soft);">
+                <i class="fas fa-sign-out-alt text-warning mb-2"></i>
+                <div class="label text-warning-emphasis">{% trans 'Out' %}</div>
+                <div class="value text-warning">{{ check_out_time|default:"--" }}</div>
+              </div>
+            </div>
+            <div class="col-4">
+              <div class="stat-box" style="background: var(--info-soft); border-color: var(--info-soft);">
+                <i class="fas fa-hourglass-half text-info mb-2"></i>
+                <div class="label text-info-emphasis">{% trans 'Hrs' %}</div>
+                <div class="value text-info pulse">{{ total_hours|default:"00:00" }}</div>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="row mt-3">
-      <div class="card card-rounded py-3">
-        <div class="table-responsive">
-          <table class="table table-bordered table-striped table-hover">
-            <thead class="table-primary">
-              <tr>
-                <th>Employee Code</th> <th>Employee Name</th> {% for day in days_in_month %}
-                  <th>{{ day|date:'d-m' }}</th>
+    <div class="col-12 col-xl-7">
+      <div class="row g-4 h-100">
+
+        {% if request.user.is_rm or request.user.is_superuser %}
+        <div class="col-12">
+          <div class="dashboard-card">
+            <div class="card-header-clean text-danger">
+              {% trans 'Needs Your Approval' %}
+              <span class="badge bg-danger rounded-pill">{{ count_list|length }}</span>
+            </div>
+            <div class="card-body my-2">
+              {% if count_list %}
+              <div class="horizontal-scroll-wrapper">
+                {% for item in count_list %}
+                <a href="{{ item.link }}" class="text-decoration-none text-dark">
+                  <div class="request-card">
+                    <i class="{{ item.icon }} text-danger fs-4 mb-2"></i>
+                    <div class="small fw-bold text-truncate" style="max-width: 100px;">{{ item.title }}</div>
+                    <div class="h4 mb-0 mt-1">{{ item.count }}</div>
+                  </div>
+                </a>
                 {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for employee in employees %}
-                <tr>
-                  <td>
-                    {% format_emp_code employee.personal_detail.employee_code %}
-                  </td>
-                  <td>{{ employee.get_full_name }}</td>
-                  {% for mdate in days_in_month %}
-                    <td>
-                      {% get_item attendance_data employee.id mdate as statuses %}
-                      {% for status in statuses %}
-                        <span style="color: {{ status.color }};">{{ status.status }}</span>
-                        {% if not forloop.last %} {% endif %}
-                      {% endfor %}
-                    </td>
-                  {% endfor %}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+              </div>
+              {% else %}
+              <div class="text-center text-muted py-3">
+                <i class="mdi mdi-check-circle-outline fs-3 text-success"></i>
+                <p class="mb-0 small">{% trans "All caught up! No pending approvals." %}</p>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+
+    {% if request.user.employees.exists %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <div class="dashboard-card h-100">
+        <div class="card-header-clean">
+          {% trans 'My Team' %}
+          <span class="badge bg-primary rounded-pill">{{ request.user.employees.count }}</span>
+        </div>
+        <div class="card-body p-0" style="max-height: 300px; overflow-y: auto;">
+          {% for user in request.user.employees.all %}
+          <div class="avatar-list-item d-flex align-items-center">
+            <img
+              src="{% if user.personal_detail.avatar %}{{ user.personal_detail.get_avatar_url }}{% else %}{% static 'source/images/user1-128x128.jpg' %}{% endif %}"
+              class="rounded-circle me-3" width="40" height="40" style="object-fit: cover;">
+            <div class="overflow-hidden">
+              <h6 class="mb-0 text-truncate" style="font-size: 0.9rem;">{{ user.get_full_name }}</h6>
+              <small class="text-muted text-truncate d-block" style="font-size: 0.75rem;">
+                {{ user.personal_detail.designation|default:"Employee" }}
+              </small>
+            </div>
+            <a href="#" class="ms-auto btn btn-sm btn-light rounded-circle" title="View Profile"><i
+                class="mdi mdi-chevron-right"></i></a>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="col-12 col-md-8 {% if request.user.employees.exists %}col-lg-4{% else %}col-lg-8{% endif %}">
+      <div class="dashboard-card">
+        <div class="card-header-clean text-primary">
+          {% trans 'My Request Status' %}
+        </div>
+        <div class="card-body">
+          <div class="horizontal-scroll-wrapper">
+            {% user_summary_counts %}
+          </div>
+        </div>
+        <div class="px-3">
+          {% get_leave_balances request.user request %}
+
+        </div>
+      </div>
+    </div>
+
+
+    <div class="col-12 col-md-12 col-lg-4">
+      <div class="dashboard-card">
+        <div class="card-header-clean text-warning">
+          <i class="fas fa-umbrella-beach me-2"></i> {% trans 'Upcoming Holidays' %}
+        </div>
+        <div class="card-body p-0">
+          {% get_holidays %}
         </div>
       </div>
     </div>
   </div>
+
+  <div class="row g-4">
+    <div class="col-12">
+      <div class="dashboard-card">
+        <div class="card-header-clean">
+          {% trans 'Monthly Attendance Overview' %}
+        </div>
+        <div class="card-body p-3">
+          <div class="table-responsive" style="max-height: 500px;">
+            <table class="table table-hover table-striped mb-0 attendance-table">
+              <thead>
+                <tr>
+                  <th class="sticky-col text-dark" style="min-width: 80px;">Code</th>
+                  <th class="sticky-col-2 text-dark" style="min-width: 150px; text-align: left;">Employee Name</th>
+                  {% for day in days_in_month %}
+                  <th style="min-width: 50px;">
+                    {{ day|date:'d' }}<br>
+                    <span style="font-weight: 400; font-size: 0.65rem;">{{ day|date:'D' }}</span>
+                  </th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for employee in employees %}
+                <tr>
+                  <td class="sticky-col fw-bold text-muted">
+                    {% format_emp_code employee.personal_detail.employee_code %}
+                  </td>
+                  <td class="sticky-col-2 text-start fw-bold text-primary">
+                    {{ employee.get_full_name }}
+                  </td>
+                  {% for mdate in days_in_month %}
+                  <td>
+                    {% get_item attendance_data employee.id mdate as statuses %}
+                    {% for status in statuses %}
+                    <span class="badge rounded-pill"
+                      style="background-color: {{ status.color }}20; color: {{ status.color }}; border: 1px solid {{ status.color }}50; font-weight: 600; font-size: 0.7rem;">
+                      {{ status.status }}
+                    </span>
+                    {% empty %}
+                    <span class="text-muted">-</span>
+                    {% endfor %}
+                  </td>
+                  {% endfor %}
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
 {% endblock %}
 
+
 {% block extra_js %}
-  <script>
-    $(document).ready(function () {
-      $('.table').DataTable({
-        paging: true,
-        searching: true,
-        ordering: false,
-        dom: 'Bfrtip',
-        buttons: [],
-        pageLength: 25,
-        lengthMenu: [10, 25, 50, 100]
-      })
+<script>
+  $(document).ready(function () {
+    $('.table').DataTable({
+      paging: true,
+      searching: true,
+      ordering: false,
+      dom: 'Bfrtip',
+      buttons: [],
+      pageLength: 25,
+      lengthMenu: [10, 25, 50, 100]
     })
-  </script>
+  })
+</script>
 {% endblock %}

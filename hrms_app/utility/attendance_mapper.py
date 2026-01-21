@@ -1,7 +1,7 @@
 from collections import defaultdict
 from datetime import timedelta
 from django.utils.timezone import localtime
-from django.db.models import Count, Q, Prefetch
+from django.db.models import Count, Q
 from django.conf import settings
 from hrms_app.models import (
     Holiday,
@@ -25,9 +25,12 @@ class AttendanceMapper:
         "CLH": 9,      # Casual Leave Half
         "SL": 9,      # Sick Leave
         "SLH": 9,      # Sick Leave Half
+        "PATH": 9,      # Sick Leave Half
+        "PAT": 9,      # Sick Leave Half
         "ML": 9,      # Medical Leave
         "EL": 9,      # Emergency Leave
         "CO": 9,      # Compansetory Off
+        "STL": 9,      # Short leave
         "LWP": 9,     # Leave Without Pay
         "T": 8,       # Tour
         "TH": 8,       # Tour
@@ -38,7 +41,7 @@ class AttendanceMapper:
         "OFF": 2,     # Sunday/Weekend
     }
     
-    WORKING_STATUSES = {"P", "L", "CL","CLH","CO", "SL","SLH", "ML", "EL","LWP", "FL", "H", "T"}
+    WORKING_STATUSES = {"P", "L", "CL","CLH","CO", "SL","SLH","STL", "ML", "EL","LWP","PAT","PATH", "FL", "H", "T"}
     ABSENT_STATUSES = {"A", "LWP", "AWOL"}
 
     def __init__(self, start_date_object, end_date_object):

@@ -1,0 +1,189 @@
+:root {
+    --sidebar-width: 260px;
+    --sidebar-bg: #ffffff;           /* Pure White */
+    --sidebar-text: #64748b;         /* Slate Gray */
+    --sidebar-text-hover: #1e293b;   /* Dark Navy */
+    --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); /* Indigo Gradient */
+    --hover-bg: #f1f5f9;             /* Very light gray for hover */
+    --border-color: #e2e8f0;         /* Light border */
+    --search-input-bg: #f8fafc;      /* Light gray input background */
+}
+
+/* Container Setup */
+#sidebar {
+    width: var(--sidebar-width);
+    background-color: var(--sidebar-bg);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border-color);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.02); /* Softer shadow for light mode */
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+/* 1. Header & Search Area */
+.sidebar-header {
+    padding: 1.5rem;
+    background: var(--sidebar-bg);
+}
+
+.sidebar-search input {
+    background: var(--search-input-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: #334155; /* Dark text */
+    padding: 10px 15px;
+    transition: all 0.3s ease;
+}
+
+.sidebar-search input:focus {
+    background: #fff;
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    color: #0f172a;
+}
+
+.sidebar-search input::placeholder {
+    color: #94a3b8;
+}
+
+/* 2. Scrollable Menu Area */
+.sidebar-menu-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 1rem;
+}
+
+/* Custom Scrollbar (Light Version) */
+.sidebar-menu-wrapper::-webkit-scrollbar {
+    width: 5px;
+}
+.sidebar-menu-wrapper::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+/* 3. Navigation Items */
+.nav-item {
+    margin-bottom: 4px;
+}
+
+.nav-link {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    color: var(--sidebar-text) !important;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    text-decoration: none;
+}
+
+.nav-link:hover {
+    color: var(--sidebar-text-hover) !important;
+    background: var(--hover-bg);
+    transform: translateX(3px);
+}
+
+.nav-link i.menu-icon {
+    font-size: 1.1rem;
+    margin-right: 12px;
+    width: 20px;
+    text-align: center;
+    color: #94a3b8; /* Lighter icon color by default */
+    transition: color 0.2s;
+}
+
+.nav-link:hover i.menu-icon {
+    color: #6366f1; /* Icon turns purple on hover */
+}
+
+/* Active State */
+.nav-item.active > .nav-link {
+    background: var(--primary-gradient);
+    color: #fff !important; /* Text turns white on active */
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+.nav-item.active > .nav-link i.menu-icon {
+    color: #fff !important; /* Icon turns white on active */
+}
+
+.nav-item.active > .nav-link:hover {
+    transform: none;
+}
+
+/* Categories */
+.nav-category {
+    color: #94a3b8;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 700;
+    margin: 20px 0 10px 15px;
+}
+
+/* Submenus */
+.sub-menu {
+    padding-left: 0;
+    margin-top: 5px;
+    background: #f8fafc; /* Slightly different shade */
+    border-radius: 8px;
+    overflow: hidden;
+}
+.sub-menu .nav-link {
+    padding-left: 45px;
+    font-size: 0.85rem;
+}
+.sub-menu .nav-link::before {
+    content: '';
+    position: absolute;
+    left: 24px;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    background: #cbd5e1;
+    border-radius: 50%;
+    transform: translateY(-50%);
+}
+.sub-menu .nav-link.active::before {
+    background: #6366f1;
+}
+
+/* 4. The Sticky Footer (Light Mode) */
+.sidebar-footer {
+    padding: 1rem;
+    background: #f8fafc;
+    border-top: 1px solid var(--border-color);
+    margin-top: auto;
+}
+
+.user-profile-mini {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--sidebar-text-hover);
+}
+
+.user-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+/* Helper to override inline styles if present */
+.sidebar-footer .user-info div {
+    color: #334155 !important;
+}
+.sidebar-footer .user-info div:last-child {
+    color: #94a3b8 !important;
+}

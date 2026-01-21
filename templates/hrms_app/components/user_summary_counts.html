@@ -1,13 +1,65 @@
+<style>
+  /* Compact Modern Stat Card Styling */
+  .hover-card {
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    border: 1px solid #f1f5f9;
+    background: #fff;
+    border-radius: 12px; /* Slightly tighter radius */
+  }
+
+  .hover-card:hover {
+    transform: translateY(-4px); /* Subtle lift */
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+    border-color: #6366f1;
+  }
+
+  .icon-shape {
+    width: 36px;  /* Reduced from 48px */
+    height: 36px;
+    background: rgba(99, 102, 241, 0.1);
+    color: #6366f1;
+    border-radius: 8px; /* Tighter radius */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem; /* Smaller icon */
+    transition: background 0.3s;
+  }
+
+  .hover-card:hover .icon-shape {
+    background: #6366f1;
+    color: #ffffff;
+  }
+</style>
+
 {% for item in items %}
-  <div class="pending-data flex-shrink-0" style="min-width: 150px; max-width: 150px;">
-    <a href="{{ item.link }}" class="text-decoration-none h-100">
-      <div class="card count-card shadow-sm h-100 d-flex flex-column">
-        <div class="card-body text-center d-flex flex-column justify-content-center">
-          <i class="{{ item.icon }} icon"></i>
-          <h5 class="card-title mt-2 text-dark text-truncate">{{ item.title }}</h5>
-          <h2 class="count-number">{{ item.count }}</h2>
+<div class="pending-data flex-shrink-0 py-1 px-2" style="min-width: 180px; max-width: 180px;">
+  <a href="{{ item.link }}" class="text-decoration-none h-100 d-block">
+    <div class="card hover-card h-100 shadow-sm border-0">
+      <div class="card-body p-2"> <div class="d-flex justify-content-between align-items-start mb-2">
+          <div class="me-2 overflow-hidden">
+            <p class="text-muted text-uppercase fw-bold mb-0 text-truncate"
+              style="font-size: 0.65rem; letter-spacing: 0.5px;">
+              {{ item.title }}
+            </p>
+            <h4 class="mb-0 fw-bolder text-dark font-monospace mt-1">
+              {{ item.count }}
+            </h4>
+          </div>
+
+          <div class="icon-shape flex-shrink-0">
+            <i class="{{ item.icon }}"></i>
+          </div>
         </div>
+
+        <div class="mt-2 pt-2 border-top border-light d-flex align-items-center text-primary"
+          style="font-size: 0.65rem;">
+          <span>View Details</span>
+          <i class="mdi mdi-arrow-right ms-auto" style="font-size: 0.8rem;"></i>
+        </div>
+
       </div>
-    </a>
-  </div>
+    </div>
+  </a>
+</div>
 {% endfor %}

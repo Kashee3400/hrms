@@ -4,7 +4,7 @@ from django.utils import timezone
 from datetime import datetime
 from collections import defaultdict
 import logging
-from .models import AttendanceCacheLog,AttendanceCache,CustomUser,AttendanceLog
+from ..models import AttendanceCacheLog,AttendanceCache,CustomUser,AttendanceLog
 from hrms_app.utility import attendanceutils as at
 
 logger = logging.getLogger(__name__)

@@ -1,275 +1,272 @@
 {% extends 'hrms_app/base.html' %}
 {% load static hrms_tag i18n %}
-{{ form.media }}
-{% block title %}
-  {{ user }} | Apply Leave
-{% endblock %}
-{% block extrastyle %}
-  <style>
-    @keyframes zoomInOut {
-      0% {
-        transform: scale(1);
-      }
-      50% {
-        transform: scale(1.2);
-      }
-      100% {
-        transform: scale(1);
-      }
-    }
-    .zoom-animation {
-      animation: zoomInOut 1s ease-in-out infinite;
-    }
-    @keyframes fadeInOut {
-      0% {
-        opacity: 0;
-      }
-      50% {
-        opacity: 1;
-      }
-      100% {
-        opacity: 0;
-      }
-    }
-    .fade-animation {
-      animation: fadeInOut 2s ease-in-out infinite;
-    }
-  </style>
-{% endblock %}
-{% block content %}
-  {% render_breadcrumb 'Apply Leave' urls %}
-  <div class="bg-white p-3 mt-3">
-    {% if leave_balance.leave_type.leave_type_short_code == "EL" %}
-    <span class="text-warning">{% trans "Note :" %} You have applied {{el_count}}  time(s) {{ leave_balance.leave_type.leave_type_short_code }} in this FY. </span>
-    {% endif %}
-    <form method="post" enctype="multipart/form-data" id="leave-form">
-      {% csrf_token %}
-      <div id="leave_type_div">{{ form.leave_type }}</div>
-      <div class="row g-3">
-        <div class="col-md-6 py-3">
-          {% if form.non_field_errors %}
-            <div class="notifications">
-              {% for error in form.non_field_errors %}
-                <div class="p-2 text-danger">{{ error }}</div>
-              {% endfor %}
-            </div>
-          {% endif %}
-          <div id="dates" class="row mb-3">
-            <div class="col-6 col-sm-12 col-md-6 col-lg-6">
-              <div class="mb-3">
-                <label for="{{ form.startDate.id_for_label }}" class="form-label">{{ form.startDate.label }}<span class="text-danger">*</span></label>
-                {{ form.startDate }}
-                {% if form.startDate.errors %}
-                  <div class="text-danger">
-                    {% for error in form.startDate.errors %}
-                      <div>{{ error }}</div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="col-6 col-sm-12 col-md-6 col-lg-6">
-              <div class="mb-3">
-                <label for="{{ form.endDate.id_for_label }}" class="form-label">{{ form.endDate.label }}<span class="text-danger">*</span></label>
-                {{ form.endDate }}
-                {% if form.endDate.errors %}
-                  <div class="text-danger">
-                    {% for error in form.endDate.errors %}
-                      <div>{{ error }}</div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="col-6 col-sm-12 col-md-6 col-lg-6">
-              <div class="mb-3">
-                <label for="{{ form.leave_address.id_for_label }}" class="form-label">{{ form.leave_address.label }}<span class="text-danger">*</span></label>
-                {{ form.leave_address }}
-                {% if form.leave_address.errors %}
-                  <div class="text-danger">
-                    {% for error in form.leave_address.errors %}
-                      <div>{{ error }}</div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-          
-          <div id="choices" class="row mb-3">
-            <div class="col-6 col-sm-12 col-md-6 col-lg-6">
-              <div class="mb-3">
-                <label for="{{ form.startDayChoice.id_for_label }}" class="form-label">{{ form.startDayChoice.label }}<span class="text-danger">*</span></label>
-                {{ form.startDayChoice }}
-                {% if form.startDayChoice.errors %}
-                  <div class="text-danger">
-                    {% for error in form.startDayChoice.errors %}
-                      <div>{{ error }}</div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              </div>
-            </div>
-            <div class="col-6 col-sm-12 col-md-6 col-lg-6">
-              <div class="mb-3">
-                <label for="{{ form.endDayChoice.id_for_label }}" class="form-label">{{ form.endDayChoice.label }}<span class="text-danger">*</span></label>
-                {{ form.endDayChoice }}
-                {% if form.endDayChoice.errors %}
-                  <div class="text-danger">
-                    {% for error in form.endDayChoice.errors %}
-                      <div>{{ error }}</div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              </div>
-            </div>
-          </div>
 
-          <div id="balances" class="row mb-3">
-            <div class="col-6 col-sm-12 col-md-6 col-lg-6">
-              <div class="mb-3">
-                <label for="{{ form.usedLeave.id_for_label }}" class="form-label">{{ form.usedLeave.label }}</label>
-                {{ form.usedLeave }}
-                {% if form.usedLeave.errors %}
-                  <div class="text-danger">
-                    {% for error in form.usedLeave.errors %}
-                      <div>{{ error }}</div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              </div>
-            </div>
-            <input type="hidden" id="leaveId" value="{{ leave_balance.leave_type.pk }}" />
-            <div class="col-6 col-sm-12 col-md-6 col-lg-6">
-              <div class="mb-3">
-                <label for="{{ form.balanceLeave.id_for_label }}" class="form-label">{{ form.balanceLeave.label }}</label>
-                {{ form.balanceLeave }}
-                {% if form.balanceLeave.errors %}
-                  <div class="text-danger">
-                    {% for error in form.balanceLeave.errors %}
-                      <div>{{ error }}</div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              </div>
+{{ form.media }}
+
+{% block title %}
+{{ user }} | Apply Leave
+{% endblock %}
+
+{% block extrastyle %}
+<style>
+  /* Kept your original animations */
+  @keyframes zoomInOut {
+    0% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.2);
+    }
+
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .zoom-animation {
+    animation: zoomInOut 1s ease-in-out infinite;
+  }
+
+  @keyframes fadeInOut {
+    0% {
+      opacity: 0;
+    }
+
+    50% {
+      opacity: 1;
+    }
+
+    100% {
+      opacity: 0;
+    }
+  }
+
+  .fade-animation {
+    animation: fadeInOut 2s ease-in-out infinite;
+  }
+
+  /* Added style for the date table */
+  #dateOptions select {
+    max-width: 150px;
+  }
+
+  .table-sm td {
+    padding: 0.5rem;
+    vertical-align: middle;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% render_breadcrumb 'Apply Leave' urls %}
+
+<div class="bg-white p-3 mt-3">
+
+  {% if leave_balance.leave_type.leave_type_short_code == "EL" %}
+  <div class="alert alert-warning">
+    <i class="mdi mdi-information"></i>
+    {% trans "Note :" %} You have applied {{el_count}} time(s) {{ leave_balance.leave_type.leave_type_short_code }} in
+    this FY.
+  </div>
+  {% endif %}
+
+  <div id="leaveErrorAlert" class="alert alert-danger" style="display: none;"></div>
+
+  <form method="post" enctype="multipart/form-data" id="leave-form">
+    {% csrf_token %}
+
+    <div id="leave_type_div" style="display:none;">{{ form.leave_type }}</div>
+
+    <div class="row g-3">
+      <div class="col-md-6 py-3">
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {% for error in form.non_field_errors %}
+          <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <div id="dates" class="row mb-3">
+          <div class="col-6">
+            <div class="mb-3">
+              <label for="{{ form.startDate.id_for_label }}" class="form-label">{{ form.startDate.label }}<span
+                  class="text-danger">*</span></label>
+              {{ form.startDate }}
+              <div class="text-danger small">{{ form.startDate.errors }}</div>
             </div>
           </div>
-          {% if form.attachment %}
+          <div class="col-6">
             <div class="mb-3">
-              <label for="{{ form.attachment.id_for_label }}" class="form-label">{{ form.attachment.label }}<span class="text-danger"></span></label>
-              {{ form.attachment }}
-              {% if form.attachment.errors %}
-                <div class="text-danger">
-                  {% for error in form.attachment.errors %}
-                    <div>{{ error }}</div>
-                  {% endfor %}
-                </div>
-              {% endif %}
+              <label for="{{ form.endDate.id_for_label }}" class="form-label">{{ form.endDate.label }}<span
+                  class="text-danger">*</span></label>
+              {{ form.endDate }}
+              <div class="text-danger small">{{ form.endDate.errors }}</div>
             </div>
-          {% endif %}
-          <div class="mb-3">
-            <label for="{{ form.reason.id_for_label }}" class="form-label">{{ form.reason.label }}<span class="text-danger">*</span></label>
-            {{ form.reason }}
-            {% if form.reason.errors %}
-              <div class="text-danger">
-                {% for error in form.reason.errors %}
-                  <div>{{ error }}</div>
-                {% endfor %}
-              </div>
-            {% endif %}
           </div>
         </div>
-        <div class="col-md-6">
-          <h4 style="background-color: {{ leave_balance.leave_type.color_hex }}; color: {{ leave_balance.leave_type.text_color_hex }};" class="mt-3 p-3 fade-animation text-white">{% blocktrans with leave_type=leave_balance.leave_type.leave_type %}Applying for {{ leave_type }} {% endblocktrans %}</h4>
-          <div id="balanceSummary" class="border p-3 bg-white mb-3">
-            <table class="table">
-              <tbody>
-                <tr>
-                  <td id="td_date" class="fw-bold">---------------</td>
-                  <td>Day(s)</td>
-                </tr>
-                <tr style="background-color: #f2f2f2;">
-                  <td>
-                    <strong>{% trans 'Available balance' %}</strong>
-                  </td>
-                  <td id="balance">{{rem_bal}}</td>
-                  {% comment %} <td id="balance">{{ leave_balance.remaining_leave_balances }} On-Hold: {{rem_bal}}</td> {% endcomment %}
-                </tr>
-                <tr>
-                  <td>
-                    <strong>{% trans 'Currently booked' %}</strong>
-                  </td>
-                  <td id="currentlyBooked"></td>
-                </tr>
-                <tr style="background-color: #f2f2f2;">
-                  <td>
-                    <strong>{% trans 'Balance after this leave' %}</strong>
-                  </td>
-                  <td id="remainingBal"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div id="leaveDates" class="border p-3 bg-white mb-3">
-            <div id="dateOptions"></div>
-            <div style="background-color: #f2f2f2;" class="row p-2 m-2">
-              <div class="col-8 text-dark fw-bold">
-                {% trans 'Total Days' %}
-              </div>
-              <div id="totalDays" class="col-4 text-dark fw-bold"></div>
-            </div>
-          </div>
-          <div class="row mt-3 d-flex justify-content-center align-items-center">
-            <div class="col-12 d-flex justify-content-center">
-              <button type="button" data-bs-toggle="modal" data-bs-target="#confirmationModal" class="btn btn-primary btn-sm shadow mt-2">
-                {% blocktrans with leave_code=leave_balance.leave_type.leave_type_short_code %}Apply Leave ({{ leave_code }}){% endblocktrans %}
-                <i class="mdi mdi-send"></i>
-              </button>
-            </div>
-          </div>
+
+        <div class="mb-3">
+          <label for="{{ form.leave_address.id_for_label }}" class="form-label">{{ form.leave_address.label }}<span
+              class="text-danger">*</span></label>
+          {{ form.leave_address }}
+          <div class="text-danger small">{{ form.leave_address.errors }}</div>
+        </div>
+
+        <div id="choices" style="display:none;">
+          {{ form.startDayChoice }}
+          {{ form.endDayChoice }}
+        </div>
+
+        <div id="balances" style="display:none;">
+          {{ form.usedLeave }}
+          {{ form.balanceLeave }}
+          <input type="hidden" id="leaveId" value="{{ leave_balance.leave_type.pk }}" />
+        </div>
+
+        {% if form.attachment %}
+        <div class="mb-3">
+          <label for="{{ form.attachment.id_for_label }}" class="form-label">{{ form.attachment.label }}</label>
+          {{ form.attachment }}
+          <div class="text-danger small">{{ form.attachment.errors }}</div>
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label for="{{ form.reason.id_for_label }}" class="form-label">{{ form.reason.label }}<span
+              class="text-danger">*</span></label>
+          {{ form.reason }}
+          <div class="text-danger small">{{ form.reason.errors }}</div>
         </div>
       </div>
-    </form>
-  </div>
-    <!-- Modal -->
-    <div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header bg-warning text-white">
-            <h5 class="modal-title" id="confirmationModalLabel">Are you sure?</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+
+      <div class="col-md-6">
+        <h4
+          style="background-color: {{ leave_balance.leave_type.color_hex }}; color: {{ leave_balance.leave_type.text_color_hex }};"
+          class="mt-3 p-3 text-white rounded shadow-sm">
+          {% blocktrans with leave_type=leave_balance.leave_type.leave_type %}Applying for {{ leave_type }}{%
+          endblocktrans %}
+        </h4>
+
+        <div id="balanceSummary" class="border p-3 bg-white mb-3 rounded">
+          <table class="table table-borderless mb-0">
+            <tbody>
+              <tr>
+                <td id="td_date" class="fw-bold text-muted small">Select dates to calculate</td>
+                <td class="text-end">Day(s)</td>
+              </tr>
+              <tr class="bg-light">
+                <td><strong>{% trans 'Available balance' %}</strong></td>
+                <td id="balance" class="text-end fw-bold">{{ rem_bal }}</td>
+              </tr>
+              <tr>
+                <td><strong>{% trans 'Currently booked' %}</strong></td>
+                <td id="currentlyBooked" class="text-end text-primary">0</td>
+              </tr>
+              <tr class="bg-light border-top">
+                <td><strong>{% trans 'Balance after this leave' %}</strong></td>
+                <td id="remainingBal" class="text-end fw-bold">--</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div id="leaveDates" class="border p-3 bg-white mb-3 rounded">
+          <h6 class="text-muted mb-3">{% trans "Day Wise Breakdown" %}</h6>
+
+          <div id="dateOptions" class="table-responsive"></div>
+
+          <div class="d-flex justify-content-between align-items-center bg-light p-3 rounded mt-2">
+            <div class="text-dark fw-bold">{% trans 'Total Days' %}</div>
+            <div id="totalDays" class="text-primary fw-bold h5 mb-0">
+              0 Day(s)
+            </div>
           </div>
-          <div class="modal-body">You want to apply for a leave. Please check the details before you submit.</div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary" onclick="submitForm()">Submit</button>
+        </div>
+        <!-- {% if leave_balance.leave_type.leave_type_short_code == 'STL' %}
+        <div id="attendanceSummary" class="border p-3 bg-light rounded mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="text-muted mb-0">Attendance Summary</h6>
+            <span class="badge bg-secondary">HH:MM</span>
+          </div>
+
+          <div class="d-flex justify-content-between py-1">
+            <span class="text-muted">Worked</span>
+            <strong id="attendanceWorked" class="text-success">--:--</strong>
+          </div>
+
+          <div class="d-flex justify-content-between py-1">
+            <span class="text-muted">Required</span>
+            <strong id="attendanceRequired">08:00</strong>
+          </div>
+
+          <hr class="my-2">
+
+          <div class="d-flex justify-content-between py-1">
+            <span class="fw-semibold text-warning">Short Leave Needed</span>
+            <strong id="attendanceMissing" class="text-warning">--:--</strong>
+          </div>
+
+          <small class="text-muted d-block mt-2">
+            Time displayed in <strong>HH:MM</strong> format
+          </small>
+        </div>
+        {% else %}
+        
+        {% endif %} -->
+
+        <div class="row mt-3 d-flex justify-content-center align-items-center">
+          <div class="col-12 d-flex justify-content-center">
+            <button type="button" id="applyLeaveButton" data-bs-toggle="modal" data-bs-target="#confirmationModal"
+              class="btn btn-primary shadow mt-2 px-4">
+              {% blocktrans with leave_code=leave_balance.leave_type.leave_type_short_code %}Apply Leave ({{
+              leave_code}}){% endblocktrans %}
+              <i class="mdi mdi-send ms-1"></i>
+            </button>
           </div>
         </div>
       </div>
     </div>
+  </form>
+</div>
+
+<div class="modal fade" id="confirmationModal" tabindex="-1" aria-labelledby="confirmationModalLabel"
+  aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-white">
+        <h5 class="modal-title" id="confirmationModalLabel"><i class="mdi mdi-alert-circle-outline me-1"></i> Are you
+          sure?</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        You are about to apply for leave. Please review the details before submitting.
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" onclick="submitForm()">Submit Application</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
-  <script>
-    var leaveTypeShortCode = '{{ leave_balance.leave_type.leave_type_short_code }}';
-    var leaveBalanceRaw = {% if object %}{{ leave_balance.remaining_leave_balances|default:0 }}{% else %}{{ rem_bal }}{% endif %};
-    var leaveBalance = (leaveTypeShortCode === 'EL') ? Math.floor(leaveBalanceRaw) : leaveBalanceRaw;
-    var totalDays = 0
-    var bookedBalance = 0
-    var endDay = 1
-    var startDay = 1
-    $(document).ready(function () {
-      $('#balances,#leave_type_div,#choices').hide();
-      if (leaveBalance === 0 && leaveTypeShortCode !== 'LWP') {
-        $('#applyLeaveButton').prop('disabled', true)
-      }
-    })
-  </script>
-  <script src="{% static 'hrms_app/js/apply_leave.js' %}"></script>
-  <script src="{% static 'hrms_app/source/js/charts.js' %}"></script>
-  <script>
-    function submitForm() {
-      $('#leave-form').submit()
-    }
-  </script>
+<script src="{% static 'hrms_app/source/js/charts.js' %}"></script>
+
+<script>
+  // These variables are picked up by the optimized JS
+  var leaveTypeShortCode = '{{ leave_balance.leave_type.leave_type_short_code|default:"" }}';
+  var rawBalance = parseFloat("{{ rem_bal|default:0 }}"); // Ensure it's a number
+  // Apply EL logic if necessary (as per your original code)
+  var leaveBalance = rawBalance;
+
+  // Helper for Modal
+  function submitForm() {
+    $('#leave-form').submit();
+  }
+</script>
+
+<script src="{% static 'hrms_app/js/apply_leave.js' %}"></script>
 {% endblock %}

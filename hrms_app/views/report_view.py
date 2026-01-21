@@ -284,7 +284,6 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
 
     def leave_balance_html_table(self, year=None):
         year = year or timezone.now().year
-        current_month = timezone.now().month
         months = settings.MONTHS
         columns = ["Employee Code", "Employee Name"]
         annual_headers = ["EL", "SL", "CL"]
@@ -339,7 +338,7 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
     def get_leave_data(self, year, monthly_headers):
         leave_balance_openings = LeaveBalanceOpenings.objects.filter(
             leave_type__leave_type_short_code__in=["EL", "SL", "CL"],year=year,
-        ).values("user_id", "leave_type__leave_type_short_code", "opening_balance", "no_of_leaves")
+        ).exclude(leave_type__leave_type_short_code="CO").values("user_id", "leave_type__leave_type_short_code", "opening_balance", "no_of_leaves")
         leave_opening_dict = defaultdict(lambda: {lt: {"opening_balance": 0, "no_of_leaves": 0} for lt in ["EL", "SL", "CL"]})
         for balance in leave_balance_openings:
             leave_opening_dict[balance["user_id"]][balance["leave_type__leave_type_short_code"]] = {
@@ -347,7 +346,13 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
                 "no_of_leaves": float(balance["opening_balance"] or 0)
             }
         search_query = self.request.GET.get("q", "").strip()
-        leave_summary = LeaveApplication.objects.filter(endDate__year=year, status=settings.APPROVED)
+        leave_summary = LeaveApplication.objects.filter(
+            endDate__year=year,
+            status=settings.APPROVED,
+        ).exclude(
+            leave_type__leave_type_short_code="CO"
+        )
+
         if search_query:
             leave_summary = leave_summary.filter(
                 Q(appliedBy__first_name__icontains=search_query) |

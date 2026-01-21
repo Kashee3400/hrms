@@ -15,7 +15,7 @@ import logging
 
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
-
+from ..utility.attendanceutils import get_worked_minutes
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +153,8 @@ class LeavePolicyManager:
         leave_type,
         start_date,
         end_date,
+        from_time,
+        to_time,
         start_day_choice,
         end_day_choice,
         bookedLeave,
@@ -167,6 +169,8 @@ class LeavePolicyManager:
         self.end_day_choice = end_day_choice
         self.booked_leave = bookedLeave
         self.exclude_application_id = exclude_application_id
+        self.from_time = from_time
+        self.to_time = to_time
 
     def validate_policies(self):
         """
@@ -181,6 +185,7 @@ class LeavePolicyManager:
             self.apply_el_policy()
         elif self.leave_type.leave_type_short_code == "SL":
             self.apply_sl_policy()
+
 
     def validate_overlapping_leaves(self):
         """
@@ -455,3 +460,103 @@ class LeaveStatsManager:
         for item in qs:
             report[item["month"].strftime("%B")] = item["total"]
         return dict(report)
+
+
+REQUIRED_DAILY_MINUTES = 8 * 60
+
+
+class ShortLeavePolicyManager:
+    """
+    Policy Manager for Attendance-Based Short Leave (SLT)
+    """
+
+    def __init__(
+        self,
+        *,
+        user,
+        leave_type,
+        start_date,
+        from_time,
+        to_time,
+    ):
+        self.user = user
+        self.leave_type = leave_type
+        self.start_date = start_date
+        self.from_time = from_time
+        self.to_time = to_time
+
+    # --------------------------------------------------
+    # PUBLIC API
+    # --------------------------------------------------
+    def apply(self):
+        """
+        Entry point for Short Leave policy validation
+        """
+        self._validate_time_range()
+        short_leave_minutes = self._calculate_short_leave_minutes()
+        self._validate_attendance_based_slt(short_leave_minutes)
+        self._validate_short_leave_duration(short_leave_minutes)
+
+        return short_leave_minutes
+
+    # --------------------------------------------------
+    # INTERNAL HELPERS
+    # --------------------------------------------------
+    def _validate_time_range(self):
+        if not self.from_time or not self.to_time:
+            raise ValidationError("From Time and To Time are required.")
+
+        if self.from_time >= self.to_time:
+            raise ValidationError("To Time must be after From Time.")
+
+    def _calculate_short_leave_minutes(self):
+        leave_date = self.start_date.date()
+        return int(
+            (
+                datetime.combine(leave_date, self.to_time)
+                - datetime.combine(leave_date, self.from_time)
+            ).total_seconds() / 60
+        )
+
+    def _validate_attendance_based_slt(self, short_leave_minutes):
+        leave_date = self.start_date.date()
+
+        worked_minutes = get_worked_minutes(self.user, leave_date)
+
+        max_slt_minutes = int(self.leave_type.max_duration or 0)
+        min_work_minutes = REQUIRED_DAILY_MINUTES - max_slt_minutes
+
+        # 1️⃣ Minimum working condition
+        if worked_minutes < min_work_minutes:
+            raise ValidationError(
+                f"Short Leave can be applied only if you have worked at least "
+                f"{min_work_minutes // 60} hours."
+            )
+
+        total_minutes = worked_minutes + short_leave_minutes
+
+        # 2️⃣ Must complete duty hours
+        if total_minutes < REQUIRED_DAILY_MINUTES:
+            raise ValidationError(
+                "Working hours plus short leave do not complete duty hours."
+            )
+
+        # 3️⃣ Cannot exceed duty hours
+        if total_minutes > REQUIRED_DAILY_MINUTES:
+            raise ValidationError(
+                "Short Leave exceeds required daily working hours."
+            )
+
+    def _validate_short_leave_duration(self, short_leave_minutes):
+        min_d = self.leave_type.min_duration
+        max_d = self.leave_type.max_duration
+
+        if min_d and short_leave_minutes < int(min_d):
+            raise ValidationError(
+                f"Minimum short leave duration is {min_d} minutes."
+            )
+
+        if max_d and short_leave_minutes > int(max_d):
+            raise ValidationError(
+                f"Maximum short leave duration is {max_d} minutes."
+            )

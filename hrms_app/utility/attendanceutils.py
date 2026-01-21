@@ -153,9 +153,101 @@ def get_tour_logs(employee_ids, start_date, end_date):
 
 
 def str_to_date(value):
-    from django.utils.timezone import localtime, make_aware, utc
+    from django.utils.timezone import make_aware, utc
     date_time = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
     date_time = (
         make_aware(date_time, timezone=utc) if date_time.tzinfo is None else date_time
     )
     return date_time
+
+from django.utils import timezone
+
+def get_worked_minutes(user, date):
+    """
+    Calculate total worked minutes for a user on a given date
+    based on AttendanceLog.
+    """
+
+    day_start = timezone.make_aware(
+        timezone.datetime.combine(date, timezone.datetime.min.time())
+    )
+    day_end = timezone.make_aware(
+        timezone.datetime.combine(date, timezone.datetime.max.time())
+    )
+
+    logs = AttendanceLog.objects.filter(
+        applied_by=user,
+        start_date__gte=day_start,
+        end_date__lte=day_end,
+        is_regularisation=True,
+    ).exclude(
+        reg_status=settings.MIS_PUNCHING
+    )
+
+    total_minutes = 0
+
+    for log in logs:
+        start = log.start_date
+        end = log.end_date
+
+        if timezone.is_aware(start) and timezone.is_aware(end):
+            diff = end - start
+        else:
+            diff = timezone.make_aware(end) - timezone.make_aware(start)
+
+        total_minutes += int(diff.total_seconds() / 60)
+
+    return total_minutes
+
+REQUIRED_DAILY_MINUTES = 8 * 60
+
+
+def get_attendance_summary(user, date, leave_type):
+    """
+    Attendance summary assuming ONE attendance row per date.
+    """
+
+    log = AttendanceLog.objects.filter(
+        applied_by=user,
+        start_date__date=date,
+        is_regularisation=True
+    ).first()
+
+    # -----------------------------
+    # Default values (safe)
+    # -----------------------------
+    worked_minutes = 0
+    eligible = False
+    attendance_start = None
+    attendance_end = None
+
+    if log and log.start_date and log.end_date:
+        diff = log.end_date - log.start_date
+        worked_minutes = max(0, int(diff.total_seconds() / 60))
+
+        # 🔹 Pass times to frontend
+        attendance_start = log.start_date.isoformat()
+        attendance_end = log.end_date.isoformat()
+
+    max_slt = int(leave_type.max_duration or 0)
+
+    missing_minutes = max(0, REQUIRED_DAILY_MINUTES - worked_minutes)
+    suggested = min(missing_minutes, max_slt)
+
+    # Eligibility rule:
+    # worked_minutes >= (8 hrs - max_slt)
+    eligible = worked_minutes >= (REQUIRED_DAILY_MINUTES - max_slt)
+
+    return {
+        "worked_minutes": worked_minutes,
+        "required_minutes": REQUIRED_DAILY_MINUTES,
+        "missing_minutes": missing_minutes,
+        "max_short_leave_minutes": max_slt,
+        "suggested_short_leave_minutes": suggested,
+        "eligible": eligible,
+        "attendance_complete": bool(log and log.start_date and log.end_date),
+
+        # 🔹 NEW (Frontend use)
+        "attendance_start": attendance_start,
+        "attendance_end": attendance_end,
+    }

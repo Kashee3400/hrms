@@ -8,9 +8,9 @@ from hrms_app.utility.leave_utils import (
     get_regularization_requests,
 )
 from django.utils.translation import gettext as _
-from hrms_app.utility.attendanceutils import get_from_to_datetime,get_month_start_end
+from hrms_app.utility.attendanceutils import get_month_start_end
 from hrms_app.models import PersonalDetails
-from django.utils.timezone import now, localdate, localtime
+from django.utils.timezone import now
 from django.db import models
 from datetime import timedelta
 import random
@@ -197,6 +197,14 @@ def get_leave_balances(user, request):
                 for leave in user_pending_leaves
                 if leave.leave_type == lb.leave_type
             )
+            # 🔹 Route Short Leave to its dedicated page
+            if lb.leave_type.leave_type_short_code == "STL":
+                apply_url = reverse("short_leave_create")
+            else:
+                apply_url = reverse(
+                    "apply_leave_with_id",
+                    args=[lb.leave_type.pk],
+                )
 
             total_balance = lb.remaining_leave_balances - on_hold_leave
 
@@ -218,16 +226,14 @@ def get_leave_balances(user, request):
                         if lb.leave_type.leave_type_short_code == "EL"
                         else on_hold_leave
                     ),
+                    "is_active": lb.is_active,
                     "total_balance": (
                         int(total_balance)
                         if lb.leave_type.leave_type_short_code == "EL"
                         else total_balance
                     ),
                     "leave_type": lb.leave_type,
-                    "url": reverse(
-                        "apply_leave_with_id",
-                        args=[lb.leave_type.pk],
-                    ),
+                    "url": apply_url,
                     "color": lb.leave_type.color_hex,
                 }
             )
@@ -267,11 +273,9 @@ def get_leave_balances(user, request):
                             - used_leave
                             - on_hold_leave
                         ),
+                        "is_active": lb.is_active,
                         "leave_type": ml_balance.leave_type.leave_type,
-                        "url": reverse(
-                            "apply_leave_with_id",
-                            args=[ml_balance.leave_type.id],
-                        ),
+                        "url": apply_url,
                         "color": "#ff9447",
                     }
                 )
@@ -673,11 +677,21 @@ def str_to_date(value):
     return date_time
 
 
-@register.inclusion_tag(filename="leave_balances/holidays.html")
-def get_holidays():
-    return {"holidays": Holiday.objects.filter(start_date__year=now().year).order_by("start_date")}
+from django.db.models import Q
 
-
+@register.inclusion_tag(filename="leave_balances/holidays.html", takes_context=True)
+def get_holidays(context):
+    request = context.get('request')
+    current_year = now().year
+    
+    # Base query: Year matches AND (User is in applicable_users OR applicable_users is empty)
+    holidays = Holiday.objects.filter(
+        start_date__year=current_year
+    ).filter(
+        Q(applicable_users=request.user) | Q(applicable_users__isnull=True)
+    ).distinct().order_by("start_date")
+    
+    return {"holidays": holidays}
 @register.inclusion_tag(filename="leave_balances/announcement.html")
 def get_announcement(user, request):
     announcements = (

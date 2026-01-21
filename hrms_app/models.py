@@ -1043,6 +1043,18 @@ class LeaveApplication(models.Model):
             "The date when the leave ends. Leave can be of a single day or multiple days."
         ),
     )
+     # 🔹 NEW: Short Leave Time Fields
+    from_time = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="Start time for Short Leave"
+    )
+    to_time = models.TimeField(
+        null=True,
+        blank=True,
+        help_text="End time for Short Leave"
+    )
+
     usedLeave = models.FloatField(
         verbose_name=_("Used Leave"),
         help_text=_("Total leave days used for this application."),
@@ -1108,7 +1120,10 @@ class LeaveApplication(models.Model):
     )
 
     is_leave_deducted = models.BooleanField(default=False)
-
+    
+    def is_short_leave(self):
+        return self.leave_type.leave_type_short_code == "STL"
+    
     def save(self, *args, **kwargs):
         if self.startDate and self.endDate and self.startDate > self.endDate:
             raise ValidationError(_("Start date cannot be after end date."))
@@ -1386,166 +1401,207 @@ class LeaveDayChoiceAdjustment(models.Model):
         verbose_name = "Leave Day Choice Adjustment"
         verbose_name_plural = "Leave Day Choice Adjustments"
 
-
+from .choices.leave import LeaveUnit,LeaveAccrualPeriod,LeaveExpiryPolicy
 class LeaveType(models.Model):
+    # ------------------------
+    # Basic Info
+    # ------------------------
+
     leave_type = models.CharField(
         max_length=100,
         unique=True,
-        choices=settings.LEAVE_TYPE_CHOICES,
         verbose_name=_("Leave Type"),
-        help_text=_(
-            "Select the type of leave (e.g., Sick Leave, Casual Leave). This must be unique."
-        ),
+        help_text=_("Name of the leave type (e.g. Sick Leave, Short Leave)."),
     )
+
     leave_type_short_code = models.CharField(
-        max_length=100,
+        max_length=50,
         unique=True,
         blank=True,
         null=True,
-        verbose_name=_("Leave Type Short Code"),
-        help_text=_(
-            "Provide a short code for the leave type (optional). This must be unique if provided."
-        ),
+        verbose_name=_("Leave Short Code"),
     )
+
     half_day_short_code = models.CharField(
-        max_length=100,
+        max_length=50,
         unique=True,
         blank=True,
         null=True,
         verbose_name=_("Half Day Short Code"),
-        help_text=_(
-            "Provide a short code for the leave type (optional). This must be unique if provided."
-        ),
-    )
-    default_allocation = models.FloatField(
-        blank=True,
-        null=True,
-        verbose_name=_("Default Allocation"),
-        help_text=_("Set the default number of days allocated for this leave type."),
-    )
-    min_notice_days = models.FloatField(
-        blank=True,
-        null=True,
-        verbose_name=_("Minimum Notice Days"),
-        help_text=_(
-            "Specify the minimum number of days notice required before applying for this leave."
-        ),
-    )
-    max_days_limit = models.FloatField(
-        blank=True,
-        null=True,
-        verbose_name=_("Maximum Days Limit"),
-        help_text=_(
-            "Set the maximum number of days that can be taken for this leave type."
-        ),
-    )
-    min_days_limit = models.FloatField(
-        blank=True,
-        null=True,
-        verbose_name=_("Minimum Days Limit"),
-        help_text=_(
-            "Set the minimum number of days that can be taken for this leave type."
-        ),
-    )
-    allowed_days_per_year = models.FloatField(
-        blank=True,
-        null=True,
-        verbose_name=_("Allowed Days Per Year"),
-        help_text=_(
-            "Specify the total number of days allowed for this leave type per year."
-        ),
-    )
-    leave_fy_start = models.DateField(
-        blank=True,
-        null=True,
-        verbose_name="Leave FY Start",
-        help_text=_(
-            "Define the start of the financial year for leave calculations (optional)."
-        ),
-    )
-    leave_fy_end = models.DateField(
-        blank=True,
-        null=True,
-        verbose_name="Leave FY End",
-        help_text=_(
-            "Define the end of the financial year for leave calculations (optional)."
-        ),
-    )
-    color_hex = models.CharField(
-        max_length=7,
-        blank=True,
-        null=True,
-        verbose_name=_("Color Hex Code"),
-        help_text=_(
-            "Enter a hex color code to represent this leave type in the system."
-        ),
-    )
-    text_color_hex = models.CharField(
-        max_length=7,
-        blank=True,
-        null=True,
-        verbose_name=_("Text Color Hex Code"),
-        help_text=_(
-            "Enter a hex color code for the text color to be used with this leave type."
-        ),
-    )
-    created_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name=_("Created At"),
-        help_text=_(
-            "The date and time when this leave type was created (automatically set)."
-        ),
-    )
-    created_by = models.ForeignKey(
-        CustomUser,
-        on_delete=models.SET_NULL,
-        related_name="created_leave_types",
-        null=True,
-        blank=True,
-        verbose_name=_("Created By"),
-        help_text=_("The user who created this leave type (set automatically)."),
-    )
-    updated_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name=_("Updated At"),
-        help_text=_(
-            "The date and time when this leave type was last updated (automatically set)."
-        ),
-    )
-    updated_by = models.ForeignKey(
-        CustomUser,
-        on_delete=models.SET_NULL,
-        related_name="updated_leave_types",
-        null=True,
-        blank=True,
-        verbose_name=_("Updated By"),
-        help_text=_("The user who last updated this leave type (set automatically)."),
     )
 
-    consecutive_restriction = models.BooleanField(
+    # ------------------------
+    # Leave Measurement
+    # ------------------------
+
+    leave_unit = models.CharField(
+        max_length=10,
+        choices=LeaveUnit.choices,
+        default=LeaveUnit.DAY,
+        verbose_name=_("Leave Unit"),
+        help_text=_("Defines whether leave is counted in days, hours, or minutes."),
+    )
+
+    allow_half_day = models.BooleanField(
         default=False,
-        verbose_name=_("Consecutive Leave Restriction"),
+        verbose_name=_("Allow Half Day"),
+    )
+
+    half_day_value = models.FloatField(
+        default=0.5,
+        verbose_name=_("Half Day Value"),
+        help_text=_("Applicable only for day-based leaves."),
+    )
+
+    min_duration = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name=_("Minimum Duration"),
+        help_text=_("Minimum duration allowed (based on leave unit)."),
+    )
+
+    max_duration = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        verbose_name=_("Maximum Duration"),
+        help_text=_("Maximum duration allowed (based on leave unit)."),
+    )
+
+    # ------------------------
+    # Accrual & Expiry
+    # ------------------------
+
+    accrual_period = models.CharField(
+        max_length=10,
+        choices=LeaveAccrualPeriod.choices,
+        default=LeaveAccrualPeriod.YEARLY,
+        verbose_name=_("Accrual Period"),
+    )
+
+    accrual_quantity = models.FloatField(
+        blank=True,
+        null=True,
+        verbose_name=_("Accrual Quantity"),
+        help_text=_("Leave allocated per accrual period."),
+    )
+
+    expiry_policy = models.CharField(
+        max_length=15,
+        choices=LeaveExpiryPolicy.choices,
+        default=LeaveExpiryPolicy.NONE,
+        verbose_name=_("Expiry Policy"),
+    )
+
+    allow_carry_forward = models.BooleanField(
+        default=False,
+        verbose_name=_("Allow Carry Forward"),
+    )
+
+    max_carry_forward = models.FloatField(
+        blank=True,
+        null=True,
+        verbose_name=_("Max Carry Forward"),
+    )
+
+    must_apply_within_accrual_period = models.BooleanField(
+        default=False,
+        verbose_name=_("Must Apply Within Same Period"),
         help_text=_(
-            "Check if consecutive leave applications are not allowed for this leave type."
+            "If enabled, leave must be applied within the same accrual period "
+            "(e.g. short leave must be used in the same month)."
         ),
     )
+
+    # ------------------------
+    # Existing Limits
+    # ------------------------
+
+    default_allocation = models.FloatField(blank=True, null=True)
+    min_notice_days = models.FloatField(blank=True, null=True)
+    max_days_limit = models.FloatField(blank=True, null=True)
+    min_days_limit = models.FloatField(blank=True, null=True)
+    allowed_days_per_year = models.FloatField(blank=True, null=True)
+
+    leave_fy_start = models.DateField(blank=True, null=True)
+    leave_fy_end = models.DateField(blank=True, null=True)
+
+    color_hex = models.CharField(max_length=7, blank=True, null=True)
+    text_color_hex = models.CharField(max_length=7, blank=True, null=True)
+
+    # ------------------------
+    # Restrictions
+    # ------------------------
+
+    consecutive_restriction = models.BooleanField(default=False)
+
     restricted_after_leave_types = models.ManyToManyField(
         "self",
         blank=True,
         symmetrical=False,
         related_name="restricted_by_leave_types",
-        verbose_name=_("Restricted After Leave Types"),
-        help_text=_(
-            "Select leave types after which this leave type cannot be applied consecutively."
-        ),
     )
 
+    # ------------------------
+    # Audit Fields
+    # ------------------------
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    created_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_leave_types",
+    )
+
+    updated_by = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="updated_leave_types",
+    )
+
+    # =========================
+    # VALIDATIONS
+    # =========================
+
+    def clean(self):
+        # Half day only for day-based leaves
+        if self.allow_half_day and self.leave_unit != LeaveUnit.DAY:
+            raise ValidationError(_("Half day is only allowed for day-based leaves."))
+
+        # Duration validation
+        if self.min_duration and self.max_duration:
+            if self.min_duration > self.max_duration:
+                raise ValidationError(_("Minimum duration cannot exceed maximum."))
+
+        # Accrual validation
+        if self.accrual_period != LeaveAccrualPeriod.NONE and not self.accrual_quantity:
+            raise ValidationError(_("Accrual quantity is required."))
+
+        # Carry forward validation
+        if not self.allow_carry_forward and self.max_carry_forward:
+            raise ValidationError(_("Carry forward is disabled."))
+
+        # Short leave rules
+        if self.leave_unit in [LeaveUnit.HOUR, LeaveUnit.MINUTE]:
+            if self.allow_half_day:
+                raise ValidationError(_("Half day not applicable for short leaves."))
+            if self.allow_carry_forward:
+                raise ValidationError(_("Short leave cannot be carried forward."))
+
+    # =========================
+    # META
+    # =========================
+
     def __str__(self):
-        return f"{self.leave_type}"
+        return self.leave_type
 
     class Meta:
         db_table = "tbl_leave_type"
-        managed = True
         verbose_name = _("Leave Type")
         verbose_name_plural = _("Leave Types")
 
@@ -1653,7 +1709,11 @@ class LeaveBalanceOpenings(models.Model):
         verbose_name=_("Updated By"),
         help_text=_("User who last updated this leave balance entry."),
     )
-
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Whether this leave balance is active and can be used for applying leave."),
+    )
     class Meta:
         db_table = "tbl_leave_balance_openings"
         managed = True
@@ -1667,6 +1727,13 @@ class LeaveBalanceOpenings(models.Model):
             f"{self.user.get_full_name()} -{self.year} "
             f"{self.leave_type.leave_type_short_code} (Balance: {self.remaining_leave_balances})"
         )
+    
+    def can_apply_leave(self) -> bool:
+        return (
+            self.is_active
+            and (self.remaining_leave_balances or 0) > 0
+        )
+
 
     @classmethod
     def initialize_leave_balances(cls, user, leave_types, year, created_by):

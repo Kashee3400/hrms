@@ -1,0 +1,739 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag i18n %}
+{% block title %}Leave Balance Initialization{% endblock %}
+{{ form.media }}
+{% block extrastyle %}
+
+<style>
+    .gradient-bg {
+        background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
+        min-height: 100vh;
+    }
+
+    .card-modern {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e2e8f0;
+    }
+
+    .stat-card {
+        padding: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .stat-icon {
+        padding: 0.5rem;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .stat-icon-blue {
+        background: #dbeafe;
+        color: #2563eb;
+    }
+
+    .stat-icon-green {
+        background: #d1fae5;
+        color: #059669;
+    }
+
+    .stat-icon-amber {
+        background: #fef3c7;
+        color: #d97706;
+    }
+
+    .stat-icon-red {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .info-box {
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid;
+        margin-bottom: 1rem;
+    }
+
+    .info-box-blue {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+        color: #1e40af;
+    }
+
+    .info-box-amber {
+        background: #fffbeb;
+        border-color: #fde68a;
+        color: #92400e;
+    }
+
+    .filter-btn {
+        padding: 0.5rem 1rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .filter-btn.active-all {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .filter-btn.active-create {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    .filter-btn.active-update {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .filter-btn.inactive {
+        background: #f1f5f9;
+        color: #64748b;
+    }
+
+    .badge-create {
+        background: #d1fae5;
+        color: #065f46;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .badge-update {
+        background: #fef3c7;
+        color: #92400e;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .alert-custom {
+        padding: 1rem;
+        border-radius: 8px;
+        border: 1px solid;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+    }
+
+    .alert-error {
+        background: #fef2f2;
+        border-color: #fecaca;
+        color: #991b1b;
+    }
+
+    .alert-success {
+        background: #f0fdf4;
+        border-color: #bbf7d0;
+        color: #166534;
+    }
+
+    .spinner {
+        border: 2px solid #f3f4f6;
+        border-top: 2px solid #3b82f6;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        margin-right: 8px;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    .table-modern {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .table-modern thead {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .table-modern th {
+        padding: 0.75rem 1rem;
+        text-align: left;
+        font-size: 0.75rem;
+        font-weight: 500;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .table-modern td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .table-modern tbody tr:hover {
+        background: #f8fafc;
+    }
+
+    .hidden {
+        display: none !important;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gradient-bg">
+    <div class="container-fluid" style="max-width: 1280px;">
+
+        <!-- Header -->
+        <div style="margin-bottom: 2rem;">
+            <h1 style="font-size: 1.875rem; font-weight: bold; color: #0f172a; margin-bottom: 0.5rem;">
+                Leave Balance Initialization
+            </h1>
+            <p style="color: #64748b;">
+                Configure and initialize leave balances for your employees
+            </p>
+        </div>
+
+        <!-- Configuration Card -->
+        <div class="card-modern" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+            <h2 style="font-size: 1.125rem; font-weight: 600; color: #0f172a; margin-bottom: 1rem;"> Configuration </h2>
+            <div class="row" style="margin-bottom: 1.5rem;">
+                <div class="col-md-6"> <label
+                        style="display: block; font-size: 0.875rem; font-weight: 500; color: #475569; margin-bottom: 0.5rem;">
+                        Leave Type * </label> <select id="leaveTypeSelect" class="form-control"
+                        style="border-radius: 8px;">
+                        <option value="">Select Leave Type</option>
+                    </select> </div>
+                <div class="col-md-6"> <label
+                        style="display: block; font-size: 0.875rem; font-weight: 500; color: #475569; margin-bottom: 0.5rem;">
+                        Year * </label> <select id="yearSelect" class="form-control"
+                        style="border-radius: 8px;"></select> </div>
+            </div> <!-- Info Box -->
+            <div id="infoBox" class="hidden"></div>
+            <button id="previewBtn" class="btn btn-primary btn-block"
+                style="border-radius: 8px; padding: 0.75rem; font-weight: 500;"> <i class="fas fa-users"></i> Generate
+                Preview
+            </button>
+        </div>
+        <!-- Alerts -->
+        <div id="errorAlert" class="alert-custom alert-error hidden">
+            <div style="display: flex; align-items: start; gap: 0.75rem; flex: 1;">
+                <i class="fas fa-exclamation-circle" style="margin-top: 2px;"></i>
+                <div style="flex: 1;">
+                    <h3 style="font-weight: 600; margin-bottom: 0.25rem;">Error</h3>
+                    <p id="errorMessage" style="font-size: 0.875rem; margin: 0;"></p>
+                </div>
+            </div>
+            <button onclick="clearMessages()" style="background: none; border: none; color: #f87171; cursor: pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div id="successAlert" class="alert-custom alert-success hidden">
+            <div style="display: flex; align-items: start; gap: 0.75rem; flex: 1;">
+                <i class="fas fa-check-circle" style="margin-top: 2px;"></i>
+                <div style="flex: 1;">
+                    <h3 style="font-weight: 600; margin-bottom: 0.25rem;">Success</h3>
+                    <p id="successMessage" style="font-size: 0.875rem; margin: 0;"></p>
+                </div>
+            </div>
+            <button onclick="clearMessages()" style="background: none; border: none; color: #4ade80; cursor: pointer;">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Preview Section -->
+        <div id="previewSection" class="hidden">
+            <!-- Summary Cards -->
+            <div class="row" style="margin-bottom: 1.5rem;">
+                <div class="col-md-3">
+                    <div class="card-modern stat-card">
+                        <div class="stat-icon stat-icon-blue">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.875rem; color: #64748b;">Total Employees</span>
+                            <p id="totalEmployees"
+                                style="font-size: 1.5rem; font-weight: bold; color: #0f172a; margin: 0;"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card-modern stat-card">
+                        <div class="stat-icon stat-icon-green">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.875rem; color: #64748b;">New Records</span>
+                            <p id="toCreate" style="font-size: 1.5rem; font-weight: bold; color: #0f172a; margin: 0;">
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card-modern stat-card">
+                        <div class="stat-icon stat-icon-amber">
+                            <i class="fas fa-arrow-up"></i>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.875rem; color: #64748b;">To Update</span>
+                            <p id="toUpdate" style="font-size: 1.5rem; font-weight: bold; color: #0f172a; margin: 0;">
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3">
+                    <div class="card-modern stat-card">
+                        <div class="stat-icon stat-icon-red">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.875rem; color: #64748b;">Errors</span>
+                            <p id="errors" style="font-size: 1.5rem; font-weight: bold; color: #0f172a; margin: 0;"></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card-modern" style="padding: 1rem; margin-bottom: 1.5rem;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <h3 style="font-weight: 600; color: #0f172a; margin: 0;">Employee Preview</h3>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button id="filterAll" class="filter-btn active-all" onclick="setFilter('all')">
+                            All (<span id="countAll">0</span>)
+                        </button>
+                        <button id="filterCreate" class="filter-btn inactive" onclick="setFilter('create')">
+                            New (<span id="countCreate">0</span>)
+                        </button>
+                        <button id="filterUpdate" class="filter-btn inactive" onclick="setFilter('update')">
+                            Updates (<span id="countUpdate">0</span>)
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preview Table -->
+            <div class="card-modern" style="overflow: hidden; margin-bottom: 1.5rem;">
+                <div style="overflow-x: auto;" class="p-2">
+                    <table class="table table-modern attendance-table" id="previewTable">
+                        <thead>
+                            <tr>
+                                <th>Employee</th>
+                                <th>Current Balance</th>
+                                <th>Opening Balance</th>
+                                <th>Remaining</th>
+                                <th>Closing</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="previewTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="row">
+                <div class="col-md-6">
+                    <button id="cancelBtn" class="btn btn-default btn-block"
+                        style="border-radius: 8px; padding: 0.75rem; font-weight: 500;" onclick="handleCancel()">
+                        Cancel
+                    </button>
+                </div>
+                <div class="col-md-6">
+                    <button id="executeBtn" class="btn btn-success btn-block"
+                        style="border-radius: 8px; padding: 0.75rem; font-weight: 500;" onclick="handleExecute()">
+                        <i class="fas fa-check-circle"></i> Execute Initialization
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{% csrf_token %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'hrms_app/js/leaveBalanceStore.js' %}"></script>
+<script>
+    $(document).ready(function () {
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+
+        $('#previewTable').DataTable({
+            responsive: true,
+            paging: true,
+            searching: true,
+            info: true,
+            lengthChange: true,
+            pageLength: 25,
+            lengthMenu: [10, 25, 50, 100, -1],
+            dom: 'Bfrtip',
+            ordering: false,   // 🚀 disable sorting
+            buttons: [
+                {
+                    extend: 'copy',
+                    className: 'btn btn-sm btn-outline-primary',
+                    text: '<i class="fas fa-copy"></i> Copy'
+                },
+                {
+                    extend: 'csv',
+                    className: 'btn btn-sm btn-outline-success',
+                    text: '<i class="fas fa-file-csv"></i> CSV'
+                },
+                {
+                    extend: 'excel',
+                    className: 'btn btn-sm btn-outline-success',
+                    text: '<i class="fas fa-file-excel"></i> Excel'
+                }
+            ],
+            language: {
+                lengthMenu: "Show _MENU_ employees per page",
+                zeroRecords: "No attendance records found",
+                info: "Showing _START_ to _END_ of _TOTAL_ employees",
+                infoEmpty: "No employees available",
+                infoFiltered: "(filtered from _MAX_ total employees)",
+                search: "Search employees:",
+                paginate: {
+                    first: "First",
+                    last: "Last",
+                    next: "Next",
+                    previous: "Previous"
+                }
+            },
+            columnDefs: [
+                {
+                    targets: 0,
+                    className: 'employee-info'
+                }
+            ]
+        });
+
+        // Smooth scrolling for horizontal table
+        $('.table-container').on('scroll', function () {
+            // Add shadow effects based on scroll position
+            if ($(this).scrollLeft() > 0) {
+                $(this).addClass('scrolled-left');
+            } else {
+                $(this).removeClass('scrolled-left');
+            }
+        });
+
+    });
+</script>
+<script>
+    const store = window.leaveBalanceStore;
+    let currentState = store.getState();
+
+    // Subscribe to store changes
+    store.subscribe((state) => {
+        currentState = state;
+        renderUI();
+    });
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+        await store.fetchLeaveTypes();
+        populateYears();
+    });
+
+    // Populate years dropdown
+    function populateYears() {
+        const yearSelect = document.getElementById('yearSelect');
+        const currentYear = new Date().getFullYear();
+
+        for (let i = -2; i <= 2; i++) {
+            const year = currentYear + i;
+            const option = document.createElement('option');
+            option.value = year;
+            option.textContent = year;
+            if (i === 0) option.selected = true;
+            yearSelect.appendChild(option);
+        }
+    }
+    $(document).on('select2:select select2:clear', '#leaveTypeSelect', function (e) {
+        const value = $(this).val();
+        if (value) {
+            store.selectLeaveTypeById(parseInt(value));
+        } else {
+            store.setSelectedLeaveType(null);
+        }
+
+        store.clearMessages();
+    });
+
+    $(document).on('change', '#yearSelect', function () {
+        const value = $(this).val();
+
+        if (value) {
+            store.setSelectedYear(parseInt(value));
+        } else {
+            store.setSelectedYear(null);
+        }
+
+        store.clearMessages();
+    });
+
+    document.getElementById('previewBtn').addEventListener('click', handlePreview);
+
+    // Handle Preview
+    async function handlePreview() {
+        const { selectedLeaveType, selectedYear, selectedUserIds } = currentState;
+
+        if (!selectedLeaveType) {
+            store.setError('Please select a leave type');
+            return;
+        }
+
+        await store.previewInitialization(
+            selectedLeaveType.id,
+            selectedYear,
+            selectedUserIds.length > 0 ? selectedUserIds : undefined
+        );
+    }
+
+    // Handle Execute
+    async function handleExecute() {
+        const { selectedLeaveType, selectedYear, selectedUserIds } = currentState;
+
+        if (!selectedLeaveType) return;
+
+        if (confirm('Are you sure you want to execute this initialization? This action cannot be undone.')) {
+            await store.executeInitialization(
+                selectedLeaveType.id,
+                selectedYear,
+                selectedUserIds.length > 0 ? selectedUserIds : undefined
+            );
+
+            store.clearUserSelection();
+        }
+    }
+
+    // Handle Cancel
+    function handleCancel() {
+        store.cancelPreview();
+        store.clearMessages();
+    }
+
+    // Set Filter
+    function setFilter(filter) {
+        store.setPreviewFilter(filter);
+    }
+
+    // Clear Messages
+    function clearMessages() {
+        store.clearMessages();
+    }
+
+    // Render UI based on state
+    function renderUI() {
+        renderLeaveTypes();
+        renderInfoBox();
+        renderAlerts();
+        renderPreview();
+        updateButtonStates();
+    }
+
+    // Render Leave Types
+    function renderLeaveTypes() {
+        const select = document.getElementById('leaveTypeSelect');
+        const currentValue = select.value;
+
+        select.innerHTML = '<option value="">Select Leave Type</option>';
+        currentState.leaveTypes.forEach(lt => {
+            const option = document.createElement('option');
+            option.value = lt.id;
+            option.textContent = `${lt.leave_type} ${lt.default_allocation ? ` - ${lt.default_allocation} days` : ''}`;
+            select.appendChild(option);
+        });
+
+        if (currentValue) {
+            select.value = currentValue;
+        }
+    }
+
+    // Render Info Box
+    function renderInfoBox() {
+        const infoBox = document.getElementById('infoBox');
+        const { selectedLeaveType, selectedYear } = currentState;
+
+        if (!selectedLeaveType) {
+            infoBox.classList.add('hidden');
+            return;
+        }
+        const isSLorEL = ['SL', 'EL'].includes(
+            selectedLeaveType.leave_type_short_code?.toUpperCase()
+            );
+
+        const boxClass = isSLorEL ? 'info-box-blue' : 'info-box-amber';
+        const iconClass = isSLorEL ? 'fa-info-circle' : 'fa-exclamation-triangle';
+        const title = isSLorEL ? 'Carryforward Policy' : 'No Carryforward Policy';
+        const message = isSLorEL
+            ? `Previous year's remaining balance will be carried forward to ${selectedYear}. Closing balance will equal remaining balance.`
+            : `Fresh allocation of ${selectedLeaveType.default_allocation || 0} days. Previous balance will lapse and closing balance will be set to 0.`;
+
+        infoBox.className = `info-box ${boxClass}`;
+        infoBox.innerHTML = `
+            <div style="display: flex; align-items: start; gap: 0.75rem;">
+                <i class="fas ${iconClass}" style="margin-top: 2px;"></i>
+                <div style="flex: 1;">
+                    <h3 style="font-weight: 600; margin-bottom: 0.25rem;">${title}</h3>
+                    <p style="font-size: 0.875rem; margin: 0;">${message}</p>
+                </div>
+            </div>
+        `;
+        infoBox.classList.remove('hidden');
+    }
+
+    // Render Alerts
+    function renderAlerts() {
+        const errorAlert = document.getElementById('errorAlert');
+        const successAlert = document.getElementById('successAlert');
+
+        if (currentState.error) {
+            document.getElementById('errorMessage').textContent = currentState.error;
+            errorAlert.classList.remove('hidden');
+        } else {
+            errorAlert.classList.add('hidden');
+        }
+
+        if (currentState.success) {
+            document.getElementById('successMessage').textContent = currentState.success;
+            successAlert.classList.remove('hidden');
+        } else {
+            successAlert.classList.add('hidden');
+        }
+    }
+
+    // Render Preview
+    function renderPreview() {
+        const previewSection = document.getElementById('previewSection');
+        const { previewData, filteredPreviewData, previewFilter } = currentState;
+
+        if (!previewData) {
+            previewSection.classList.add('hidden');
+            return;
+        }
+
+        previewSection.classList.remove('hidden');
+
+        // Update summary
+        document.getElementById('totalEmployees').textContent = previewData.summary.total_employees;
+        document.getElementById('toCreate').textContent = previewData.summary.to_create;
+        document.getElementById('toUpdate').textContent = previewData.summary.to_update;
+        document.getElementById('errors').textContent = previewData.summary.errors;
+
+        // Update filter counts
+        document.getElementById('countAll').textContent = previewData.data.length;
+        document.getElementById('countCreate').textContent = previewData.summary.to_create;
+        document.getElementById('countUpdate').textContent = previewData.summary.to_update;
+
+        // Update filter buttons
+        document.getElementById('filterAll').className = `filter-btn ${previewFilter === 'all' ? 'active-all' : 'inactive'}`;
+        document.getElementById('filterCreate').className = `filter-btn ${previewFilter === 'create' ? 'active-create' : 'inactive'}`;
+        document.getElementById('filterUpdate').className = `filter-btn ${previewFilter === 'update' ? 'active-update' : 'inactive'}`;
+
+        // Render table
+        const tbody = document.getElementById('previewTableBody');
+        tbody.innerHTML = '';
+
+        filteredPreviewData.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>
+                    <div>
+                        <p style="font-weight: 500; color: #0f172a; margin: 0;">${item.user_name}</p>
+                        ${item.employee_code ? `<p style="font-size: 0.875rem; color: #64748b; margin: 0;">${item.employee_code}</p>` : ''}
+                    </div>
+                </td>
+                <td style="color: #475569;">
+                    ${item.current_balance !== null ? item.current_balance.toFixed(1) : '-'}
+                </td>
+                <td>
+                    <span style="font-weight: 500; color: #0f172a;">
+                        ${item.new_opening_balance.toFixed(1)}
+                    </span>
+
+                    ${item.carryforward_amount > 0 ? `
+                        <div style="font-size: 0.75rem; color: #2563eb; margin-top: 0.25rem;">
+                            + ${item.carryforward_amount.toFixed(1)} from ${item.carryforward_from_year}
+                        </div>
+                    ` : ''}
+
+                    <div style="font-size: 0.75rem; color: #059669; margin-top: 0.1rem;">
+                        + ${item.current_year_allocation.toFixed(1)} current year
+                    </div>
+                </td>
+                <td style="color: #475569;">${item.new_remaining_balance.toFixed(1)}</td>
+                <td>
+                    <span style="font-weight: 500; color: ${item.new_closing_balance === 0 ? '#dc2626' : '#059669'};">
+                        ${item.new_closing_balance.toFixed(1)}
+                    </span>
+                    ${item.new_closing_balance === 0 ? '<div style="font-size: 0.75rem; color: #dc2626; margin-top: 0.25rem;">Will lapse</div>' : ''}
+                </td>
+                <td>
+                    <span class="badge-${item.action}">${item.action === 'create' ? 'New' : 'Update'}</span>
+                    ${item.warnings && item.warnings.length > 0 ? `
+                        <div style="margin-top: 0.25rem; font-size: 0.75rem; color: #d97706; display: flex; align-items: start; gap: 0.25rem;">
+                            <i class="fas fa-exclamation-triangle" style="margin-top: 2px;"></i>
+                            <span>${item.warnings[0]}</span>
+                        </div>
+                    ` : ''}
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Update Button States
+    function updateButtonStates() {
+        const previewBtn = document.getElementById('previewBtn');
+        const executeBtn = document.getElementById('executeBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const { loading, selectedLeaveType } = currentState;
+
+        const isLoading = loading.preview || loading.execute || loading.leaveTypes;
+
+        previewBtn.disabled = isLoading || !selectedLeaveType;
+        executeBtn.disabled = loading.execute;
+        cancelBtn.disabled = loading.execute;
+
+        if (loading.preview) {
+            previewBtn.innerHTML = '<span class="spinner"></span> Loading Preview...';
+        } else {
+            previewBtn.innerHTML = '<i class="fas fa-users"></i> Generate Preview';
+        }
+
+        if (loading.execute) {
+            executeBtn.innerHTML = '<span class="spinner"></span> Executing...';
+        } else {
+            executeBtn.innerHTML = '<i class="fas fa-check-circle"></i> Execute Initialization';
+        }
+    }
+</script>
+{% endblock %}

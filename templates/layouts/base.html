@@ -1,108 +1,97 @@
-{% load i18n static hrms_tag webpush_notifications %}
+{% load i18n static hrms_tag %}
 <!DOCTYPE html>
 {% get_current_language as LANGUAGE_CODE %}
 {% get_current_language_bidi as LANGUAGE_BIDI %}
-<html lang="{{ LANGUAGE_CODE|default:'en-us' }}" dir="{{ LANGUAGE_BIDI|yesno:'rtl,ltr,auto' }}" style="overflow-y: hidden;">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>
-      {% block title %}
+<html lang="{{ LANGUAGE_CODE|default:'en-us' }}" dir="{{ LANGUAGE_BIDI|yesno:'rtl,ltr,auto' }}"
+  style="overflow-y: hidden;">
 
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>
+    {% block title %}
+
+    {% endblock %}
+  </title>
+  {% include 'includes/mstyles.html' %}
+  {% block dark-mode-vars %}
+  {% endblock %}
+  {% block extrastyle %}
+
+  {% endblock extrastyle %}
+  {% block extrahead %}
+
+  {% endblock %}
+  {% block blockbots %}
+  <meta name="robots" content="NONE,NOARCHIVE" />
+  {% endblock %}
+</head>
+
+<body data-admin-utc-offset="{% now 'Z' %}">
+  <div class="container-scroller">
+    {% block navigation %}
+    {% include 'includes/navigation.html' %}
+    {% endblock %}
+    <div class="page-body-wrapper">
+      {% block sidebar %}
+      {% include 'includes/sidebar.html' %}
       {% endblock %}
-    </title>
-    {% include 'includes/mstyles.html' %}
-    {% block dark-mode-vars %}
-    {% endblock %}
-    {% block extrastyle %}
-
-    {% endblock extrastyle %}
-    {% block extrahead %}
-
-    {% endblock %}
-    {% block blockbots %}
-      <meta name="robots" content="NONE,NOARCHIVE" />
-    {% endblock %}
-    {% webpush_header %}
-  </head>
-
-  <body data-admin-utc-offset="{% now 'Z' %}">
-    <div class="container-scroller">
-      {% block navigation %}
-        {% include 'includes/navigation.html' %}
-      {% endblock %}
-      <div class="container-fluid page-body-wrapper">
-        {% block sidebar %}
-          {% include 'includes/sidebar.html' %}
-        {% endblock %}
-
-        <div class="main-panel vh-100 overflow-auto border-top">
-          <div class="content-wrapper px-4 py-1 mb-5">
-            <div class="col-12">
-              {% block messages %}
-                {% if messages %}
-                  <div class="messages">
-                    {% for message in messages %}
-                      <div class="alert {% if message.tags == 'success' %}
+      <div style="height: 88vh;" class="content-wrapper overflow-auto">
+        <div class="col-12">
+          {% block messages %}
+          {% if messages %}
+          <div class="messages">
+            {% for message in messages %}
+            <div class="alert {% if message.tags == 'success' %}
                           alert-success{% elif message.tags == 'info' %}
                           alert-info{% elif message.tags == 'warning' %}
                           alert-warning{% elif message.tags == 'error' %}
                           alert-danger{% else %}alert-secondary
-                          {% endif %} alert-dismissible fade show"
-                        role="alert">
-                        {{ message|capfirst }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                      </div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              {% endblock %}
+                          {% endif %} alert-dismissible fade show" role="alert">
+              {{ message|capfirst }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
-
-            <div class="row">
-              <div class="col-sm-12">
-                {% block content %}
-                  {% block object-tools %}
-                {% endblock %}
-                {{ content }}
-                {% endblock %}
-              </div>
-            </div>
-            {% comment %} {% webpush_button with_class='btn btn-outline-info' %} {% endcomment %}
-            {% include 'includes/footer.html' %}
+            {% endfor %}
           </div>
+          {% endif %}
+          {% endblock %}
         </div>
-        {% block notification %}
-          {% load_side_notifications request.user %}
-        {% endblock %}
-        {% block settings_panel %}
-          {% include 'includes/settings-panel.html' %}
-        {% endblock %}
+        {% block content %}
+            {% block object-tools %}
+            {% endblock %}
+            {{ content }}
+            {% endblock %}
+        {% include 'includes/footer.html' %}
       </div>
+      {% block notification %}
+      {% load_side_notifications request.user %}
+      {% endblock %}
     </div>
-    <!-- END Container -->
-    {% include 'includes/mscripts.html' %}
-    <script>
-      document.addEventListener('DOMContentLoaded', () => {
-        const toggleButton = document.getElementById('toggle-sidebar')
-        if(toggleButton!=null){
+  </div>
+  <!-- END Container -->
+  {% include 'includes/mscripts.html' %}
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggleButton = document.getElementById('toggle-sidebar')
+      if (toggleButton != null) {
         // Open the sidebar
         toggleButton.addEventListener('click', () => {
           sidebar.classList.toggle('active')
         });
-        }
-        const sidebar = document.getElementById('right-sidebar')
-        if(sidebar != null){
-          const closeButton = sidebar.querySelector('.settings-close')
-          closeButton.addEventListener('click', () => {
-            sidebar.classList.remove('active')
-          })
-        }
-      
-      })
-    </script>
-    {% block extra_js %}
+      }
+      const sidebar = document.getElementById('right-sidebar')
+      if (sidebar != null) {
+        const closeButton = sidebar.querySelector('.settings-close')
+        closeButton.addEventListener('click', () => {
+          sidebar.classList.remove('active')
+        })
+      }
 
-    {% endblock %}
-  </body>
+    })
+  </script>
+  {% block extra_js %}
+
+  {% endblock %}
+</body>
+
 </html>

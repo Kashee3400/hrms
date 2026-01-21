@@ -1,0 +1,380 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag i18n %}
+
+{{ form.media }}
+
+{% block title %}
+{{ user }} | Apply Short Leave
+{% endblock %}
+
+{% block extrastyle %}
+<style>
+  .table-sm td {
+    padding: 0.5rem;
+    vertical-align: middle;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+{% render_breadcrumb 'Apply Short Leave' urls %}
+
+<div class="bg-white p-3 mt-3">
+
+  <div id="leaveErrorAlert" class="alert alert-danger" style="display: none;"></div>
+
+  <form method="post" id="short-leave-form">
+    {% csrf_token %}
+
+    <!-- hidden leave type -->
+    <div style="display:none;">{{ form.leave_type }}</div>
+
+    <div class="row g-3">
+      <!-- LEFT COLUMN -->
+      <div class="col-md-6 py-3">
+
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+          {% for error in form.non_field_errors %}
+          <div>{{ error }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Date -->
+        <div class="mb-3">
+          <label class="form-label">
+            {{ form.startDate.label }} <span class="text-danger">*</span>
+          </label>
+          {{ form.startDate }}
+          <div class="text-danger small">{{ form.startDate.errors }}</div>
+        </div>
+
+        <!-- Time Row -->
+        <div class="row">
+          <div class="col-6">
+            <div class="mb-3">
+              <label class="form-label">
+                {{ form.from_time.label }} <span class="text-danger">*</span>
+              </label>
+              {{ form.from_time }}
+              <div class="text-danger small">{{ form.from_time.errors }}</div>
+            </div>
+          </div>
+
+          <div class="col-6">
+            <div class="mb-3">
+              <label class="form-label">
+                {{ form.to_time.label }} <span class="text-danger">*</span>
+              </label>
+              {{ form.to_time }}
+              <div class="text-danger small">{{ form.to_time.errors }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label for="{{ form.leave_address.id_for_label }}" class="form-label">{{ form.leave_address.label }}<span
+              class="text-danger">*</span></label>
+          {{ form.leave_address }}
+          <div class="text-danger small">{{ form.leave_address.errors }}</div>
+        </div>
+
+        <div id="balances" style="display:none;">
+          {{ form.usedLeave }}
+          {{ form.balanceLeave }}
+          <input type="hidden" id="leaveId" value="{{ leave_balance.leave_type.pk }}" />
+        </div>
+
+        <!-- Reason -->
+        <div class="mb-3">
+          <label class="form-label">
+            {{ form.reason.label }} <span class="text-danger">*</span>
+          </label>
+          {{ form.reason }}
+          <div class="text-danger small">{{ form.reason.errors }}</div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN -->
+      <div class="col-md-6">
+        <h4 style="background-color:#6f42c1;color:#fff" class="mt-3 p-3 rounded shadow-sm">
+          {% trans "Applying for Short Leave" %}
+        </h4>
+        <div id="balanceSummary" class="border p-3 bg-white mb-3 rounded">
+          <table class="table table-borderless mb-0">
+            <tbody>
+              <tr>
+                <td id="td_date" class="fw-bold text-muted small">Select dates to calculate</td>
+                <td class="text-end">Day(s)</td>
+              </tr>
+              <tr class="bg-light">
+                <td><strong>{% trans 'Available balance' %}</strong></td>
+                <td id="balance" class="text-end fw-bold">{{ rem_bal }}</td>
+              </tr>
+              <tr>
+                <td><strong>{% trans 'Currently booked' %}</strong></td>
+                <td id="currentlyBooked" class="text-end text-primary">0</td>
+              </tr>
+              <tr class="bg-light border-top">
+                <td><strong>{% trans 'Balance after this leave' %}</strong></td>
+                <td id="remainingBal" class="text-end fw-bold">--</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- Short Leave Summary -->
+        <div id="shortLeaveSummary" class="border p-3 bg-white mb-3 rounded">
+          <table class="table table-borderless mb-0">
+            <tbody>
+              <tr>
+                <td class="fw-bold text-muted">{% trans "Leave Type" %}</td>
+                <td class="text-end fw-bold">STL</td>
+              </tr>
+
+              <tr class="bg-light">
+                <td>{% trans "Date" %}</td>
+                <td id="summaryDate" class="text-end text-primary fw-semibold">
+                  --
+                </td>
+              </tr>
+
+              <tr>
+                <td>{% trans "Attendance Window" %}</td>
+                <td id="attendanceWindow" class="text-end fw-semibold">
+                  --
+                </td>
+              </tr>
+
+              <tr class="bg-light">
+                <td>{% trans "Time Range (Short Leave)" %}</td>
+                <td id="summaryTime" class="text-end">
+                  --
+                </td>
+              </tr>
+
+              <tr class="border-top">
+                <td class="fw-semibold text-danger">
+                  {% trans "Attendance Missing" %}
+                </td>
+                <td id="attendanceMissing" class="text-end fw-bold text-danger">
+                  --:--
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Submit -->
+        <div class="row mt-3 d-flex justify-content-center">
+          <div class="col-12 d-flex justify-content-center">
+            <button type="button" class="btn btn-primary shadow mt-2 px-4" data-bs-toggle="modal"
+              data-bs-target="#confirmationModal">
+              {% trans "Apply Short Leave" %}
+              <i class="mdi mdi-send ms-1"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmationModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-warning text-white">
+        <h5 class="modal-title">
+          <i class="mdi mdi-alert-circle-outline me-1"></i>
+          {% trans "Confirm Submission" %}
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        {% trans "Please confirm before submitting Short Leave." %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+          {% trans "Cancel" %}
+        </button>
+        <button type="button" class="btn btn-primary" onclick="submitShortLeave()">
+          {% trans "Submit" %}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  function submitShortLeave() {
+    document.getElementById("short-leave-form").submit();
+  }
+</script>
+
+<script>
+  class LeaveApplicationHandler {
+    constructor() {
+      this.baseTotalDays = 0;
+      this.bindEvents();
+      this.totalBal = `{{ rem_bal }}`;
+    }
+
+    bindEvents() {
+      $(document).on('dp.change', () => {
+        this.handleDateChange();
+        this.updateShortLeaveSummary();
+      });
+    }
+    formatDateToYMD(date) {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    async handleDateChange() {
+      const startDate = $('#id_startDate').val();
+
+      if (!startDate) return;
+
+      // 🔹 Short Leave is always single-day
+      $('#summaryDate').text(startDate);
+      this.setBalance(this.totalBal,1)
+      // 🔹 Fetch attendance summary for the selected date
+      await this.fetchAttendanceSummary(this.formatDateToYMD(startDate));
+    }
+
+    timeToMinutes(timeStr) {
+      const [h, m] = timeStr.split(':').map(Number);
+      return (h * 60) + m;
+    }
+
+    formatMinutesToHHMM(minutes) {
+      if (minutes == null || isNaN(minutes)) return '--:--';
+
+      const hrs = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return `${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    }
+
+    async fetchAttendanceSummary(date) {
+      try {
+        const response = await fetch(
+          `/api/v1/attendance/summary/?date=${date}&leave_type=STL`,
+          { credentials: 'same-origin' }
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch attendance summary");
+        }
+
+        const data = await response.json();
+        this.updateAttendanceUI(data);
+      } catch (error) {
+        console.error(error);
+        alert("Unable to fetch attendance summary.");
+        this.resetAttendanceUI();
+      }
+    }
+
+    updateAttendanceUI(data) {
+      // Worked
+      $('#attendanceWorked').text(
+        this.formatMinutesToHHMM(data.worked_minutes)
+      );
+
+      // Required
+      $('#attendanceRequired').text(
+        this.formatMinutesToHHMM(data.required_minutes)
+      );
+
+      // Missing (attendance-based)
+      const missingHHMM = this.formatMinutesToHHMM(data.missing_minutes);
+      $('#attendanceMissing').text(missingHHMM);
+
+      // 🔹 Update summary section also
+      $('#summaryDuration').text(missingHHMM);
+
+      // 🔹 Attendance window (AM/PM format)
+      if (data.attendance_start && data.attendance_end) {
+        const start = new Date(data.attendance_start).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        const end = new Date(data.attendance_end).toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+
+        $('#attendanceWindow').text(`${start} - ${end}`);
+      } else {
+        $('#attendanceWindow').text('--');
+      }
+
+      // 🔒 Eligibility gate
+      $('#applyLeaveButton').prop(
+        'disabled',
+        !data.eligible || !data.attendance_complete
+      );
+    }
+
+    resetAttendanceUI() {
+      $('#attendanceWorked').text('--:--');
+      $('#attendanceRequired').text('--:--');
+      $('#attendanceMissing').text('--:--');
+      $('#applyLeaveButton').prop('disabled', true);
+    }
+        /**
+     * Updates Input Fields and Validates Submit Button based on Balance
+     */
+    setBalance(typeBal, totalDays) {
+        $('#currentlyBooked').text(totalDays);
+        $('#remainingBal').text(typeBal - totalDays);
+        $('#id_usedLeave').val(totalDays);
+        $('#id_balanceLeave').val(typeBal - totalDays);
+    }
+
+    updateShortLeaveSummary() {
+      const date = $('#id_startDate').val();
+      const from = $('#id_from_time').val();
+      const to = $('#id_to_time').val();
+
+      $('#summaryDate').text(date || '--');
+
+      if (!from || !to) {
+        $('#summaryTime').text('--');
+        $('#summaryDuration').text('--:--');
+        return;
+      }
+
+      $('#summaryTime').text(`${from} - ${to}`);
+
+      const fromMin = this.timeToMinutes(from);
+      const toMin = this.timeToMinutes(to);
+
+      if (toMin <= fromMin) {
+        $('#summaryDuration').text('--:--');
+        return;
+      }
+
+      const duration = toMin - fromMin;
+      $('#summaryDuration').text(
+        this.formatMinutesToHHMM(duration)
+      );
+    }
+
+  }
+
+  // 🚀 Init
+  $(document).ready(function () {
+    window.leaveHandler = new LeaveApplicationHandler();
+  });
+</script>
+
+{% endblock %}

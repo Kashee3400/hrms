@@ -13,10 +13,10 @@ from django_ckeditor_5.widgets import CKEditor5Widget
 from django.utils.safestring import mark_safe
 from .views.views import make_json_serializable
 from import_export.admin import ImportExportModelAdmin
-import json
 from django.forms.models import model_to_dict
-from django.core.serializers.json import DjangoJSONEncoder
-
+from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
+from .filters import LeaveAllocationFilter,LeaveUnitFilter
 admin.site.site_title = "HRMS"
 admin.site.site_header = "HRMS Administration"
 
@@ -53,62 +53,233 @@ class CustomUserAdmin(UserAdmin, ImportExportModelAdmin):
 
 admin.site.register(CustomUser, CustomUserAdmin)
 
+from .hrms.admin_forms import LeaveTypeAdminForm
 
 class LeaveTypeAdmin(admin.ModelAdmin):
-    form = LeaveTypeForm
-    list_display = [
-        "leave_type",
-        "leave_type_short_code",
-        "half_day_short_code",
-        "min_notice_days",
-        "max_days_limit",
-        "min_days_limit",
-        "allowed_days_per_year",
-        "leave_fy_start",
-        "leave_fy_end",
-        "created_at",
-        "created_by",
-        "updated_at",
-        "updated_by",
-        "consecutive_restriction",
-    ]
+    form = LeaveTypeAdminForm
 
-    fields = (
-        "leave_type",
-        "leave_type_short_code",
-        "half_day_short_code",
-        "min_notice_days",
-        "max_days_limit",
-        "min_days_limit",
-        "allowed_days_per_year",
-        "leave_fy_start",
-        "leave_fy_end",
-        "consecutive_restriction",
-        "restricted_after_leave_types",
+    # ---------------------
+    # List Display
+    # ---------------------
+
+    list_display = (
+        'leave_type',
+        'leave_unit',
+        'display_half_day',
+        'display_accrual',
+        'display_duration',
+        'display_color',
+        'consecutive_restriction',
+        'created_by',
+        'created_at',
     )
 
-    search_fields = ["leave_type"]
+    list_display_links = ('leave_type',)
 
-    filter_horizontal = ["restricted_after_leave_types"]
+    # ---------------------
+    # Filters
+    # ---------------------
 
-    def color_representation(self, obj):
-        return mark_safe(
-            f'<div style="width: 30px; height: 20px; background-color: {obj.color_hex}"></div>'
+    list_filter = (
+        LeaveUnitFilter,
+        'allow_half_day',
+        LeaveAllocationFilter,
+        'expiry_policy',
+        'consecutive_restriction',
+        'created_at',
+    )
+
+    search_fields = (
+        'leave_type',
+        'leave_type_short_code',
+        'half_day_short_code',
+    )
+
+    ordering = ('leave_type',)
+    date_hierarchy = 'created_at'
+    list_per_page = 25
+    save_on_top = True
+    preserve_filters = True
+
+    # ---------------------
+    # Readonly
+    # ---------------------
+
+    readonly_fields = (
+        'created_at',
+        'created_by',
+        'updated_at',
+        'updated_by',
+        'display_color_preview',
+    )
+
+    # ---------------------
+    # Fieldsets
+    # ---------------------
+
+    fieldsets = (
+        (_('Basic Information'), {
+            'fields': (
+                'leave_type',
+                'leave_type_short_code',
+                'half_day_short_code',
+            )
+        }),
+
+        (_('Leave Measurement'), {
+            'fields': (
+                'leave_unit',
+                'allow_half_day',
+                'half_day_value',
+                'min_duration',
+                'max_duration',
+            ),
+            'description': _('Configure how this leave is measured.'),
+        }),
+
+        (_('Accrual & Expiry Rules'), {
+            'fields': (
+                'accrual_period',
+                'accrual_quantity',
+                'expiry_policy',
+                'must_apply_within_accrual_period',
+            ),
+            'description': _('Define renewal, expiry, and usage rules.'),
+        }),
+
+        (_('Carry Forward'), {
+            'fields': (
+                'allow_carry_forward',
+                'max_carry_forward',
+            ),
+        }),
+
+        (_('Allocation & Limits'), {
+            'fields': (
+                'default_allocation',
+                'allowed_days_per_year',
+                'min_days_limit',
+                'max_days_limit',
+                'min_notice_days',
+            ),
+        }),
+
+        (_('Financial Year Settings'), {
+            'fields': (
+                'leave_fy_start',
+                'leave_fy_end',
+            ),
+        }),
+
+        (_('Appearance'), {
+            'fields': (
+                'color_hex',
+                'text_color_hex',
+                'display_color_preview',
+            ),
+        }),
+
+        (_('Restrictions'), {
+            'fields': (
+                'consecutive_restriction',
+                'restricted_after_leave_types',
+            ),
+        }),
+
+        (_('Audit Information'), {
+            'fields': (
+                'created_at',
+                'created_by',
+                'updated_at',
+                'updated_by',
+            ),
+        }),
+    )
+
+    filter_horizontal = ('restricted_after_leave_types',)
+
+    # ---------------------
+    # Actions
+    # ---------------------
+
+    actions = (
+        'enable_consecutive_restriction',
+        'disable_consecutive_restriction',
+    )
+
+    # =====================
+    # DISPLAY HELPERS
+    # =====================
+
+    def display_half_day(self, obj):
+        if obj.allow_half_day:
+            return _("Yes")
+        return _("No")
+    display_half_day.short_description = _("Half Day")
+
+    def display_accrual(self, obj):
+        if obj.accrual_period != 'NONE':
+            return f"{obj.accrual_quantity} / {obj.accrual_period}"
+        return _("No Accrual")
+    display_accrual.short_description = _("Accrual")
+
+    def display_duration(self, obj):
+        if obj.leave_unit in ['HOUR', 'MINUTE']:
+            return f"{obj.min_duration} - {obj.max_duration} {obj.leave_unit.lower()}"
+        return "-"
+    display_duration.short_description = _("Duration")
+
+    def display_color(self, obj):
+        if obj.color_hex:
+            return format_html(
+                '<div style="width:40px;height:18px;background:{};border-radius:3px;"></div>',
+                obj.color_hex,
+            )
+        return '-'
+    display_color.short_description = _("Color")
+
+    def display_color_preview(self, obj):
+        if not obj.color_hex:
+            return _("No color set")
+        return format_html(
+            '<div style="width:220px;height:60px;background:{};color:{};'
+            'display:flex;align-items:center;justify-content:center;'
+            'border-radius:6px;font-weight:bold;">{}</div>',
+            obj.color_hex,
+            obj.text_color_hex or '#000',
+            obj.leave_type,
         )
+    display_color_preview.short_description = _("Color Preview")
 
-    color_representation.short_description = "Color"
+    # =====================
+    # ACTIONS
+    # =====================
+
+    def enable_consecutive_restriction(self, request, queryset):
+        updated = queryset.update(consecutive_restriction=True)
+        self.message_user(request, _(f"{updated} leave types updated."))
+
+    def disable_consecutive_restriction(self, request, queryset):
+        updated = queryset.update(consecutive_restriction=False)
+        self.message_user(request, _(f"{updated} leave types updated."))
+
+    # =====================
+    # SAVE HOOKS
+    # =====================
 
     def save_model(self, request, obj, form, change):
-        obj._current_user = request.user
+        if not change:
+            obj.created_by = request.user
+        obj.updated_by = request.user
         super().save_model(request, obj, form, change)
 
-    def text_color_representation(self, obj):
-        return mark_safe(
-            f'<div style="width: 30px; height: 20px; background-color: {obj.text_color_hex}"></div>'
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'created_by', 'updated_by'
         )
 
-    text_color_representation.short_description = "Text Color"
-
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
 
 admin.site.register(LeaveType, LeaveTypeAdmin)
 
@@ -318,6 +489,16 @@ admin.site.register(UserTour, UserTourAdmin)
 
 from django.contrib import messages
 
+@admin.action(description="Mark selected leave balances as ACTIVE")
+def make_active(modeladmin, request, queryset):
+    queryset.update(
+        is_active=True,
+    )
+@admin.action(description="Mark selected leave balances as INACTIVE")
+def make_inactive(modeladmin, request, queryset):
+    queryset.update(
+        is_active=False,
+    )
 
 @admin.register(AttendanceLogHistory)
 class AttendanceLogHistoryAdmin(admin.ModelAdmin):
@@ -339,7 +520,7 @@ class AttendanceLogHistoryAdmin(admin.ModelAdmin):
         "Revert selected attendance logs to this state"
     )
 
-
+@admin.register(LeaveBalanceOpenings)
 class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
     list_display = (
         "user",
@@ -349,17 +530,41 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
         "remaining_leave_balances",
         "opening_balance",
         "closing_balance",
+        "is_active_badge",
+    )
+
+    list_filter = (
+        "year",
+        "leave_type",
+        "is_active",
+    )
+
+    search_fields = (
+        "user__username",
+        "user__first_name",
+        "user__last_name",
+    )
+
+    readonly_fields = (
         "created_at",
-        "created_by",
         "updated_at",
+        "created_by",
         "updated_by",
     )
-    search_fields = ["user__username", "user__first_name", "user__last_name"]
-    list_filter = ("year", "leave_type")
-    readonly_fields = ("created_at", "updated_at", "created_by", "updated_by")
 
+    actions = [make_active, make_inactive]
 
-admin.site.register(LeaveBalanceOpenings, LeaveBalanceOpeningAdmin)
+    list_per_page = 50
+    def is_active_badge(self, obj):
+        if obj.is_active:
+            return format_html(
+                '<span style="color: green; font-weight: bold;">Active</span>'
+            )
+        return format_html(
+            '<span style="color: #999;">Inactive</span>'
+        )
+
+    is_active_badge.short_description = "Status"
 
 
 class ReligionAdmin(admin.ModelAdmin):

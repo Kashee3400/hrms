@@ -1,0 +1,28 @@
+.leave-help-box {
+    background: #f8fafc;
+    border-left: 5px solid #2563eb;
+    padding: 16px;
+    margin-top: 20px;
+    border-radius: 6px;
+}
+
+.leave-help-box h3 {
+    margin-top: 0;
+    color: #1e40af;
+}
+
+.leave-help-box ul {
+    padding-left: 20px;
+}
+
+.leave-help-box .hint {
+    margin-top: 10px;
+    color: #92400e;
+    font-weight: 600;
+}
+
+body.monthly-leave .form-row.field-expiry_policy {
+    background: #fff7ed;
+    border-left: 4px solid #fb923c;
+    padding-left: 10px;
+}

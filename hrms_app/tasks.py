@@ -501,3 +501,19 @@ def recalculate_monthly_attendance_cache(year, month):
     except Exception as exc:
         logger.error(f"Monthly attendance cache recalculation failed: {str(exc)}")
         raise
+
+
+
+from django.contrib.auth import get_user_model
+from .services.short_leave_refresh import refresh_monthly_short_leave
+
+User = get_user_model()
+
+
+@shared_task(bind=True, autoretry_for=(Exception,), retry_kwargs={"max_retries": 3})
+def refresh_short_leave_task(self):
+    """
+    Monthly task to refresh Short Leave balances.
+    """
+    system_user = User.objects.filter(is_superuser=True).first()
+    refresh_monthly_short_leave(system_user=system_user)

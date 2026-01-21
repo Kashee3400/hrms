@@ -611,3 +611,57 @@ class SendOTPSerializer(serializers.Serializer):
 class VerifyOTPSerializer(serializers.Serializer):
     email = serializers.EmailField()
     otp = serializers.CharField(max_length=6)
+
+
+class LeaveBalancePreviewSerializer(serializers.Serializer):
+    """Serializer for previewing leave balance changes"""
+    user_id = serializers.IntegerField()
+    user_name = serializers.CharField()
+    employee_code = serializers.CharField(required=False)
+    leave_type = serializers.CharField()
+    year = serializers.IntegerField()
+    
+    # Current state
+    current_balance = serializers.FloatField(allow_null=True)
+    
+    # Proposed changes
+    new_opening_balance = serializers.FloatField()
+    new_no_of_leaves = serializers.FloatField()
+    new_remaining_balance = serializers.FloatField()
+    new_closing_balance = serializers.FloatField()
+    
+    # Metadata
+    is_carryforward = serializers.BooleanField()
+    carryforward_from_year = serializers.IntegerField(allow_null=True)
+    carryforward_amount = serializers.FloatField(allow_null=True)
+    action = serializers.ChoiceField(choices=['create', 'update'])
+    warnings = serializers.ListField(child=serializers.CharField(), required=False)
+
+
+class InitializeLeaveBalanceSerializer(serializers.Serializer):
+    """Serializer for initializing leave balances"""
+    leave_type_id = serializers.IntegerField()
+    year = serializers.IntegerField(min_value=2000, max_value=2100)
+    preview_only = serializers.BooleanField(default=False)
+    user_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        required=False,
+        help_text="Optional: Specific user IDs. If empty, applies to all active users."
+    )
+    
+    def validate_year(self, value):
+        """Ensure year is not in the distant future"""
+        current_year = timezone.now().year
+        if value > current_year + 2:
+            raise serializers.ValidationError(
+                f"Year cannot be more than 2 years in the future (max: {current_year + 2})"
+            )
+        return value
+    
+    def validate_leave_type_id(self, value):
+        """Ensure leave type exists"""
+        try:
+            LeaveType.objects.get(id=value)
+        except LeaveType.DoesNotExist:
+            raise serializers.ValidationError("Leave type does not exist")
+        return value

@@ -1,9 +1,10 @@
 from django.urls import path
 from hrms_app.views import views, auth_views, report_view, announcement
-
+from hrms_app.views import ShortLeaveCreateView,ShortLeaveUpdateView
 from ..views.attendance_view import BulkAttendanceView, AttendancePreviewAjaxView, GetEmployeesAjaxView, \
     AttendanceStatsAjaxView
 from ..views.leave_bulk import BulkLeaveCreateView,BulkLeaveHistoryView
+from ..views.leave_bulk import LeaveBalanceInitializerView
 
 class CustomSite:
     def __init__(self):
@@ -64,6 +65,14 @@ site.register_view('leave/apply/<int:leave_type>/', views.ApplyOrUpdateLeaveView
 site.register_view('leave/edit/<slug:slug>/', views.ApplyOrUpdateLeaveView, name='update_leave')
 site.register_view('leave/<slug:slug>/', views.LeaveApplicationDetailView, name='leave_application_detail')
 site.register_view('leave/<slug:slug>/update', views.LeaveApplicationUpdateView, name='leave_application_update')
+
+site.register_view("short-leave/apply/", ShortLeaveCreateView, name='short_leave_create')
+site.register_view('short-leave/<int:pk>/edit/', ShortLeaveUpdateView, name='short_leave_update')
+
+site.register_view('leave/initializer', LeaveBalanceInitializerView, name='leave_intializer')
+
+
+
 site.register_view('delete/<str:model_name>/<int:pk>/', views.GenericDeleteView, name='generic_delete')
 site.register_view('leave-transaction/', views.LeaveTransactionCreateView, name='leave_transaction_create'),
 site.register_view('leave-balance-update/', views.LeaveBalanceUpdateView, name='leave_bal_up'),

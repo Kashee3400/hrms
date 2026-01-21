@@ -2,10 +2,6 @@ from hrms_app.models import (
     LeaveBalanceOpenings,
     LeaveType,
     LeaveTransaction,
-    LeaveDay,
-    LeaveApplication,
-    AttendanceLog,
-    UserTour,
 )
 from collections import defaultdict
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -19,10 +15,10 @@ import json
 from datetime import datetime, timedelta
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION
 from django.contrib.contenttypes.models import ContentType
-from django.db.models import Sum, F
 from hrms_app.utility import attendanceutils as at
 from django.contrib.auth import get_user_model
-from django.utils.timezone import make_aware, localtime, utc
+from django.utils.timezone import make_aware
+from ..utility.attendance_mapper import aggregate_attendance_data
 
 User = get_user_model()
 
@@ -123,7 +119,6 @@ class CreditELLeaveView(View):
     def post(self, request, *args, **kwargs):
         try:
             data = json.loads(request.body)
-            print(data)
             year = data.get("year", timezone.now().year)
             employee_data = data.get("employees", [])
             emp_codes = [emp["emp_code"] for emp in employee_data]
@@ -219,7 +214,7 @@ class UserAttendanceAggregation(View):
         employees = self._get_filtered_employees(active=True)
         employee_ids = employees.values_list("id", flat=True)
 
-        attendance_data = at.aggregate_attendance_data(
+        attendance_data = aggregate_attendance_data(
             employee_ids=employee_ids,
             start_date_object=converted_from_datetime,
             end_date_object=converted_to_datetime,
