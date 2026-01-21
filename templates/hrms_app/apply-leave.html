@@ -146,8 +146,7 @@
         <h4
           style="background-color: {{ leave_balance.leave_type.color_hex }}; color: {{ leave_balance.leave_type.text_color_hex }};"
           class="mt-3 p-3 text-white rounded shadow-sm">
-          {% blocktrans with leave_type=leave_balance.leave_type.leave_type %}Applying for {{ leave_type }}{%
-          endblocktrans %}
+          {% blocktrans with leave_type=leave_balance.leave_type.leave_type %}Applying for {{ leave_type }}{% endblocktrans %}
         </h4>
 
         <div id="balanceSummary" class="border p-3 bg-white mb-3 rounded">
@@ -220,8 +219,7 @@
           <div class="col-12 d-flex justify-content-center">
             <button type="button" id="applyLeaveButton" data-bs-toggle="modal" data-bs-target="#confirmationModal"
               class="btn btn-primary shadow mt-2 px-4">
-              {% blocktrans with leave_code=leave_balance.leave_type.leave_type_short_code %}Apply Leave ({{
-              leave_code}}){% endblocktrans %}
+              {% blocktrans with leave_code=leave_balance.leave_type.leave_type_short_code %}Apply Leave ({{ leave_code}}){% endblocktrans %}
               <i class="mdi mdi-send ms-1"></i>
             </button>
           </div>
