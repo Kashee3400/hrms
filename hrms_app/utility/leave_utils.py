@@ -153,8 +153,6 @@ class LeavePolicyManager:
         leave_type,
         start_date,
         end_date,
-        from_time,
-        to_time,
         start_day_choice,
         end_day_choice,
         bookedLeave,
@@ -169,8 +167,6 @@ class LeavePolicyManager:
         self.end_day_choice = end_day_choice
         self.booked_leave = bookedLeave
         self.exclude_application_id = exclude_application_id
-        self.from_time = from_time
-        self.to_time = to_time
 
     def validate_policies(self):
         """
