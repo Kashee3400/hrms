@@ -399,10 +399,10 @@ class LeaveStatsManager:
         self.user = user
         self.leave_type = leave_type
 
-    def get_on_hold_leave(self):
+    def get_on_hold_leave(self,year):
         return (
             LeaveApplication.objects.filter(
-                appliedBy=self.user, status="pending", leave_type=self.leave_type
+                appliedBy=self.user, status="pending", leave_type=self.leave_type,startDate__year = year
             ).aggregate(total=Sum("usedLeave"))["total"]
             or 0
         )
@@ -436,7 +436,7 @@ class LeaveStatsManager:
         return record.remaining_leave_balances if record else 0
 
     def get_remaining_balance(self, year):
-        return self.get_opening_balance(year=year) - self.get_approved_leave_total(year=year)
+        return self.get_opening_balance(year=year) - self.get_on_hold_leave(year=year)
 
     def get_monthly_report(self, year):
         qs = (

@@ -98,7 +98,7 @@ class LeaveManager {
 
             // Update Booked Balance UI
             this.calculateBookedBalance(this.baseTotalDays, startDate);
-            $('#balances').show();
+            // $('#balances').show();
         }
     }
 
