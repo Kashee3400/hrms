@@ -490,8 +490,8 @@ class ShortLeavePolicyManager:
         """
         self._validate_time_range()
         short_leave_minutes = self._calculate_short_leave_minutes()
-        self._validate_attendance_based_slt(short_leave_minutes)
-        self._validate_short_leave_duration(short_leave_minutes)
+        # self._validate_attendance_based_slt(short_leave_minutes)
+        # self._validate_short_leave_duration(short_leave_minutes)
 
         return short_leave_minutes
 
