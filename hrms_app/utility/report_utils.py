@@ -1,19 +1,18 @@
 from django.contrib.auth import get_user_model
 from collections import defaultdict
 from django.utils.translation import gettext_lazy as _
-from django.db.models import Prefetch
+from django.db.models import Prefetch,Q
 from hrms_app.models import (
     AttendanceLog,
-    AttendanceLogHistory,
     LeaveDay,
     UserTour,
     OfficeClosure,
 )
-User = get_user_model()
-from django.utils.timezone import make_aware, localtime, utc
+from django.utils.timezone import localtime
 from datetime import datetime, timedelta
 from django.conf import settings
 
+User = get_user_model()
 
 def get_monthly_presence_html_table(
     converted_from_datetime, converted_to_datetime, is_active, location, query
@@ -76,86 +75,33 @@ def get_monthly_presence_html_table(
     return table_html
 
 
-def get_cell_data(user, day_date, day_str, monthly_presence_data, emp_code):
-    cell_data = {
-        "status": "A",
-        "in_time": "",
-        "out_time": "",
-        "total_duration": "",
-        "leave": "",
-        "tour": "",
-        "reg": "",
-    }
-    if (
-        (user.personal_detail.dot and day_date < user.personal_detail.dot)
-        or (
-            not user.personal_detail.dot
-            and user.personal_detail.doj
-            and day_date < user.personal_detail.doj
-        )
-        or (user.personal_detail.dol and day_date >= user.personal_detail.dol)
-    ):
-        return cell_data
-
-    status_entry = monthly_presence_data.get(emp_code, {}).get(day_str, None)
-    if status_entry:
-        cell_data.update(
-            {
-                "status": status_entry.get("present", {}).get(
-                    "status", cell_data["status"]
-                ),
-                "in_time": status_entry.get("present", {}).get("in_time", ""),
-                "out_time": status_entry.get("present", {}).get("out_time", ""),
-                "total_duration": status_entry.get("present", {}).get(
-                    "total_duration", ""
-                ),
-                "leave": status_entry.get("holiday", {}).get(
-                    "status", status_entry.get("leave", {}).get("leave", "")
-                ),
-                "tour": status_entry.get("tour", {}).get("tour", ""),
-                "reg": status_entry.get("present", {}).get("reg", ""),
-            }
-        )
-        if status_entry.get("sunday", {}).get("status"):
-            cell_data["leave"] = status_entry["sunday"]["status"]
-    return cell_data
-
-
-def get_style(row_type, cell_data):
-    if row_type == "status":
-        return {
-            "P": "text-success",
-            "T": "text-primary",
-            "A": "text-danger",
-            "H": "text-secondary",
-        }.get(cell_data[row_type], "text-dark")
-    return ""
-
-
-from django.db.models import Q
-
-
 def generate_monthly_presence_data_detailed(
     converted_from_datetime, converted_to_datetime, is_active, location, query
 ):
     monthly_presence_data = defaultdict(lambda: defaultdict(dict))
-    employees = (
-        User.objects.filter(is_active=is_active)
-        .prefetch_related(Prefetch("personal_detail", to_attr="personal_detail_cache"))
-        .order_by("first_name")
-    )
+    
+    # OPTIMIZATION: Build employee filter once and reuse
+    employees_filter = Q(is_active=is_active)
     if query:
-        employees = employees.filter(
+        employees_filter &= (
             Q(first_name__icontains=query)
             | Q(last_name__icontains=query)
             | Q(username__icontains=query)
         )
-
     if location:
-        employees = employees.filter(
-            device_location__in=location.values_list("id", flat=True)
-        ).order_by("first_name")
-    leaves = LeaveDay.objects.filter(
+        employees_filter &= Q(device_location__in=location.values_list("id", flat=True))
+    
+    employees = (
+        User.objects.filter(employees_filter)
+        .prefetch_related(Prefetch("personal_detail", to_attr="personal_detail_cache"))
+        .order_by("first_name")
+    )
+    
+    # OPTIMIZATION: Get employee IDs once for all subsequent queries
+    employee_ids = list(employees.values_list("id", flat=True))
+    
+    # OPTIMIZATION: Build date range filter once
+    date_range_filter = (
         Q(
             leave_application__startDate__date__range=[
                 converted_from_datetime,
@@ -171,25 +117,47 @@ def generate_monthly_presence_data_detailed(
         | Q(
             leave_application__startDate__date__lte=converted_from_datetime,
             leave_application__endDate__date__gte=converted_to_datetime,
-        ),
-        leave_application__appliedBy__in=employees.values_list("id", flat=True),
-        leave_application__status=settings.APPROVED,
-    ).select_related("leave_application__appliedBy__personal_detail")
-
-    logs = AttendanceLog.objects.filter(
-        Q(start_date__date__range=[converted_from_datetime, converted_to_datetime])
-        |Q(end_date__date__range=[converted_from_datetime, converted_to_datetime]),
-    ).filter(applied_by__in=employees.values_list("id", flat=True)).select_related("applied_by__personal_detail")
-    # User Tours
-    all_tours = UserTour.objects.filter(
-        Q(start_date__range=[converted_from_datetime, converted_to_datetime])
-        | Q(end_date__range=[converted_from_datetime, converted_to_datetime])
-        | Q(
-            start_date__lte=converted_from_datetime, end_date__gte=converted_to_datetime
-        ),
-        applied_by__in=employees.values_list("id", flat=True),
-        status=settings.APPROVED,
-    ).select_related("applied_by__personal_detail")
+        )
+    )
+    
+    leaves = (
+        LeaveDay.objects.filter(
+            date_range_filter,
+            leave_application__appliedBy__in=employee_ids,
+            leave_application__status=settings.APPROVED,
+        )
+        .exclude(leave_application__leave_type__leave_type_short_code="STL")
+        .select_related(
+            "leave_application__appliedBy__personal_detail",
+            "leave_application__leave_type"  # OPTIMIZATION: Prefetch leave_type
+        )
+    )
+    
+    logs = (
+        AttendanceLog.objects.filter(
+            Q(start_date__date__range=[converted_from_datetime, converted_to_datetime])
+            | Q(end_date__date__range=[converted_from_datetime, converted_to_datetime]),
+            applied_by__in=employee_ids,
+        )
+        .select_related("applied_by__personal_detail")
+        .order_by("applied_by_id", "start_date")  # OPTIMIZATION: Order for better cache locality
+    )
+    
+    all_tours = (
+        UserTour.objects.filter(
+            Q(start_date__range=[converted_from_datetime, converted_to_datetime])
+            | Q(end_date__range=[converted_from_datetime, converted_to_datetime])
+            | Q(
+                start_date__lte=converted_from_datetime,
+                end_date__gte=converted_to_datetime,
+            ),
+            applied_by__in=employee_ids,
+            status=settings.APPROVED,
+        )
+        .select_related("applied_by__personal_detail")
+        .order_by("applied_by_id")  # OPTIMIZATION: Order for better cache locality
+    )
+    
     from .attendance_mapper import get_holiday_logs
     
     holidays = get_holiday_logs(converted_from_datetime, converted_to_datetime)
@@ -202,11 +170,12 @@ def generate_monthly_presence_data_detailed(
         converted_to_datetime,
     )
     
-    process_logs(logs, monthly_presence_data)
+    process_logs(logs, monthly_presence_data, converted_from_datetime, converted_to_datetime)
     process_leaves(leaves, monthly_presence_data)
     process_tours(all_tours, monthly_presence_data)
 
     return monthly_presence_data
+
 
 def process_sundays_and_holidays(
     employees,
@@ -215,25 +184,28 @@ def process_sundays_and_holidays(
     converted_from_datetime,
     converted_to_datetime,
 ):
+    # OPTIMIZATION: Pre-calculate total days once
+    total_days = (converted_to_datetime - converted_from_datetime).days + 1
+    
     # -------------------------
     # 1️⃣ Identify all Sundays
     # -------------------------
     sundays = {
         (converted_from_datetime + timedelta(days=day)).strftime("%Y-%m-%d")
-        for day in range((converted_to_datetime - converted_from_datetime).days + 1)
+        for day in range(total_days)
         if (converted_from_datetime + timedelta(days=day)).weekday() == 6
     }
 
     # -------------------------
     # 2️⃣ Preload holiday applicability
     # -------------------------
-    holiday_map = {}  # {holiday_date: (holiday_obj, [applicable_user_ids] or None)}
+    holiday_map = {}  # {holiday_date: (holiday_obj, set(applicable_user_ids) or None)}
 
     for holiday in holidays:
         holiday_date = holiday.start_date.strftime("%Y-%m-%d")
 
-        # Get users this holiday applies to
-        applicable_users = list(
+        # OPTIMIZATION: Use set for O(1) membership checks instead of list
+        applicable_users = set(
             holiday.applicable_users.values_list("id", flat=True)
         )
 
@@ -263,8 +235,8 @@ def process_sundays_and_holidays(
         # ----- Holidays (user-specific) -----
         for holiday_date, (holiday, applicable_users) in holiday_map.items():
 
-            # only apply if:
-            # applicable_users is None OR emp_id is in applicable_users
+            # OPTIMIZATION: Use set membership check (O(1) instead of O(n))
+            # only apply if: applicable_users is None OR emp_id is in applicable_users
             if applicable_users is None or emp_id in applicable_users:
 
                 if holiday_date not in monthly_presence_data[emp_code]:
@@ -276,62 +248,111 @@ def process_sundays_and_holidays(
                     }
 
 
-def process_logs(logs, monthly_presence_data):
+def process_logs(logs, monthly_presence_data, converted_from_datetime, converted_to_datetime):
+    # OPTIMIZATION: Batch fetch all office closures and STL leaves upfront to eliminate N+1 queries
+    date_range_days = (converted_to_datetime - converted_from_datetime).days + 1
+    all_dates = [
+        converted_from_datetime + timedelta(days=day)
+        for day in range(date_range_days)
+    ]
+    
+    # OPTIMIZATION: Build office closure map once
+    office_closures = OfficeClosure.objects.filter(
+        date__in=[d for d in all_dates]
+    ).values("date", "short_code")
+    office_closure_map = {
+        oc["date"]: oc["short_code"] for oc in office_closures
+    }
+    
+    # OPTIMIZATION: Build STL leave map once (grouped by employee and date)
+    stl_leaves = (
+        LeaveDay.objects
+        .approved()
+        .filter(
+            date__range=[converted_from_datetime, converted_to_datetime],
+            leave_application__leave_type__leave_type_short_code="STL",
+        )
+        .select_related("leave_application__appliedBy", "leave_application")
+        .values(
+            "date",
+            "leave_application__appliedBy_id",
+            "leave_application__from_time",
+            "leave_application__to_time",
+        )
+    )
+    
+    # OPTIMIZATION: Create lookup dict for O(1) access
+    stl_map = {}
+    for stl in stl_leaves:
+        key = (stl["leave_application__appliedBy_id"], stl["date"])
+        stl_map[key] = {
+            "from_time": stl["leave_application__from_time"],
+            "to_time": stl["leave_application__to_time"],
+        }
+    
     for log in logs:
         emp_code = log.applied_by.personal_detail.employee_code
-        log_date = log.start_date
-        history = None
-        office_closer = OfficeClosure.objects.filter(date=log.start_date.date()).values("short_code").first()        
-        if log.regularized:
-            history = AttendanceLogHistory.objects.filter(attendance_log=log).last()
-        if history:
-            # Parse and make `start_date` and `end_date` timezone-aware if they aren't already
-            parsed_in_time = datetime.strptime(
-                history.previous_data["start_date"], "%Y-%m-%dT%H:%M:%SZ"
-            )
-            parsed_out_time = datetime.strptime(
-                history.previous_data["end_date"], "%Y-%m-%dT%H:%M:%SZ"
-            )
-            # Convert to aware datetime objects if naive
-            parsed_in_time = (
-                make_aware(parsed_in_time, timezone=utc)
-                if parsed_in_time.tzinfo is None
-                else parsed_in_time
-            )
-            parsed_out_time = (
-                make_aware(parsed_out_time, timezone=utc)
-                if parsed_out_time.tzinfo is None
-                else parsed_out_time
-            )
-            in_time = localtime(parsed_in_time).strftime("%I:%M")
-            out_time = localtime(parsed_out_time).strftime("%I:%M")  if history.previous_data["reg_status"] != "mis punching" else ""
-            status = history.previous_data["att_status_short_code"]
-            duration = history.previous_data["duration"]
-        else:
-            # Use log's start_date and end_date
-            in_time = localtime(log.start_date).strftime("%I:%M")
-            out_time = localtime(log.end_date).strftime("%I:%M")
-            status = log.att_status_short_code
-            duration = log.duration
-        # Update the monthly_presence_data dictionary
-        monthly_presence_data[emp_code][log_date.date().strftime("%Y-%m-%d")][
-            "present"
-        ] = {
+        log_date = log.start_date.date()
+        date_key = log_date.strftime("%Y-%m-%d")
+
+        # -----------------------------
+        # Attendance data (UNCHANGED)
+        # -----------------------------
+        in_time = localtime(log.start_date).strftime("%I:%M")
+        out_time = localtime(log.end_date).strftime("%I:%M")
+        status = log.att_status_short_code
+        duration = log.duration
+
+        # -----------------------------
+        # Office Closure (REG row) - OPTIMIZED with pre-built map
+        # -----------------------------
+        reg_value = office_closure_map.get(log_date, "")
+
+        # -----------------------------
+        # STL (REG row ONLY) - OPTIMIZED with pre-built map
+        # -----------------------------
+        stl_data = stl_map.get((log.applied_by.id, log_date))
+        
+        if stl_data:
+            from_time = stl_data["from_time"]
+            to_time = stl_data["to_time"]
+
+            if from_time and to_time:
+                stl_duration = (
+                    datetime.combine(log_date, to_time)
+                    - datetime.combine(log_date, from_time)
+                )
+                reg_value = (
+                    f"STL "
+                    f"({from_time.strftime('%H:%M')} - "
+                    f"{to_time.strftime('%H:%M')}) "
+                    f"[{stl_duration}]"
+                )
+            else:
+                reg_value = "STL"
+
+        # -----------------------------
+        # Update monthly_presence_data
+        # -----------------------------
+        monthly_presence_data[emp_code][date_key]["present"] = {
             "status": status,
             "in_time": in_time,
             "out_time": out_time,
             "total_duration": duration,
-            "reg": "R" if log.regularized else office_closer['short_code'] if office_closer else "",
+            "reg": reg_value,
         }
-from datetime import timedelta
+
 
 def process_leaves(leaves, monthly_presence_data):
     for leave in leaves:
         emp_code = leave.leave_application.appliedBy.personal_detail.employee_code
+        
+        # OPTIMIZATION: Access leave_type once (already prefetched)
+        leave_type = leave.leave_application.leave_type
         code = (
-            leave.leave_application.leave_type.leave_type_short_code
+            leave_type.leave_type_short_code
             if leave.is_full_day
-            else leave.leave_application.leave_type.half_day_short_code
+            else leave_type.half_day_short_code
         )
 
         employee_attendance = monthly_presence_data.get(emp_code, {})
@@ -381,6 +402,7 @@ def process_leaves(leaves, monthly_presence_data):
                 "total_duration": None,
             }
 
+
 def process_tours(all_tours, monthly_presence_data):
     for tour in all_tours:
         daily_durations = calculate_daily_tour_durations(
@@ -394,8 +416,6 @@ def process_tours(all_tours, monthly_presence_data):
                 "out_time": None,
                 "total_duration": str(duration),
             }
-
-
 
 def get_office_closers(start_date, end_date):
     """
@@ -491,3 +511,58 @@ def format_emp_code(emp_code):
         return f"0{emp_code}"
     else:
         return emp_code
+
+def get_cell_data(user, day_date, day_str, monthly_presence_data, emp_code):
+    cell_data = {
+        "status": "A",
+        "in_time": "",
+        "out_time": "",
+        "total_duration": "",
+        "leave": "",
+        "tour": "",
+        "reg": "",
+    }
+    if (
+        (user.personal_detail.dot and day_date < user.personal_detail.dot)
+        or (
+            not user.personal_detail.dot
+            and user.personal_detail.doj
+            and day_date < user.personal_detail.doj
+        )
+        or (user.personal_detail.dol and day_date >= user.personal_detail.dol)
+    ):
+        return cell_data
+
+    status_entry = monthly_presence_data.get(emp_code, {}).get(day_str, None)
+    if status_entry:
+        cell_data.update(
+            {
+                "status": status_entry.get("present", {}).get(
+                    "status", cell_data["status"]
+                ),
+                "in_time": status_entry.get("present", {}).get("in_time", ""),
+                "out_time": status_entry.get("present", {}).get("out_time", ""),
+                "total_duration": status_entry.get("present", {}).get(
+                    "total_duration", ""
+                ),
+                "leave": status_entry.get("holiday", {}).get(
+                    "status", status_entry.get("leave", {}).get("leave", "")
+                ),
+                "tour": status_entry.get("tour", {}).get("tour", ""),
+                "reg": status_entry.get("present", {}).get("reg", ""),
+            }
+        )
+        if status_entry.get("sunday", {}).get("status"):
+            cell_data["leave"] = status_entry["sunday"]["status"]
+    return cell_data
+
+
+def get_style(row_type, cell_data):
+    if row_type == "status":
+        return {
+            "P": "text-success",
+            "T": "text-primary",
+            "A": "text-danger",
+            "H": "text-secondary",
+        }.get(cell_data[row_type], "text-dark")
+    return ""

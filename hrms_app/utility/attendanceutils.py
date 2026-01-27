@@ -91,26 +91,6 @@ def get_days_in_month(start_date, end_date):
         start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)
     ]
 
-def get_holiday_logs(start_date, end_date, employee_ids=None):
-    """
-    Get holidays for a date range, optionally filtered by specific employees
-    """
-    from django.db.models import Count, Q
-    
-    holidays = Holiday.objects.filter(start_date__range=[start_date, end_date])
-    
-    if employee_ids:
-        # Get holidays where:
-        # 1. No users assigned (applies to all), OR
-        # 2. At least one of the employees is in applicable_users
-        holidays = holidays.annotate(
-            user_count=Count('applicable_users')
-        ).filter(
-            Q(user_count=0) | Q(applicable_users__id__in=employee_ids)
-        ).distinct()
-    
-    return holidays
-
 def get_payroll_date_holidays(start_date, end_date, user=None):
     """
     Get holidays for a date range, optionally filtered by user
@@ -129,27 +109,122 @@ def get_payroll_date_holidays(start_date, end_date, user=None):
     
     return holidays
 
+def get_non_stl_leave_logs(employee_ids, start_date=None, end_date=None):
+    return LeaveDay.objects.non_stl_leave_days(
+        employee_ids=employee_ids,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+
+def get_stl_leave_logs(employee_ids, start_date=None, end_date=None):
+    return LeaveDay.objects.stl_leave_days(
+        employee_ids=employee_ids,
+        start_date=start_date,
+        end_date=end_date,
+    )
+
+from django.db.models import Q
+from datetime import datetime, time, timedelta
+from django.utils.timezone import make_aware
 
 def get_attendance_logs(employee_ids, start_date, end_date):
-    return AttendanceLog.objects.filter(
-        applied_by_id__in=employee_ids, start_date__date__range=[start_date, end_date]
+    """
+    Optimization:
+    1. select_related('applied_by'): avoids N+1 user queries.
+    2. Uses datetime range instead of __date to preserve DB index usage.
+    3. Expands range by -1 day and +1 day for edge coverage.
+    """
+
+    # Normalize to aware datetimes
+    if not isinstance(start_date, datetime):
+        start_dt = make_aware(datetime.combine(start_date, time.min))
+        end_dt = make_aware(datetime.combine(end_date, time.max))
+    else:
+        start_dt, end_dt = start_date, end_date
+
+    # 🔹 Expand range
+    start_dt -= timedelta(days=1)
+    end_dt += timedelta(days=1)
+
+    return (
+        AttendanceLog.objects
+        .filter(
+            applied_by_id__in=employee_ids,
+            start_date__range=(start_dt, end_dt),
+        )
+        .select_related("applied_by")
     )
 
 
 def get_leave_logs(employee_ids, start_date=None, end_date=None):
+    """
+    Optimization:
+    1. select_related: Fetches the LeaveApplication AND the Employee (appliedBy)
+       to avoid hitting the DB when you access leave_log.leave_application.appliedBy.
+    """
     return LeaveDay.objects.filter(
         leave_application__appliedBy_id__in=employee_ids,
         date__range=[start_date, end_date],
         leave_application__status=settings.APPROVED,
+    ).select_related(
+        'leave_application', 
+        'leave_application__appliedBy'
     )
 
 
 def get_tour_logs(employee_ids, start_date, end_date):
+    """
+    Optimization: select_related for the user.
+    """
     return UserTour.objects.filter(
         applied_by_id__in=employee_ids,
         start_date__range=[start_date, end_date],
         status=settings.APPROVED,
-    )
+    ).select_related('applied_by')
+
+
+def get_holiday_logs(start_date, end_date, employee_ids=None):
+    """
+    Optimization:
+    1. Removed .annotate(Count): This is expensive.
+    2. used Q(applicable_users__isnull=True) to find global holidays.
+    3. prefetch_related: If you need to check which users are assigned later.
+    """
+    # Base filter for date
+    base_query = Q(start_date__range=[start_date, end_date])
+
+    if employee_ids:
+        # Holidays that are Global (no assigned users) OR assigned to these specific employees
+        user_query = Q(applicable_users__isnull=True) | Q(applicable_users__id__in=employee_ids)
+        qs = Holiday.objects.filter(base_query & user_query)
+    else:
+        qs = Holiday.objects.filter(base_query)
+
+    # Distinct is needed because an employee might match multiple groups if you have groups logic,
+    # or the join might duplicate rows.
+    return qs.distinct().prefetch_related('applicable_users')
+
+# def get_attendance_logs(employee_ids, start_date, end_date):
+#     return AttendanceLog.objects.filter(
+#         applied_by_id__in=employee_ids, start_date__date__range=[start_date, end_date]
+#     )
+
+
+# def get_leave_logs(employee_ids, start_date=None, end_date=None):
+#     return LeaveDay.objects.filter(
+#         leave_application__appliedBy_id__in=employee_ids,
+#         date__range=[start_date, end_date],
+#         leave_application__status=settings.APPROVED,
+#     )
+
+
+# def get_tour_logs(employee_ids, start_date, end_date):
+#     return UserTour.objects.filter(
+#         applied_by_id__in=employee_ids,
+#         start_date__range=[start_date, end_date],
+#         status=settings.APPROVED,
+#     )
 
 
 def str_to_date(value):

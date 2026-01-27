@@ -16,7 +16,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db.models import Sum
 from django.templatetags.static import static
-
+from .manager.leave_days import LeaveDayManager
 
 
 class Role(models.Model):
@@ -1283,7 +1283,7 @@ class LeaveDay(models.Model):
     )
     date = models.DateField(verbose_name=_("Date"))
     is_full_day = models.BooleanField(default=True, verbose_name=_("Is Full Day"))
-
+    objects = LeaveDayManager()
     class Meta:
         unique_together = ("leave_application", "date")
 

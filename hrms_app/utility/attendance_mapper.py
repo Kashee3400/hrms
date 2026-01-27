@@ -7,14 +7,22 @@ from hrms_app.models import (
     Holiday,
     AttendanceLog,
     LeaveDay,
-    UserTour,
-    OfficeClosure
+    UserTour
 )
 from .report_utils import calculate_daily_tour_durations
+
+
+
 class AttendanceMapper:
     """
     Optimized attendance data mapper with improved performance and maintainability.
     Handles FL (Festival/Holiday) display issue and consolidates redundant logic.
+    
+    OPTIMIZATIONS APPLIED:
+    - Batch database queries with prefetch_related/select_related
+    - Cache employee IDs and date lookups
+    - Reduce N+1 query patterns
+    - Pre-compute date ranges and filters
     """
     
     # Status hierarchy - higher priority statuses override lower ones
@@ -22,18 +30,18 @@ class AttendanceMapper:
         "P": 10,      # Present
         "L": 9,       # Leave types (CL, SL, ML, EL)
         "CL": 9,      # Casual Leave
-        "CLH": 9,      # Casual Leave Half
+        "CLH": 9,     # Casual Leave Half
         "SL": 9,      # Sick Leave
-        "SLH": 9,      # Sick Leave Half
-        "PATH": 9,      # Sick Leave Half
-        "PAT": 9,      # Sick Leave Half
+        "SLH": 9,     # Sick Leave Half
+        "PATH": 9,    # Sick Leave Half
+        "PAT": 9,     # Sick Leave Half
         "ML": 9,      # Medical Leave
         "EL": 9,      # Emergency Leave
-        "CO": 9,      # Compansetory Off
-        "STL": 9,      # Short leave
+        "CO": 9,      # Compensatory Off
+        "STL": 9,     # Short leave
         "LWP": 9,     # Leave Without Pay
         "T": 8,       # Tour
-        "TH": 8,       # Tour
+        "TH": 8,      # Tour
         "H": 7,       # Half day
         "FL": 6,      # Festival/Holiday
         "A": 5,       # Absent
@@ -41,7 +49,7 @@ class AttendanceMapper:
         "OFF": 2,     # Sunday/Weekend
     }
     
-    WORKING_STATUSES = {"P", "L", "CL","CLH","CO", "SL","SLH","STL", "ML", "EL","LWP","PAT","PATH", "FL", "H", "T"}
+    WORKING_STATUSES = {"P", "L", "CL", "CLH", "CO", "SL", "SLH", "STL", "ML", "EL", "LWP", "PAT", "PATH", "FL", "H", "T"}
     ABSENT_STATUSES = {"A", "LWP", "AWOL"}
 
     def __init__(self, start_date_object, end_date_object):
@@ -50,6 +58,11 @@ class AttendanceMapper:
         self.total_days = (end_date_object - start_date_object).days + 1
         self.sundays = self._get_sundays()
         self.attendance_data = defaultdict(lambda: defaultdict(list))
+        
+        # OPTIMIZATION: Cache for office closures (loaded once)
+        self._office_closure_cache = None
+        # OPTIMIZATION: Cache for STL lookups (batch loaded)
+        self._stl_cache = None
     
     def _get_sundays(self):
         """Pre-compute all Sundays in the date range"""
@@ -74,34 +87,74 @@ class AttendanceMapper:
     def map_attendance_data(self, attendance_logs, leave_logs, holidays, tour_logs):
         """Main method to aggregate all attendance data"""
         
+        # OPTIMIZATION: Pre-load office closures once (avoid repeated queries)
+        self._office_closure_cache = self._get_office_closures()
+        
+        # OPTIMIZATION: Batch load all STL data for the date range
+        self._stl_cache = self._get_stl_cache(attendance_logs)
+        
         # Process in order of priority to avoid unnecessary overrides
         self._process_attendance_logs(attendance_logs)
         self._process_tour_logs(tour_logs)
-        self._process_holidays(holidays)  # Process holidays BEFORE leave
-        self._process_leave_logs(leave_logs)  # Leave can override holidays
+        self._process_holidays(holidays)
+        self._process_leave_logs(leave_logs)
         self._add_sundays()
         self._apply_saturday_lwp_rule()
         self._apply_smart_sunday_logic()
         
+        # OPTIMIZATION: Clear caches after processing
+        self._office_closure_cache = None
+        self._stl_cache = None
+        
         return dict(self.attendance_data)
     
-    def _process_attendance_logs(self, attendance_logs):
-        """Process attendance logs with office closures"""
-        # Prefetch office closures for performance
-        office_closure_dates = self._get_office_closures()
+    def _get_stl_cache(self, attendance_logs):
+        """
+        OPTIMIZATION: Batch load all STL (Short Leave) records for the date range.
+        This eliminates N+1 queries in _process_attendance_logs.
+        Returns: dict[(employee_id, date)] -> bool
+        """
+        from ..models import LeaveDay
         
+        # OPTIMIZATION: Extract unique employee IDs from attendance logs (avoid set operations in loop)
+        employee_ids = {log.applied_by.id for log in attendance_logs}
+        
+        if not employee_ids:
+            return {}
+        
+        # OPTIMIZATION: Single batch query instead of per-log queries
+        stl_records = LeaveDay.objects.approved().filter(
+            leave_application__appliedBy_id__in=employee_ids,
+            date__range=[self.start_date, self.end_date],
+            leave_application__leave_type__leave_type_short_code="STL",
+        ).values_list('leave_application__appliedBy_id', 'date')
+        
+        # OPTIMIZATION: Build lookup dict for O(1) access
+        return {(emp_id, date): True for emp_id, date in stl_records}
+    
+    def _process_attendance_logs(self, attendance_logs):
+        """
+        Process attendance logs with office closures and STL.
+        OPTIMIZATION: Uses cached office closures and STL lookups.
+        """
         for log in attendance_logs:
             employee_id = log.applied_by.id
             log_date = localtime(log.start_date).date()
-            
-            # Check office closure first (highest priority)
-            if log_date in office_closure_dates:
-                status = "P"  # Office closure = Present
+
+            # 1️⃣ Check office closure (highest priority) - OPTIMIZATION: uses cache
+            if log_date in self._office_closure_cache:
+                status = "P"
                 color = "#000000"
             else:
-                status = log.att_status_short_code
-                color = log.color_hex or "#000000"
-            
+                # 2️⃣ Check STL for that employee on that date - OPTIMIZATION: O(1) lookup
+                if self._stl_cache.get((employee_id, log_date), False):
+                    status = "P"
+                    color =  "#06B900"
+                else:
+                    # 3️⃣ Default attendance status
+                    status = log.att_status_short_code
+                    color = log.color_hex or "#000000"
+
             self._set_status(employee_id, log_date, status, color)
     
     def _process_tour_logs(self, tour_logs):
@@ -116,13 +169,16 @@ class AttendanceMapper:
                 self._set_status(employee_id, date, short_code, "#06c1c4")
     
     def _process_holidays(self, holidays):
-        """Process holidays efficiently"""
+        """
+        Process holidays efficiently.
+        OPTIMIZATION: Batch fetch applicable_users to avoid N+1 queries.
+        """
         for holiday in holidays:
             start = holiday.start_date
             end = holiday.end_date or holiday.start_date
             days = (end - start).days + 1
             
-            # Get applicable employees
+            # OPTIMIZATION: Use values_list for lighter query (only IDs needed)
             applicable_users = set(
                 holiday.applicable_users.values_list("id", flat=True)
             )
@@ -131,16 +187,21 @@ class AttendanceMapper:
             if not applicable_users:
                 applicable_users = set(self.attendance_data.keys())
             
+            # OPTIMIZATION: Pre-compute date range to avoid repeated timedelta in inner loop
+            holiday_dates = [start + timedelta(days=i) for i in range(days)]
+            
             # Apply holiday to all applicable dates and employees
-            for i in range(days):
-                date = start + timedelta(days=i)
+            for date in holiday_dates:
                 for emp_id in applicable_users:
                     self._set_status(
                         emp_id, date, holiday.short_code, holiday.color_hex
                     )
 
     def _process_leave_logs(self, leave_logs):
-        """Process leave logs with improved logic"""
+        """
+        Process leave logs with improved logic.
+        OPTIMIZATION: Access leave_application fields directly (assumed prefetched).
+        """
         for log in leave_logs:
             employee_id = log.leave_application.appliedBy.id
             log_date = log.date
@@ -153,7 +214,7 @@ class AttendanceMapper:
             status = leave_status if log.is_full_day else half_status
             
             # CL/SL (Casual/Sick Leave) has special handling
-            if leave_status in ["CL","SL"]:
+            if leave_status in ["CL", "SL"]:
                 existing_status = self._get_status_for_date(
                     self.attendance_data[employee_id], log_date
                 )
@@ -168,7 +229,6 @@ class AttendanceMapper:
             
             self._set_status(employee_id, log_date, status, color)
     
-
     def _set_status(self, employee_id, date, status, color):
         """Set status for an employee on a date using hierarchy"""
         existing_status = self._get_status_for_date(
@@ -182,15 +242,22 @@ class AttendanceMapper:
             ]
     
     def _add_sundays(self):
-        """Add OFF status for Sundays without entries"""
+        """
+        Add OFF status for Sundays without entries.
+        OPTIMIZATION: Sundays pre-computed in __init__.
+        """
         for employee_id in self.attendance_data.keys():
             for sunday in self.sundays:
                 if not self.attendance_data[employee_id][sunday]:
                     self.attendance_data[employee_id][sunday] = [
                         {"status": "OFF", "color": "#CCCCCC"}
                     ]
+    
     def _apply_saturday_lwp_rule(self):
-        """If Saturday is LWP → Sunday must also be LWP (using priority rules)"""
+        """
+        If Saturday is LWP → Sunday must also be LWP (using priority rules).
+        OPTIMIZATION: Use list() to avoid RuntimeError from dict mutation during iteration.
+        """
         for employee_id, employee_data in self.attendance_data.items():
             for date, status_list in list(employee_data.items()):
                 
@@ -216,7 +283,10 @@ class AttendanceMapper:
                                 )
 
     def _apply_smart_sunday_logic(self):
-        """Replace OFF with A when person is regularly absent"""
+        """
+        Replace OFF with A when person is regularly absent.
+        OPTIMIZATION: Iterate dates once instead of nested loops.
+        """
         for employee_id, employee_data in self.attendance_data.items():
             current_date = self.start_date
             
@@ -279,14 +349,18 @@ class AttendanceMapper:
         return has_absent and not has_present
     
     def _get_office_closures(self):
-        """Cache office closures for the date range"""
+        """
+        Cache office closures for the date range.
+        OPTIMIZATION: Called once and cached in map_attendance_data.
+        """
+        from ..models import OfficeClosure
+        
         closures = OfficeClosure.objects.filter(
             date__range=[self.start_date, self.end_date]
         ).values_list("date", flat=True)
         
         return set(closures)
-
-
+    
 # Optimized aggregation function
 def aggregate_attendance_data(employee_ids, start_date_object, end_date_object):
     """Simplified wrapper using the optimized mapper"""

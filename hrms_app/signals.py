@@ -9,8 +9,6 @@ from django.conf import settings
 from hrms_app.models import *
 from django.core.exceptions import ImproperlyConfigured
 from hrms_app.hrms.utils import check_lock_status
-from hrms_app.models import OfficeLocation
-# from .utility.detailed_attendance_mapper import export_attendance_to_excel
 
 @receiver(post_save, sender=CustomUser)
 def initialize_leave_balance(sender, instance, created, **kwargs):
@@ -100,30 +98,75 @@ def set_user_tour_slug(sender, instance, **kwargs):
             num += 1
         instance.slug = slug
 
+from django.conf import settings
+from django.utils.timezone import localtime
+from datetime import timedelta
 
 @receiver(post_save, sender=LeaveApplication)
 def create_or_update_leave_days(sender, instance, created, **kwargs):
     """
     Create or update LeaveDay instances when LeaveApplication is created or updated.
+    Skip Sundays while generating leave days.
     """
-    if instance.startDate and instance.endDate:
-        instance.leave_days.all().delete()
-        from django.utils.timezone import localtime
-        current_date = localtime(instance.startDate).date()
-        end_date = localtime(instance.endDate).date()
-        while current_date <= end_date:
-            if current_date == localtime(instance.startDate).date():
-                is_full_day = (instance.startDayChoice == settings.FULL_DAY)
-            elif current_date == localtime(instance.endDate).date():
-                is_full_day = (instance.endDayChoice == settings.FULL_DAY)
-            else:
-                is_full_day = True
-            LeaveDay.objects.create(
-                leave_application=instance,
-                date=current_date,
-                is_full_day=is_full_day,
-            )
+
+    if not instance.startDate or not instance.endDate:
+        return
+
+    # Clear existing days before recreating
+    instance.leave_days.all().delete()
+
+    current_date = localtime(instance.startDate).date()
+    end_date = localtime(instance.endDate).date()
+
+    start_date = localtime(instance.startDate).date()
+    end_date_exact = localtime(instance.endDate).date()
+
+    while current_date <= end_date:
+
+        # 🔹 Skip Sunday (weekday(): Monday=0, Sunday=6)
+        if current_date.weekday() == 6:
             current_date += timedelta(days=1)
+            continue
+
+        if current_date == start_date:
+            is_full_day = (instance.startDayChoice == settings.FULL_DAY)
+        elif current_date == end_date_exact:
+            is_full_day = (instance.endDayChoice == settings.FULL_DAY)
+        else:
+            is_full_day = True
+
+        LeaveDay.objects.create(
+            leave_application=instance,
+            date=current_date,
+            is_full_day=is_full_day,
+        )
+
+        current_date += timedelta(days=1)
+
+
+# @receiver(post_save, sender=LeaveApplication)
+# def create_or_update_leave_days(sender, instance, created, **kwargs):
+#     """
+#     Create or update LeaveDay instances when LeaveApplication is created or updated.
+#     """
+#     if instance.startDate and instance.endDate:
+#         instance.leave_days.all().delete()
+#         from django.utils.timezone import localtime
+#         current_date = localtime(instance.startDate).date()
+#         end_date = localtime(instance.endDate).date()
+#         while current_date <= end_date:
+#             if current_date == localtime(instance.startDate).date():
+#                 is_full_day = (instance.startDayChoice == settings.FULL_DAY)
+#             elif current_date == localtime(instance.endDate).date():
+#                 is_full_day = (instance.endDayChoice == settings.FULL_DAY)
+#             else:
+#                 is_full_day = True
+#             LeaveDay.objects.create(
+#                 leave_application=instance,
+#                 date=current_date,
+#                 is_full_day=is_full_day,
+#             )
+#             current_date += timedelta(days=1)
 
 @receiver(post_save, sender=CustomUser)
 def create_employee_shift(sender, instance, created, **kwargs):

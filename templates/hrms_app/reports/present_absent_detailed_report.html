@@ -2,111 +2,135 @@
 {% load static hrms_tag humanize i18n %}
 
 {% block title %}
-  {% trans 'Report' %} | {{ title }}
+{% trans 'Report' %} | {{ title }}
 {% endblock %}
 
 {% block extrastyle %}
-  <style>
-    .table-container {
-      overflow-x: auto;
-      overflow-y: auto;
-      max-height: 80vh; /* Adjust this to your needs */
-      position: relative;
-    }
-    
-    table {
-      border-collapse: collapse;
-      width: 100%;
-    }
-    
-    th,
-    td {
-      padding: 8px;
-      text-align: left;
-      border: 1px solid #ddd;
-    }
-    
-    .sticky-header {
-      position: sticky;
-      top: 0;
-      background-color: skyblue;
-      z-index: 2;
-    }
-    
-    .sticky-col {
-      position: sticky;
-      left: 0;
-      background-color: #e8fff4;
-      z-index: 1;
-    }
-    
-    .sticky-col:nth-child(2) {
-      left: 90px; /* Adjust based on the width of the first sticky column */
-      z-index: 1;
-    }
-    
-    .sticky-col:nth-child(3) {
-      left: 240px; /* Adjust based on the width of the first and second sticky columns */
-      z-index: 1;
-    }
-    
-    .sticky-header.sticky-col {
-      z-index: 3; /* Ensure the top left header cells are above others */
-    }
-  </style>
+<style>
+  .table-container {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: 80vh;
+    /* Adjust this to your needs */
+    position: relative;
+  }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  th,
+  td {
+    padding: 8px;
+    text-align: left;
+    border: 1px solid #ddd;
+  }
+
+  .sticky-header {
+    position: sticky;
+    top: 0;
+    background-color: skyblue;
+    z-index: 2;
+  }
+
+  .sticky-col {
+    position: sticky;
+    left: 0;
+    background-color: #e8fff4;
+    z-index: 1;
+  }
+
+  .sticky-col:nth-child(2) {
+    left: 90px;
+    /* Adjust based on the width of the first sticky column */
+    z-index: 1;
+  }
+
+  .sticky-col:nth-child(3) {
+    left: 240px;
+    /* Adjust based on the width of the first and second sticky columns */
+    z-index: 1;
+  }
+
+  .sticky-header.sticky-col {
+    z-index: 3;
+    /* Ensure the top left header cells are above others */
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-{% comment %} {% render_breadcrumb 'Detailed Attendance Report' urls %} {% endcomment %}
-  <div class="bg-light my-2">
-    <form method="get">
-      <div class="row m-2">
-        <div class="col-md-3 col-12 mb-2">{{ form.location.label_tag }} {{ form.location }}</div>
-        <!-- From Date Filter -->
-        <div class="col-md-3 col-12 mb-2">{{ form.from_date.label_tag }} {{ form.from_date }}</div>
-        <!-- To Date Filter -->
-        <div class="col-md-3 col-12 mb-2">{{ form.to_date.label_tag }} {{ form.to_date }}</div>
-        <!-- Active Filter -->
-        <div class="col-md-3 col-12 mb-2">{{ form.active.label_tag }} {{ form.active }}</div>
-        <!-- Buttons: Filter, Clear Filter, Export -->
-        <div class="col-md-3 col-12 mb-2">
-          <div class="input-group">
-            <input 
-              type="text" 
-              class="form-control px-3 py-2" 
-              name="q" 
-              value="{{ query }}" 
-              placeholder="Search users..."
-            />
-            <span class="input-group-text bg-primary text-white">
-              <i class="fa-solid fa-magnifying-glass"></i>
-            </span>
-          </div>
-        </div>
-        <div class="col-md-3 col-12 mb-2">
-          <button type="submit" class="btn btn-sm btn-primary"><span class="mif-filter"></span> Filter</button>
-          <a class="btn btn-sm btn-secondary" href="{% url 'detailed_attendance_report' %}">Clear Filter</a>
-          <button type="submit" name="export" value="true" class="btn btn-sm btn-success"><span class="mif-file-excel"></span> Export to Excel</button>
+<div class="bg-light p-3 rounded shadow-sm my-3">
+  <form method="get">
+    <div class="row g-3 align-items-end">
+
+      <div class="col-12 col-md-6 col-lg-3">
+        {{ form.location.label_tag }}
+        {{ form.location }}
+      </div>
+
+      <div class="col-12 col-md-6 col-lg-3">
+        {{ form.active.label_tag }}
+        {{ form.active }}
+      </div>
+
+      <div class="col-12 col-md-6 col-lg-3">
+        {{ form.from_date.label_tag }}
+        {{ form.from_date }}
+      </div>
+
+      <div class="col-12 col-md-6 col-lg-3">
+        {{ form.to_date.label_tag }}
+        {{ form.to_date }}
+      </div>
+
+      <div class="col-12 col-md-6 col-lg-6">
+        <label class="form-label d-none d-md-block">&nbsp;</label>
+        <div class="input-group">
+          <input type="text" class="form-control" name="q" value="{{ query }}" placeholder="Search users..." />
+          <span class="input-group-text bg-primary text-white">
+            <i class="fa-solid fa-magnifying-glass"></i>
+          </span>
         </div>
       </div>
-    
-    </form>
-  </div>
-  <div class="bg-white my-2 p-2">
-    <div class="dt-responsive table-responsive">{{ html_table|safe }}</div>
-  </div>
-{% endblock %}
 
+      <div class="col-12 col-md-6 col-lg-6">
+        <div class="d-flex gap-2 justify-content-md-end justify-content-start">
+          <button type="submit" class="btn btn-primary">
+            <span class="mif-filter"></span> Filter
+          </button>
+
+          <a class="btn btn-secondary" href="{% url 'detailed_attendance_report' %}">
+            Clear
+          </a>
+
+          <button type="submit" name="export" value="true" class="btn btn-success">
+            <span class="mif-file-excel"></span> Export
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </form>
+</div>
+
+<div class="bg-white my-3 p-3 shadow-sm rounded">
+  <div class="table-responsive">
+    {{ html_table|safe }}
+  </div>
+</div>
+{% endblock %}
 {% block extra_js %}
-  <script>
-    $(document).ready(function () {
-      $('.table').DataTable({
-        paging: true,
-        searching: true,
-        ordering: false,
-        dom: 'Bfrtip',
-        buttons: ['copy', 'csv', 'excel']
-      })
+<script>
+  $(document).ready(function () {
+    $('.table').DataTable({
+      paging: true,
+      searching: true,
+      ordering: false,
+      dom: 'Bfrtip',
+      buttons: ['copy', 'csv', 'excel']
     })
-  </script>
+  })
+</script>
 {% endblock %}

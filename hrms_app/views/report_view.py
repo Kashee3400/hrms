@@ -18,10 +18,10 @@ from datetime import datetime
 
 from hrms_app.utility.attendanceutils import (
     get_attendance_logs,
-    get_leave_logs,
     get_tour_logs,
     get_holiday_logs,
     get_days_in_month,
+    get_non_stl_leave_logs,
 )
 from ..utility.report_utils import get_monthly_presence_html_table
 
@@ -109,7 +109,7 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
         
         # Fetch all data with optimized queries
         attendance_logs = get_attendance_logs(employee_ids, start_date, end_date)
-        leave_logs = get_leave_logs(employee_ids, start_date, end_date)
+        leave_logs = get_non_stl_leave_logs(employee_ids, start_date, end_date)
         tour_logs = get_tour_logs(employee_ids, start_date, end_date)
         holidays = get_holiday_logs(start_date, end_date, employee_ids)
         
