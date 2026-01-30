@@ -355,7 +355,9 @@ class AttendanceLogAdmin(admin.ModelAdmin):
         "applied_by__username",
         "applied_by__last_name",
     ]
-    list_filter = ["start_date", "end_date","att_status"]
+    list_filter = ["start_date", "end_date","att_status",
+                   "regularized_backend","is_submitted",
+                   "is_regularisation","status"]
     actions = ["approve_attendance"]
 
     def color_representation(self, obj):

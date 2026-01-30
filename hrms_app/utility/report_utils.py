@@ -294,6 +294,7 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
         emp_code = log.applied_by.personal_detail.employee_code
         log_date = log.start_date.date()
         date_key = log_date.strftime("%Y-%m-%d")
+        is_backend_reg = log.regularized_backend
 
         # -----------------------------
         # Attendance data (UNCHANGED)
@@ -306,7 +307,7 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
         # -----------------------------
         # Office Closure (REG row) - OPTIMIZED with pre-built map
         # -----------------------------
-        reg_value = office_closure_map.get(log_date, "")
+        reg_value = "R" if is_backend_reg else office_closure_map.get(log_date, "") 
 
         # -----------------------------
         # STL (REG row ONLY) - OPTIMIZED with pre-built map
@@ -322,12 +323,13 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
                     datetime.combine(log_date, to_time)
                     - datetime.combine(log_date, from_time)
                 )
-                reg_value = (
-                    f"STL "
-                    f"({from_time.strftime('%H:%M')} - "
-                    f"{to_time.strftime('%H:%M')}) "
-                    f"[{stl_duration}]"
-                )
+                reg_value = "STL"
+                # reg_value = (
+                #     f"STL "
+                #     f"({from_time.strftime('%H:%M')} - "
+                #     f"{to_time.strftime('%H:%M')}) "
+                #     f"[{stl_duration}]"
+                # )
             else:
                 reg_value = "STL"
 
