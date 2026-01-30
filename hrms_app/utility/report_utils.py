@@ -258,7 +258,7 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
     # ----------------------------------
     date_range_days = (converted_to_datetime - converted_from_datetime).days + 1
     all_dates = [
-        converted_from_datetime.date() + timedelta(days=day)
+        converted_from_datetime + timedelta(days=day)
         for day in range(date_range_days)
     ]
 
