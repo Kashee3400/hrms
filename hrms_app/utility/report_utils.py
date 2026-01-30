@@ -7,6 +7,7 @@ from hrms_app.models import (
     LeaveDay,
     UserTour,
     OfficeClosure,
+    AttendanceLogHistory
 )
 from django.utils.timezone import localtime
 from datetime import datetime, timedelta
@@ -247,24 +248,34 @@ def process_sundays_and_holidays(
                         "total_duration": None,
                     }
 
+from datetime import datetime, timedelta
+from django.utils.timezone import localtime, make_aware, utc
+
 
 def process_logs(logs, monthly_presence_data, converted_from_datetime, converted_to_datetime):
-    # OPTIMIZATION: Batch fetch all office closures and STL leaves upfront to eliminate N+1 queries
+    # ----------------------------------
+    # OPTIMIZATION: Date range
+    # ----------------------------------
     date_range_days = (converted_to_datetime - converted_from_datetime).days + 1
     all_dates = [
-        converted_from_datetime + timedelta(days=day)
+        converted_from_datetime.date() + timedelta(days=day)
         for day in range(date_range_days)
     ]
-    
-    # OPTIMIZATION: Build office closure map once
+
+    # ----------------------------------
+    # OPTIMIZATION: Office Closure Map
+    # ----------------------------------
     office_closures = OfficeClosure.objects.filter(
-        date__in=[d for d in all_dates]
+        date__in=all_dates
     ).values("date", "short_code")
+
     office_closure_map = {
         oc["date"]: oc["short_code"] for oc in office_closures
     }
-    
-    # OPTIMIZATION: Build STL leave map once (grouped by employee and date)
+
+    # ----------------------------------
+    # OPTIMIZATION: STL Leave Map
+    # ----------------------------------
     stl_leaves = (
         LeaveDay.objects
         .approved()
@@ -280,8 +291,7 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
             "leave_application__to_time",
         )
     )
-    
-    # OPTIMIZATION: Create lookup dict for O(1) access
+
     stl_map = {}
     for stl in stl_leaves:
         key = (stl["leave_application__appliedBy_id"], stl["date"])
@@ -289,53 +299,74 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
             "from_time": stl["leave_application__from_time"],
             "to_time": stl["leave_application__to_time"],
         }
-    
+
+    # ----------------------------------
+    # MAIN LOOP
+    # ----------------------------------
     for log in logs:
         emp_code = log.applied_by.personal_detail.employee_code
         log_date = log.start_date.date()
         date_key = log_date.strftime("%Y-%m-%d")
         is_backend_reg = log.regularized_backend
 
-        # -----------------------------
-        # Attendance data (UNCHANGED)
-        # -----------------------------
-        in_time = localtime(log.start_date).strftime("%I:%M")
-        out_time = localtime(log.end_date).strftime("%I:%M")
-        status = log.att_status_short_code
-        duration = log.duration
+        history = None
+        if is_backend_reg:
+            history = AttendanceLogHistory.objects.filter(
+                attendance_log=log
+            ).last()
 
-        # -----------------------------
-        # Office Closure (REG row) - OPTIMIZED with pre-built map
-        # -----------------------------
-        reg_value = "R" if is_backend_reg else office_closure_map.get(log_date, "") 
+        # ----------------------------------
+        # ATTENDANCE DATA
+        # ----------------------------------
+        if history:
+            prev = history.previous_data
 
-        # -----------------------------
-        # STL (REG row ONLY) - OPTIMIZED with pre-built map
-        # -----------------------------
+            parsed_in_time = datetime.strptime(
+                prev["start_date"], "%Y-%m-%dT%H:%M:%SZ"
+            )
+            parsed_out_time = datetime.strptime(
+                prev["end_date"], "%Y-%m-%dT%H:%M:%SZ"
+            )
+
+            parsed_in_time = (
+                make_aware(parsed_in_time, timezone=utc)
+                if parsed_in_time.tzinfo is None
+                else parsed_in_time
+            )
+            parsed_out_time = (
+                make_aware(parsed_out_time, timezone=utc)
+                if parsed_out_time.tzinfo is None
+                else parsed_out_time
+            )
+
+            in_time = localtime(parsed_in_time).strftime("%I:%M")
+            out_time = (
+                localtime(parsed_out_time).strftime("%I:%M")
+                if prev.get("reg_status") != "mis punching"
+                else ""
+            )
+
+            status = prev.get("att_status_short_code")
+            duration = prev.get("duration")
+
+        else:
+            in_time = localtime(log.start_date).strftime("%I:%M")
+            out_time = localtime(log.end_date).strftime("%I:%M")
+            status = log.att_status_short_code
+            duration = log.duration
+
+        # ----------------------------------
+        # REG VALUE (Office Closure / STL / Backend R)
+        # ----------------------------------
+        reg_value = "R" if is_backend_reg else office_closure_map.get(log_date, "")
+
         stl_data = stl_map.get((log.applied_by.id, log_date))
-        
         if stl_data:
-            from_time = stl_data["from_time"]
-            to_time = stl_data["to_time"]
+            reg_value = "STL"
 
-            if from_time and to_time:
-                stl_duration = (
-                    datetime.combine(log_date, to_time)
-                    - datetime.combine(log_date, from_time)
-                )
-                reg_value = "STL"
-                # reg_value = (
-                #     f"STL "
-                #     f"({from_time.strftime('%H:%M')} - "
-                #     f"{to_time.strftime('%H:%M')}) "
-                #     f"[{stl_duration}]"
-                # )
-            else:
-                reg_value = "STL"
-
-        # -----------------------------
-        # Update monthly_presence_data
-        # -----------------------------
+        # ----------------------------------
+        # UPDATE MONTHLY DATA
+        # ----------------------------------
         monthly_presence_data[emp_code][date_key]["present"] = {
             "status": status,
             "in_time": in_time,
@@ -343,6 +374,103 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
             "total_duration": duration,
             "reg": reg_value,
         }
+
+
+# def process_logs(logs, monthly_presence_data, converted_from_datetime, converted_to_datetime):
+#     # OPTIMIZATION: Batch fetch all office closures and STL leaves upfront to eliminate N+1 queries
+#     date_range_days = (converted_to_datetime - converted_from_datetime).days + 1
+#     all_dates = [
+#         converted_from_datetime + timedelta(days=day)
+#         for day in range(date_range_days)
+#     ]
+    
+#     # OPTIMIZATION: Build office closure map once
+#     office_closures = OfficeClosure.objects.filter(
+#         date__in=[d for d in all_dates]
+#     ).values("date", "short_code")
+#     office_closure_map = {
+#         oc["date"]: oc["short_code"] for oc in office_closures
+#     }
+    
+#     # OPTIMIZATION: Build STL leave map once (grouped by employee and date)
+#     stl_leaves = (
+#         LeaveDay.objects
+#         .approved()
+#         .filter(
+#             date__range=[converted_from_datetime, converted_to_datetime],
+#             leave_application__leave_type__leave_type_short_code="STL",
+#         )
+#         .select_related("leave_application__appliedBy", "leave_application")
+#         .values(
+#             "date",
+#             "leave_application__appliedBy_id",
+#             "leave_application__from_time",
+#             "leave_application__to_time",
+#         )
+#     )
+    
+#     # OPTIMIZATION: Create lookup dict for O(1) access
+#     stl_map = {}
+#     for stl in stl_leaves:
+#         key = (stl["leave_application__appliedBy_id"], stl["date"])
+#         stl_map[key] = {
+#             "from_time": stl["leave_application__from_time"],
+#             "to_time": stl["leave_application__to_time"],
+#         }
+    
+#     for log in logs:
+#         emp_code = log.applied_by.personal_detail.employee_code
+#         log_date = log.start_date.date()
+#         date_key = log_date.strftime("%Y-%m-%d")
+#         is_backend_reg = log.regularized_backend
+
+#         # -----------------------------
+#         # Attendance data (UNCHANGED)
+#         # -----------------------------
+#         in_time = localtime(log.start_date).strftime("%I:%M")
+#         out_time = localtime(log.end_date).strftime("%I:%M")
+#         status = log.att_status_short_code
+#         duration = log.duration
+
+#         # -----------------------------
+#         # Office Closure (REG row) - OPTIMIZED with pre-built map
+#         # -----------------------------
+#         reg_value = "R" if is_backend_reg else office_closure_map.get(log_date, "") 
+
+#         # -----------------------------
+#         # STL (REG row ONLY) - OPTIMIZED with pre-built map
+#         # -----------------------------
+#         stl_data = stl_map.get((log.applied_by.id, log_date))
+        
+#         if stl_data:
+#             from_time = stl_data["from_time"]
+#             to_time = stl_data["to_time"]
+
+#             if from_time and to_time:
+#                 stl_duration = (
+#                     datetime.combine(log_date, to_time)
+#                     - datetime.combine(log_date, from_time)
+#                 )
+#                 reg_value = "STL"
+#                 # reg_value = (
+#                 #     f"STL "
+#                 #     f"({from_time.strftime('%H:%M')} - "
+#                 #     f"{to_time.strftime('%H:%M')}) "
+#                 #     f"[{stl_duration}]"
+#                 # )
+#             else:
+#                 reg_value = "STL"
+
+#         # -----------------------------
+#         # Update monthly_presence_data
+#         # -----------------------------
+#         monthly_presence_data[emp_code][date_key]["present"] = {
+#             "status": status,
+#             "in_time": in_time,
+#             "out_time": out_time,
+#             "total_duration": duration,
+#             "reg": reg_value,
+#         }
 
 
 def process_leaves(leaves, monthly_presence_data):
