@@ -1692,124 +1692,202 @@ class LeaveStatusPermission(models.Model):
             return f"{self.user} -> {self.status}"
         return f"{self.role} -> {self.status}"
 
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 class LeaveBalanceOpenings(models.Model):
+    """
+    Unified Leave Balance Model
+
+    - Yearly leave → month = None
+    - Monthly leave → month = 1-12
+    """
+
+    # ----------------------------------
+    # Core Relations
+    # ----------------------------------
+
     user = models.ForeignKey(
         CustomUser,
         on_delete=models.CASCADE,
-        verbose_name=_("User"),
-        help_text=_("The user whose leave balance is being tracked."),
+        related_name="leave_balances",
     )
+
     leave_type = models.ForeignKey(
         LeaveType,
         on_delete=models.CASCADE,
-        verbose_name=_("Leave Type"),
-        help_text=_("The type of leave associated with this balance."),
+        related_name="leave_balances",
     )
+
+    # ----------------------------------
+    # Period Definition
+    # ----------------------------------
+
     year = models.PositiveIntegerField(
         default=timezone.now().year,
-        verbose_name=_("Year"),
-        help_text=_("The year for which the leave balance is applicable."),
     )
+
+    month = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(12)],
+        help_text="Required only for monthly accrued leaves (1-12).",
+    )
+
+    # ----------------------------------
+    # Balance Fields
+    # ----------------------------------
     no_of_leaves = models.FloatField(
         blank=True,
         null=True,
         verbose_name=_("Number of Leaves"),
-        help_text=_(
-            "The total number of leaves allocated to the user for this leave type."
-        ),
-    )
-    remaining_leave_balances = models.FloatField(
-        blank=True,
-        null=True,
-        verbose_name=_("Remaining Leave Balance"),
-        help_text=_(
-            "The remaining balance of leaves available to the user for this leave type."
-        ),
-    )
+        help_text=_( "The total number of leaves allocated to the user for this leave type." ), 
+        )
     opening_balance = models.FloatField(
         default=0,
         validators=[MinValueValidator(0)],
-        verbose_name=_("Opening Balance"),
-        help_text=_("Initial balance of leave days for the year."),
     )
+
+    allocated = models.FloatField(
+        default=0,
+        validators=[MinValueValidator(0)],
+        help_text="Total allocated for this period.",
+    )
+
+    used = models.FloatField(
+        default=0,
+        validators=[MinValueValidator(0)],
+    )
+
+    remaining_leave_balances = models.FloatField(
+        default=0,
+        validators=[MinValueValidator(0)],
+    )
+
     closing_balance = models.FloatField(
         default=0,
         validators=[MinValueValidator(0)],
-        verbose_name=_("Closing Balance"),
-        help_text=_("Final balance of leave days for the year."),
     )
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        verbose_name=_("Created At"),
-    )
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        verbose_name=_("Updated At"),
-    )
+
+    # ----------------------------------
+    # Audit Fields
+    # ----------------------------------
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     created_by = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
-        related_name="leave_balance_creators",
         null=True,
-        verbose_name=_("Created By"),
-        help_text=_("User who created this leave balance entry."),
+        related_name="created_leave_balances",
     )
+
     updated_by = models.ForeignKey(
         CustomUser,
         on_delete=models.SET_NULL,
-        related_name="leave_balance_updaters",
         null=True,
-        verbose_name=_("Updated By"),
-        help_text=_("User who last updated this leave balance entry."),
+        related_name="updated_leave_balances",
     )
-    is_active = models.BooleanField(
-        default=True,
-        verbose_name=_("Is Active"),
-        help_text=_("Whether this leave balance is active and can be used for applying leave."),
-    )
+
+    # ----------------------------------
+    # Meta
+    # ----------------------------------
+
     class Meta:
         db_table = "tbl_leave_balance_openings"
-        managed = True
-        verbose_name = _("Leave Balance")
-        verbose_name_plural = _("Leave Balances")
-        unique_together = ("leave_type", "user", "year")
-        ordering = ["year", "leave_type"]
+        verbose_name = "Leave Balance"
+        verbose_name_plural = "Leave Balances"
+        ordering = ["-year", "-month"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "leave_type", "year", "month"],
+                name="unique_leave_balance_period"
+            )
+        ]
+
+    # ----------------------------------
+    # String
+    # ----------------------------------
 
     def __str__(self):
-        return (
-            f"{self.user.get_full_name()} -{self.year} "
-            f"{self.leave_type.leave_type_short_code} (Balance: {self.remaining_leave_balances})"
-        )
-    
-    def can_apply_leave(self) -> bool:
-        return (
-            self.is_active
-            and (self.remaining_leave_balances or 0) > 0
-        )
+        period = f"{self.year}-{self.month}" if self.month else f"{self.year}"
+        return f"{self.user} | {self.leave_type} | {period} | Remaining: {self.remaining_leave_balances}"
 
+    # ----------------------------------
+    # Validations
+    # ----------------------------------
+
+    def clean(self):
+        """
+        Enforce correct period behavior based on accrual type.
+        """
+        if self.leave_type.accrual_period == LeaveAccrualPeriod.MONTHLY:
+            if not self.month:
+                raise ValidationError("Month is required for monthly leave.")
+        else:
+            if self.month:
+                raise ValidationError("Month must be empty for yearly leave.")
+
+    # ----------------------------------
+    # Business Logic
+    # ----------------------------------
+
+    def can_apply_leave(self) -> bool:
+        return self.is_active and self.remaining_leave_balances > 0
+
+    def deduct_leave(self, days: float):
+        """
+        Safe deduction logic (should be wrapped in transaction.atomic externally)
+        """
+        if self.remaining_leave_balances < days:
+            raise ValidationError("Insufficient leave balance.")
+
+        self.used += days
+        self.remaining_leave_balances -= days
+        self.closing_balance = self.remaining_leave_balances
+        self.save(update_fields=["used", "remaining_leave_balances", "closing_balance"])
+
+    def add_accrual(self, quantity: float):
+        """
+        Add leave allocation (monthly or yearly accrual).
+        """
+        self.allocated += quantity
+        self.opening_balance += quantity
+        self.remaining_leave_balances += quantity
+        self.closing_balance = self.remaining_leave_balances
+        self.save(update_fields=[
+            "allocated",
+            "opening_balance",
+            "remaining_leave_balances",
+            "closing_balance",
+        ])
+
+    # ----------------------------------
+    # Class Methods
+    # ----------------------------------
 
     @classmethod
-    def initialize_leave_balances(cls, user, leave_types, year, created_by):
+    def get_balance_for_date(cls, user, leave_type, leave_date):
         """
-        Initialize leave balances for a user with multiple leave types in bulk.
+        Automatically resolve correct balance record
+        based on leave date.
         """
-        leave_balances = []
-        for leave_type in leave_types:
-            leave_balance = cls(
-                user=user,
-                leave_type=leave_type,
-                year=year,
-                opening_balance=0,
-                created_by=created_by,
-            )
-            leave_balances.append(leave_balance)
-        with transaction.atomic():
-            cls.objects.bulk_create(leave_balances)
+        year = leave_date.year
 
-    def update_balance(self, days_approved):
-        self.closing_balance = self.opening_balance + days_approved
-        self.save(update_fields=["closing_balance"])
+        if leave_type.accrual_period == LeaveAccrualPeriod.MONTHLY:
+            month = leave_date.month
+        else:
+            month = None
+
+        return cls.objects.select_for_update().get(
+            user=user,
+            leave_type=leave_type,
+            year=year,
+            month=month,
+        )
+
 
 class LeaveTransaction(models.Model):
     leave_balance = models.ForeignKey(

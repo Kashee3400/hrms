@@ -17,6 +17,12 @@ from django.forms.models import model_to_dict
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 from .filters import LeaveAllocationFilter,LeaveUnitFilter
+
+from datetime import timedelta
+from django.utils.timezone import localtime
+from hrms_app.hrms.managers import AttendanceStatusHandler
+
+
 admin.site.site_title = "HRMS"
 admin.site.site_header = "HRMS Administration"
 
@@ -330,13 +336,6 @@ class AttendanceSettingAdmin(admin.ModelAdmin):
 admin.site.register(AttendanceSetting, AttendanceSettingAdmin)
 
 
-from django.contrib import admin, messages
-from django.utils.safestring import mark_safe
-from datetime import timedelta
-from django.utils.timezone import localtime
-from hrms_app.hrms.managers import AttendanceStatusHandler
-
-
 class AttendanceLogAdmin(admin.ModelAdmin):
     list_display = (
         "applied_by",
@@ -502,25 +501,25 @@ def make_inactive(modeladmin, request, queryset):
         is_active=False,
     )
 
-@admin.register(AttendanceLogHistory)
-class AttendanceLogHistoryAdmin(admin.ModelAdmin):
-    actions = ["revert_to_this_state"]
-    list_display = ("attendance_log", "modified_by", "modified_at")
-    search_fields = ("attendance_log__id", "modified_by__username")
-    list_filter = ("modified_at", "modified_by")
-    readonly_fields = ("modified_at",)
+# @admin.register(AttendanceLogHistory)
+# class AttendanceLogHistoryAdmin(admin.ModelAdmin):
+#     actions = ["revert_to_this_state"]
+#     list_display = ("attendance_log", "modified_by", "modified_at")
+#     search_fields = ("attendance_log__id", "modified_by__username")
+#     list_filter = ("modified_at", "modified_by")
+#     readonly_fields = ("modified_at",)
 
-    def revert_to_this_state(self, request, queryset):
-        for history in queryset:
-            history.revert()
-            messages.success(
-                request,
-                f"Reverted attendance log {history.attendance_log} to the state from {history.modified_at}.",
-            )
+#     def revert_to_this_state(self, request, queryset):
+#         for history in queryset:
+#             history.revert()
+#             messages.success(
+#                 request,
+#                 f"Reverted attendance log {history.attendance_log} to the state from {history.modified_at}.",
+#             )
 
-    revert_to_this_state.short_description = (
-        "Revert selected attendance logs to this state"
-    )
+#     revert_to_this_state.short_description = (
+#         "Revert selected attendance logs to this state"
+#     )
 
 @admin.register(LeaveBalanceOpenings)
 class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
@@ -528,6 +527,7 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
         "user",
         "leave_type",
         "year",
+        "month",
         "no_of_leaves",
         "remaining_leave_balances",
         "opening_balance",
@@ -537,6 +537,7 @@ class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
 
     list_filter = (
         "year",
+        "month",
         "leave_type",
         "is_active",
     )

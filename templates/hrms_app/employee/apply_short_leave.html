@@ -109,11 +109,11 @@
               </tr>
               <tr class="bg-light">
                 <td><strong>{% trans 'Available balance' %}</strong></td>
-                <td id="balance" class="text-end fw-bold">{{ rem_bal }}</td>
+                <td id="balance" class="text-end fw-bold">--</td>
               </tr>
               <tr>
                 <td><strong>{% trans 'Currently booked' %}</strong></td>
-                <td id="currentlyBooked" class="text-end text-primary">0</td>
+                <td id="currentlyBooked" class="text-end text-primary">-</td>
               </tr>
               <tr class="bg-light border-top">
                 <td><strong>{% trans 'Balance after this leave' %}</strong></td>
@@ -217,8 +217,12 @@
   class LeaveApplicationHandler {
     constructor() {
       this.baseTotalDays = 0;
+      this.currentBalance = parseFloat(`{{ rem_bal|default:0 }}`);
+      this.previousBalance = parseFloat(`{{ pre_bal|default:0 }}`);
+      this.currentYear = parseInt(`{{ leave_year }}`);
+      this.currentMonth = parseInt(`{{ leave_month }}`);
       this.bindEvents();
-      this.totalBal = `{{ rem_bal }}`;
+
     }
 
     bindEvents() {
@@ -237,15 +241,34 @@
 
     async handleDateChange() {
       const startDate = $('#id_startDate').val();
-
       if (!startDate) return;
+      const selectedDate = new Date(startDate);
+      const selectedYear = selectedDate.getFullYear();
+      const selectedMonth = selectedDate.getMonth() + 1;
 
-      // 🔹 Short Leave is always single-day
+      let balanceToUse;
+
+      // 🔹 If selected period matches current period
+      if (
+        selectedYear === this.currentYear &&
+        selectedMonth === this.currentMonth
+      ) {
+        balanceToUse = this.currentBalance;
+      } else {
+        balanceToUse = this.previousBalance;
+      }
+      document.getElementById("balance").innerText = balanceToUse;
+
+      // 🔹 Update UI
       $('#summaryDate').text(startDate);
-      this.setBalance(this.totalBal, 1)
-      // 🔹 Fetch attendance summary for the selected date
-      await this.fetchAttendanceSummary(this.formatDateToYMD(startDate));
+      this.setBalance(balanceToUse, 1);
+
+      // 🔹 Fetch attendance summary
+      await this.fetchAttendanceSummary(
+        this.formatDateToYMD(startDate)
+      );
     }
+
 
     timeToMinutes(timeStr) {
       const [h, m] = timeStr.split(':').map(Number);

@@ -6,6 +6,9 @@ from hrms_app.hrms.leave_forms import ShortLeaveApplicationForm
 from django.urls import reverse
 from django.utils import timezone
 from hrms_app.utility.leave_utils import LeaveStatsManager
+from datetime import date
+from dateutil.relativedelta import relativedelta
+from django.utils.dateparse import parse_date
 
 
 class ShortLeaveBaseMixin(LoginRequiredMixin):
@@ -37,7 +40,10 @@ class ShortLeaveBaseMixin(LoginRequiredMixin):
             self.request,
             "Short Leave application saved successfully."
         )
-        return redirect(self.get_success_url())
+        return redirect(reverse(
+                    "leave_application_detail",
+                    kwargs={"slug": obj.slug},
+                ))
     
     def dispatch(self, request, *args, **kwargs):
         if self.kwargs.get("pk"):
@@ -54,54 +60,73 @@ class ShortLeaveBaseMixin(LoginRequiredMixin):
                 return redirect(self.success_url)
         return super().dispatch(request, *args, **kwargs)
     
-    def get_success_url(self):
-        return reverse(
-            "leave_application_detail",
-            kwargs={"slug": self.object.slug},
-        )
-        
-    def get_selected_year(self):
+    def get_selected_period(self):
         """
-        Resolve leave year from query param.
-        Fallback to current year.
+        Resolve period from query param 'period' (YYYY-MM-DD).
+        Fallback to today.
         """
-        try:
-            return int(self.request.GET.get("year", timezone.now().year))
-        except (TypeError, ValueError):
-            return timezone.now().year
+        period_str = self.request.GET.get("period")
 
+        if period_str:
+            parsed = parse_date(period_str)
+            if parsed:
+                return parsed
 
+        return timezone.now().date()
     # ------------------------------------------------------------------
     # CONTEXT DATA (YEAR-AWARE)
     # ------------------------------------------------------------------
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        selected_year = self.get_selected_year()
+        selected_date = self.get_selected_period()
+
+        selected_year = selected_date.year
+        selected_month = selected_date.month
+
+        # Previous period
+        previous_period_date = selected_date.replace(day=1) - relativedelta(months=1)
+
+        previous_year = previous_period_date.year
+        previous_month = previous_period_date.month
 
         leave_balance = LeaveBalanceOpenings.objects.filter(
             user=self.request.user,
             leave_type__leave_type_short_code="STL",
             year=selected_year,
+            month=selected_month,
         ).first()
 
-        el_count = 0
         rem_bal = 0
+        pre_bal = 0
 
         if leave_balance:
             stats = LeaveStatsManager(
                 user=self.request.user,
                 leave_type=leave_balance.leave_type,
             )
-            rem_bal = stats.get_remaining_balance(year=selected_year)
-        
+
+            rem_bal = stats.get_remaining_balance(
+                year=selected_year,
+                month=selected_month
+            )
+
+            pre_bal = stats.get_remaining_balance(
+                year=previous_year,
+                month=previous_month
+            )
+
         context.update(
             {
                 "leave_balance": leave_balance,
                 "rem_bal": rem_bal,
+                "pre_bal": pre_bal,
                 "leave_year": selected_year,
+                "leave_month": selected_month,
+                "prev_year": previous_year,
+                "prev_month": previous_month,
+                "selected_date": selected_date,
                 "object": self.object,
-                "el_count": el_count,
                 "title": self.title,
                 "urls": [
                     ("home", {"label": "Home"}),

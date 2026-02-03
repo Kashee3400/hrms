@@ -393,30 +393,66 @@ def get_current_financial_year():
         fy_end = datetime(current_year + 1, 3, 31)
     return fy_start, fy_end
 
+from collections import defaultdict
+from django.db.models import Sum
+from django.db.models.functions import TruncMonth
+from django.conf import settings
 
 class LeaveStatsManager:
     def __init__(self, user, leave_type):
         self.user = user
         self.leave_type = leave_type
 
-    def get_on_hold_leave(self,year):
+    # -------------------------------------------
+    # INTERNAL PERIOD FILTER BUILDER
+    # -------------------------------------------
+    def _build_period_filter(self, year, month=None):
+        filters = {
+            "startDate__year": year,
+        }
+
+        if month:
+            filters["startDate__month"] = month
+
+        return filters
+
+    # -------------------------------------------
+    # PENDING (ON HOLD)
+    # -------------------------------------------
+    def get_on_hold_leave(self, year, month=None):
+        period_filter = self._build_period_filter(year, month)
+
         return (
             LeaveApplication.objects.filter(
-                appliedBy=self.user, status="pending", leave_type=self.leave_type,startDate__year = year
+                appliedBy=self.user,
+                status=settings.PENDING,
+                leave_type=self.leave_type,
+                **period_filter
             ).aggregate(total=Sum("usedLeave"))["total"]
             or 0
         )
 
-    def get_approved_leave_total(self,year):
+    # -------------------------------------------
+    # APPROVED TOTAL
+    # -------------------------------------------
+    def get_approved_leave_total(self, year, month=None):
+        period_filter = self._build_period_filter(year, month)
+
         return (
             LeaveApplication.objects.filter(
-                appliedBy=self.user, status="approved", leave_type=self.leave_type,startDate__year = year
+                appliedBy=self.user,
+                status=settings.APPROVED,
+                leave_type=self.leave_type,
+                **period_filter
             ).aggregate(total=Sum("usedLeave"))["total"]
             or 0
         )
 
+    # -------------------------------------------
+    # EL COUNT (unchanged - FY based)
+    # -------------------------------------------
     def get_el_applied_times(self):
-        el_application_count = LeaveApplication.objects.filter(
+        return LeaveApplication.objects.filter(
             leave_type__leave_type_short_code=self.leave_type.leave_type_short_code,
             appliedBy=self.user,
             startDate__gte=self.leave_type.leave_fy_start,
@@ -427,22 +463,36 @@ class LeaveStatsManager:
                 settings.PENDING_CANCELLATION,
             ],
         ).count()
-        return el_application_count
 
-    def get_opening_balance(self, year):
+    # -------------------------------------------
+    # OPENING BALANCE (MONTH AWARE)
+    # -------------------------------------------
+    def get_opening_balance(self, year, month=None):
         record = LeaveBalanceOpenings.objects.filter(
-            user=self.user, leave_type=self.leave_type, year=year
+            user=self.user,
+            leave_type=self.leave_type,
+            year=year,
+            month=month,
         ).first()
+
         return record.remaining_leave_balances if record else 0
 
-    def get_remaining_balance(self, year):
-        return self.get_opening_balance(year=year) - self.get_on_hold_leave(year=year)
+    # -------------------------------------------
+    # REMAINING BALANCE (AFTER HOLD)
+    # -------------------------------------------
+    def get_remaining_balance(self, year, month=None):
+        opening = self.get_opening_balance(year=year, month=month)
+        on_hold = self.get_on_hold_leave(year=year, month=month)
+        return opening - on_hold
 
+    # -------------------------------------------
+    # MONTHLY REPORT (UNCHANGED)
+    # -------------------------------------------
     def get_monthly_report(self, year):
         qs = (
             LeaveApplication.objects.filter(
                 appliedBy=self.user,
-                status="APPROVED",
+                status=settings.APPROVED,
                 leave_type=self.leave_type,
                 startDate__year=year,
             )
@@ -455,8 +505,8 @@ class LeaveStatsManager:
         report = defaultdict(lambda: 0)
         for item in qs:
             report[item["month"].strftime("%B")] = item["total"]
-        return dict(report)
 
+        return dict(report)
 
 REQUIRED_DAILY_MINUTES = 8 * 60
 
