@@ -540,8 +540,7 @@ class ShortLeavePolicyManager:
         """
         self._validate_time_range()
         short_leave_minutes = self._calculate_short_leave_minutes()
-        # self._validate_attendance_based_slt(short_leave_minutes)
-        # self._validate_short_leave_duration(short_leave_minutes)
+        self._validate_short_leave_duration(short_leave_minutes)
 
         return short_leave_minutes
 
@@ -564,35 +563,6 @@ class ShortLeavePolicyManager:
             ).total_seconds() / 60
         )
 
-    def _validate_attendance_based_slt(self, short_leave_minutes):
-        leave_date = self.start_date.date()
-
-        worked_minutes = get_worked_minutes(self.user, leave_date)
-
-        max_slt_minutes = int(self.leave_type.max_duration or 0)
-        min_work_minutes = REQUIRED_DAILY_MINUTES - max_slt_minutes
-
-        # 1️⃣ Minimum working condition
-        if worked_minutes < min_work_minutes:
-            raise ValidationError(
-                f"Short Leave can be applied only if you have worked at least "
-                f"{min_work_minutes // 60} hours."
-            )
-
-        total_minutes = worked_minutes + short_leave_minutes
-
-        # 2️⃣ Must complete duty hours
-        if total_minutes < REQUIRED_DAILY_MINUTES:
-            raise ValidationError(
-                "Working hours plus short leave do not complete duty hours."
-            )
-
-        # 3️⃣ Cannot exceed duty hours
-        if total_minutes > REQUIRED_DAILY_MINUTES:
-            raise ValidationError(
-                "Short Leave exceeds required daily working hours."
-            )
-
     def _validate_short_leave_duration(self, short_leave_minutes):
         min_d = self.leave_type.min_duration
         max_d = self.leave_type.max_duration
@@ -606,3 +576,4 @@ class ShortLeavePolicyManager:
             raise ValidationError(
                 f"Maximum short leave duration is {max_d} minutes."
             )
+
