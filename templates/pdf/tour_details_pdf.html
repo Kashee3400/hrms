@@ -29,6 +29,7 @@
                         <p>Status:&nbsp;&nbsp; {{ object.status|capfirst }}</p>
                         <p>Action By: {{ object.logs.last.action_by_name }}</p>
                         <p>From: {{ object.from_destination }} ---> To: {{object.to_destination}}</p>
+                        <p>Approval Type: {{ object.get_approval_type_display }}</p>
                       </div>
                       <div class="row">
                         <div class="col-lg-12 col-xl-6">
