@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date,datetime
 from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
@@ -96,8 +96,12 @@ class LeaveDomainService:
     # ---------------------------------------------------------
     # PROBATION RULE VALIDATION
     # ---------------------------------------------------------
+
     @staticmethod
     def validate_probation_rules(user, leave_type, reference_date: date):
+        """
+        Prevent EL leave during 180-day probation period.
+        """
 
         if not hasattr(user, "personal_detail") or not user.personal_detail.doj:
             return
@@ -105,9 +109,14 @@ class LeaveDomainService:
         if leave_type.leave_type_short_code == "EL":
             doj = user.personal_detail.doj
 
+            # ✅ Normalize to date
+            if isinstance(reference_date, datetime):
+                reference_date = reference_date.date()
+
+            if isinstance(doj, datetime):
+                doj = doj.date()
+
             if (reference_date - doj).days < 180:
                 raise ValidationError(
-                    _(
-                        "You are in the probation period and cannot apply for Earned Leave (EL)."
-                    )
+                    _("You are in the probation period and cannot apply for Earned Leave (EL).")
                 )

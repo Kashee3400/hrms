@@ -1315,7 +1315,6 @@ class LeaveStatusUpdateForm(forms.ModelForm):
         is_admin_dept = (
                 user.personal_detail.designation.department.department == "admin"
         )
-        print(is_admin_dept, is_lwp)
         # Case: Employee
         if is_applicant:
             if current_status.status in [settings.CANCELLED, settings.REJECTED]:
