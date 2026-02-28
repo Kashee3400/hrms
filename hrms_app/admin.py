@@ -21,7 +21,13 @@ from .filters import LeaveAllocationFilter,LeaveUnitFilter
 from datetime import timedelta
 from django.utils.timezone import localtime
 from hrms_app.hrms.managers import AttendanceStatusHandler
+from django.contrib import admin, messages
+from django.utils.html import format_html
+from django.urls import path
+from django.shortcuts import redirect, get_object_or_404
+from django.contrib.admin.utils import unquote
 
+from .models import AttendanceLog, AttendanceLogHistory
 
 admin.site.site_title = "HRMS"
 admin.site.site_header = "HRMS Administration"
@@ -335,8 +341,30 @@ class AttendanceSettingAdmin(admin.ModelAdmin):
 
 admin.site.register(AttendanceSetting, AttendanceSettingAdmin)
 
+class AttendanceLogHistoryInline(admin.TabularInline):
+    model = AttendanceLogHistory
+    extra = 0
+    can_delete = False
+    readonly_fields = (
+        "previous_data",
+        "modified_by",
+        "modified_at",
+        "revert_button",
+    )
 
+    def revert_button(self, obj):
+        return format_html(
+            '<a class="button" href="revert-history/{}/">Revert</a>',
+            obj.pk,
+        )
+
+    revert_button.short_description = "Revert"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+    
 class AttendanceLogAdmin(admin.ModelAdmin):
+    inlines = [AttendanceLogHistoryInline]
     list_display = (
         "applied_by",
         "start_date",
@@ -501,26 +529,66 @@ def make_inactive(modeladmin, request, queryset):
         is_active=False,
     )
 
-# @admin.register(AttendanceLogHistory)
-# class AttendanceLogHistoryAdmin(admin.ModelAdmin):
-#     actions = ["revert_to_this_state"]
-#     list_display = ("attendance_log", "modified_by", "modified_at")
-#     search_fields = ("attendance_log__id", "modified_by__username")
-#     list_filter = ("modified_at", "modified_by")
-#     readonly_fields = ("modified_at",)
 
-#     def revert_to_this_state(self, request, queryset):
-#         for history in queryset:
-#             history.revert()
-#             messages.success(
-#                 request,
-#                 f"Reverted attendance log {history.attendance_log} to the state from {history.modified_at}.",
-#             )
+@admin.register(AttendanceLogHistory)
+class AttendanceLogHistoryAdmin(admin.ModelAdmin):
+    list_display = (
+        "attendance_log",
+        "modified_by",
+        "modified_at",
+        "revert_link",
+    )
 
-#     revert_to_this_state.short_description = (
-#         "Revert selected attendance logs to this state"
-#     )
+    readonly_fields = (
+        "attendance_log",
+        # "previous_data",
+        "modified_by",
+        "modified_at",
+    )
 
+    ordering = ["-modified_at"]
+
+    # def has_add_permission(self, request):
+    #     return False
+
+    # def has_delete_permission(self, request, obj=None):
+    #     return False
+
+    def revert_link(self, obj):
+        return format_html(
+            '<a class="button" href="revert/{}/">Revert</a>',
+            obj.pk,
+        )
+
+    revert_link.short_description = "Revert"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                "revert/<path:object_id>/",
+                self.admin_site.admin_view(self.process_revert),
+                name="attendance-log-history-revert",
+            ),
+        ]
+        return custom_urls + urls
+
+    def process_revert(self, request, object_id):
+        history_obj = get_object_or_404(
+            AttendanceLogHistory,
+            pk=unquote(object_id),
+        )
+
+        history_obj.revert()
+
+        self.message_user(
+            request,
+            "Attendance log successfully reverted.",
+            level=messages.SUCCESS,
+        )
+
+        return redirect(request.META.get("HTTP_REFERER", "/admin/"))
+    
 @admin.register(LeaveBalanceOpenings)
 class LeaveBalanceOpeningAdmin(admin.ModelAdmin):
     list_display = (

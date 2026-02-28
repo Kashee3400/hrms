@@ -2999,6 +2999,7 @@ class AttendanceLogHistory(models.Model):
             ("can_view_history", "Can view attendance log history"),
         ]
 
+
 class AttendanceLogAction(models.Model):
     log = models.ForeignKey(
         AttendanceLog,
