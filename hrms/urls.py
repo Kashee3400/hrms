@@ -20,6 +20,7 @@ urlpatterns = [
     path("", include(site.get_urls())),
     path("ckeditor5/", include("django_ckeditor_5.urls")),
     path("schedule/", include("schedule.urls")),
+    path("policy/", include("hrms_app.policy_urls")),
     path("upload/", views.CustomUploadView.as_view(), name="custom_upload_file"),
     path("events-list/", views.EventListView.as_view(), name="event_list"),
     path(
@@ -49,7 +50,4 @@ urlpatterns = [
         views.TemplateView.as_view(template_name="hrms_app/generic_success.html"),
         name="success_page",
     ),
-    # path('hbd-index', hbd.index, name='index'),
-    # path('wish/', hbd.wish, name='wish'),
-    # path('stop_sound/', hbd.stop_sound, name='stop_sound'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

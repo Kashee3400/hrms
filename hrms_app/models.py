@@ -7,7 +7,6 @@ import random
 import string
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.db import transaction
 from django.utils import timezone
 from datetime import timedelta,time
 import uuid
@@ -2471,6 +2470,26 @@ class UserTour(models.Model):
         return f"Tour {self.id} by {self.applied_by.username}"
 
     @property
+    def is_editable(self):
+        """Check if tour can be edited"""
+        return self.status == 'pending'
+    
+    @property
+    def is_approvable(self):
+        """Check if tour can be approved"""
+        return self.status == 'pending'
+    
+    @property
+    def is_extendable(self):
+        """Check if tour can be extended by employee"""
+        return self.status == 'approved'
+    
+    @property
+    def is_cancellable(self):
+        """Check if tour can be cancelled"""
+        return self.status in ['pending', 'approved', 'extended']
+    
+    @property
     def formatted_duration(self):
         """
         Returns total duration as a string: '2 Days : 5 Hrs'
@@ -2586,9 +2605,7 @@ class UserTour(models.Model):
             tour=self, action_by=action_by, action=self.status, comments=comments
         )
 
-    def extend(self, action_by, new_end_date, new_end_time, reason=None):
-        self.extended_end_date = new_end_date
-        self.extended_end_time = new_end_time
+    def extend(self, action_by, reason=None):
         self.status = settings.EXTENDED
         self.save(
             update_fields=[
@@ -2602,7 +2619,7 @@ class UserTour(models.Model):
             tour=self,
             action_by=action_by,
             action=self.status,
-            comments=f"Tour extended to {new_end_date} {new_end_time}. Reason: {reason}",
+            comments=f"Tour extended to {self.extended_end_date} {self.extended_end_time}. Reason: {reason}",
         )
 
     class Meta:
@@ -2719,9 +2736,6 @@ class Bill(models.Model):
         managed = True
         verbose_name = _("Tour Bill")
         verbose_name_plural = _("Tour Bills")
-
-# models.py
-from django.db import models
 
 class AppSetting(models.Model):
     key = models.CharField(

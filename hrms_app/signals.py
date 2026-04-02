@@ -10,12 +10,12 @@ from hrms_app.models import *
 from django.core.exceptions import ImproperlyConfigured
 from hrms_app.hrms.utils import check_lock_status
 
-@receiver(post_save, sender=CustomUser)
-def initialize_leave_balance(sender, instance, created, **kwargs):
-    if created:
-        current_year = timezone.now().year
-        leave_types =LeaveType.objects.all()
-        LeaveBalanceOpenings.initialize_leave_balances(instance,leave_types, current_year, created_by=instance)
+# @receiver(post_save, sender=CustomUser)
+# def initialize_leave_balance(sender, instance, created, **kwargs):
+#     if created:
+#         current_year = timezone.now().year
+#         leave_types =LeaveType.objects.all()
+#         LeaveBalanceOpenings.initialize_leave_balances(instance,leave_types, current_year, created_by=instance)
 
 
 

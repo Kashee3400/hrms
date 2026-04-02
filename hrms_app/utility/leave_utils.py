@@ -15,7 +15,6 @@ import logging
 
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
-from ..utility.attendanceutils import get_worked_minutes
 
 logger = logging.getLogger(__name__)
 

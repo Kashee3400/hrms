@@ -1,3 +1,7 @@
+from django.core.exceptions import PermissionDenied
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
+
 class LeaveListViewMixin:
     @staticmethod
     def get_headers():
@@ -71,10 +75,6 @@ class LeaveListViewMixin:
             }
         ]
 
-
-from django.core.exceptions import PermissionDenied
-from django.contrib.auth.decorators import login_required
-from django.utils.decorators import method_decorator
 
 @method_decorator(login_required, name="dispatch")
 class ModelPermissionRequiredMixin:
