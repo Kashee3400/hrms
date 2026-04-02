@@ -5,7 +5,7 @@ from ..views.attendance_view import BulkAttendanceView, AttendancePreviewAjaxVie
     AttendanceStatsAjaxView
 from ..views.leave_bulk import BulkLeaveCreateView,BulkLeaveHistoryView
 from ..views.leave_bulk import LeaveBalanceInitializerView
-from ..views.apply_leave import ApplyOrUpdateLeaveView
+# from ..views.apply_leave import ApplyOrUpdateLeaveView
 from ..views.tour_views import (
     ApplyTourView,
     TourApplicationDetailView,
@@ -67,8 +67,8 @@ site.register_view('', views.DashboardView, name='home')
 site.register_view('attendance/<slug:slug>/', views.EventDetailPageView, name='event_detail')
 site.register_view('attendance-log/<slug:slug>/', views.AttendanceLogActionView, name='attendance_log_action')
 site.register_view('attendance-regularization/', views.AttendanceLogListView, name='regularization')
-site.register_view('leave/apply/<int:leave_type>/', ApplyOrUpdateLeaveView, name='apply_leave_with_id')
-site.register_view('leave/edit/<slug:slug>/', ApplyOrUpdateLeaveView, name='update_leave')
+site.register_view('leave/apply/<int:leave_type>/', views.ApplyOrUpdateLeaveView, name='apply_leave_with_id')
+site.register_view('leave/edit/<slug:slug>/', views.ApplyOrUpdateLeaveView, name='update_leave')
 site.register_view('leave/<slug:slug>/', views.LeaveApplicationDetailView, name='leave_application_detail')
 site.register_view('leave/<slug:slug>/update', views.LeaveApplicationUpdateView, name='leave_application_update')
 
