@@ -1,0 +1,484 @@
+{% extends "hrms_app/base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block extrastyle %}
+<style>
+  :root {
+    --brand: #4361ee; --brand-dark: #3451d1;
+    --success: #2ec4b6; --warning: #ff9f1c; --danger: #e63946;
+    --text-main: #1a1f36; --text-muted: #6b7280;
+    --border: #e5e7eb; --surface: #ffffff; --surface-alt: #f8fafc;
+    --radius: 10px; --shadow-sm: 0 1px 3px rgba(0,0,0,.08);
+    --shadow-md: 0 4px 16px rgba(0,0,0,.10); --transition: .18s ease;
+  }
+
+  .form-page-header {
+    background: linear-gradient(135deg, #1a1f36, #2d3561);
+    border-radius: var(--radius);
+    padding: 24px 32px;
+    margin-bottom: 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .form-page-header h1 { color:#fff; font-size:1.3rem; font-weight:700; margin:0; }
+  .form-page-header p  { color:rgba(255,255,255,.65); margin:4px 0 0; font-size:.85rem; }
+
+  /* Section card */
+  .form-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 20px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .form-section-header {
+    padding: 14px 24px;
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+    cursor: pointer; user-select: none;
+  }
+  .form-section-header h6 {
+    margin: 0; font-size:.9rem; font-weight:700; color:var(--text-main); flex:1;
+  }
+  .section-icon {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .85rem;
+  }
+  .section-icon.blue   { background:rgba(67,97,238,.12);  color:var(--brand); }
+  .section-icon.green  { background:rgba(46,196,182,.12); color:var(--success); }
+  .section-icon.orange { background:rgba(255,159,28,.12); color:var(--warning); }
+  .section-icon.purple { background:rgba(139,92,246,.12); color:#7c3aed; }
+  .section-icon.red    { background:rgba(230,57,70,.12);  color:var(--danger); }
+  .section-icon.teal   { background:rgba(20,184,166,.12); color:#0d9488; }
+  .section-icon.pink   { background:rgba(236,72,153,.12); color:#db2777; }
+
+  .toggle-icon { color:var(--text-muted); transition:transform var(--transition); }
+  .toggle-icon.collapsed { transform: rotate(-90deg); }
+
+  .form-section-body { padding: 20px 24px; }
+
+  /* Form controls */
+  .form-group label {
+    font-size:.8rem; font-weight:600; color:var(--text-main);
+    margin-bottom: 5px; display:block;
+  }
+  .form-group label .req { color:var(--danger); margin-left:3px; }
+  .form-group .help-text { font-size:.72rem; color:var(--text-muted); margin-top:3px; }
+
+  .form-control {
+    border: 1px solid var(--border); border-radius: 8px;
+    font-size:.875rem; padding: 8px 12px; width:100%;
+    transition: border-color var(--transition), box-shadow var(--transition);
+    outline: none;
+  }
+  .form-control:focus {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(67,97,238,.12);
+  }
+  .form-control.is-invalid { border-color: var(--danger); }
+
+  /* Toggle switches */
+  .toggle-group {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .toggle-group label { margin: 0; font-size:.85rem; font-weight:500; flex:1; cursor:pointer; }
+  .form-check-input[type=checkbox] {
+    width: 18px; height: 18px; cursor:pointer;
+    accent-color: var(--brand);
+  }
+
+  /* Effective date callout */
+  .effective-callout {
+    background: rgba(67,97,238,.06);
+    border: 1px solid rgba(67,97,238,.2);
+    border-left: 4px solid var(--brand);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size:.83rem;
+    margin-bottom: 20px;
+    color: var(--text-main);
+  }
+  .effective-callout strong { color:var(--brand); }
+
+  /* Current policy preview */
+  .current-preview {
+    background: rgba(46,196,182,.05);
+    border: 1px solid rgba(46,196,182,.25);
+    border-radius: 8px;
+    padding: 14px 18px;
+    font-size:.82rem;
+    margin-bottom: 20px;
+  }
+  .current-preview h6 {
+    font-size:.78rem; font-weight:700; color:var(--success);
+    text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px;
+  }
+  .preview-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:8px; }
+  .preview-item label { font-size:.7rem; color:var(--text-muted); display:block; margin-bottom:2px; }
+  .preview-item span  { font-size:.82rem; font-weight:600; color:var(--text-main); }
+
+  /* Action bar */
+  .action-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap:wrap;
+    box-shadow: var(--shadow-sm);
+    position: sticky; bottom: 20px;
+  }
+  .btn-save {
+    background: var(--brand); color:#fff; border:none;
+    padding:10px 28px; border-radius:8px; font-size:.875rem; font-weight:600;
+    cursor:pointer; display:inline-flex; align-items:center; gap:7px;
+    transition: background var(--transition), transform var(--transition);
+  }
+  .btn-save:hover { background:var(--brand-dark); transform:translateY(-1px); }
+  .btn-cancel {
+    background:var(--surface-alt); color:var(--text-main);
+    border:1px solid var(--border);
+    padding:10px 20px; border-radius:8px; font-size:.875rem; font-weight:500;
+    cursor:pointer; text-decoration:none;
+    transition: background var(--transition);
+  }
+  .btn-cancel:hover { background:var(--border); color:var(--text-main); }
+
+  /* Error list */
+  .form-errors {
+    background:rgba(230,57,70,.06); border:1px solid rgba(230,57,70,.2);
+    border-left:4px solid var(--danger); border-radius:8px; padding:14px 18px;
+    margin-bottom:20px; font-size:.83rem;
+  }
+  .form-errors ul { margin:0; padding-left:18px; color:var(--danger); }
+
+  .invalid-feedback { color:var(--danger); font-size:.75rem; margin-top:3px; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; }
+  @media(max-width:640px) { .grid-2, .grid-3 { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav aria-label="breadcrumb" style="margin-bottom:16px;">
+  <ol class="breadcrumb" style="font-size:.82rem; margin:0;">
+    {% for crumb in breadcrumb %}
+      {% if forloop.last %}
+        <li class="breadcrumb-item active">{{ crumb.label }}</li>
+      {% else %}
+        <li class="breadcrumb-item"><a href="{% if crumb.url == '#' or not crumb.url %}#{% else %}{% url crumb.url %}{% endif %}">{{ crumb.label }}</a></li>
+      {% endif %}
+    {% endfor %}
+  </ol>
+</nav>
+
+<!-- Page header -->
+<div class="form-page-header">
+  <div>
+    <h1>
+      <i class="fas fa-{% if is_edit %}pen{% else %}plus-circle{% endif %}" style="margin-right:10px; opacity:.8;"></i>
+      {{ action }} Policy — {{ leave_type }}
+    </h1>
+    <p>
+      {% if is_edit %}
+        Editing the currently active policy. Changes apply immediately.
+        To version, use "New Version" instead.
+      {% else %}
+        Creating a new policy version. The previous version will be automatically closed.
+      {% endif %}
+    </p>
+  </div>
+  <a href="{% url 'leave:policy_config_list' %}" class="btn-cancel">
+    <i class="fas fa-arrow-left"></i> Back to List
+  </a>
+</div>
+
+<!-- Global errors -->
+{% if form.non_field_errors %}
+<div class="form-errors">
+  <strong><i class="fas fa-exclamation-triangle"></i> Please fix the following errors:</strong>
+  <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<!-- Current active policy preview (only on create) -->
+{% if active and not is_edit %}
+<div class="current-preview">
+  <h6><i class="fas fa-check-circle"></i> Currently Active Policy (will be closed)</h6>
+  <div class="preview-grid">
+    <div class="preview-item">
+      <label>Effective From</label>
+      <span>{{ active.effective_from|date:"d M Y" }}</span>
+    </div>
+    <div class="preview-item">
+      <label>Annual Entitlement</label>
+      <span>{{ active.annual_entitlement }} days</span>
+    </div>
+    <div class="preview-item">
+      <label>Accrual</label>
+      <span>{{ active.get_accrual_period_display }}</span>
+    </div>
+    <div class="preview-item">
+      <label>Max Consecutive</label>
+      <span>{{ active.max_consecutive_days|default:"—" }}</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<form method="post" id="policyForm">
+  {% csrf_token %}
+
+  <!-- ── Effective Dates ─────────────────────────────────── -->
+  {% if not is_edit %}
+  <div class="effective-callout">
+    <strong><i class="fas fa-calendar-check"></i> Effective From</strong> — Set the date from which this policy version applies.
+    The currently active version will be automatically closed the day before.
+  </div>
+  {% endif %}
+
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon blue"><i class="fas fa-calendar-alt"></i></div>
+      <h6>Effective Period</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div class="grid-2">
+        <div class="form-group">
+          <label for="{{ form.effective_from.id_for_label }}">
+            Effective From <span class="req">*</span>
+          </label>
+          {{ form.effective_from }}
+          {% if form.effective_from.errors %}
+            <div class="invalid-feedback d-block">{{ form.effective_from.errors.0 }}</div>
+          {% endif %}
+          <div class="help-text">Date from which this policy version takes effect.</div>
+        </div>
+        <div class="form-group">
+          <label for="{{ form.effective_to.id_for_label }}">
+            Effective To
+          </label>
+          {{ form.effective_to }}
+          {% if form.effective_to.errors %}
+            <div class="invalid-feedback d-block">{{ form.effective_to.errors.0 }}</div>
+          {% endif %}
+          <div class="help-text">Leave blank — this will be the active (open-ended) version.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Entitlement ─────────────────────────────────────── -->
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon green"><i class="fas fa-calendar-day"></i></div>
+      <h6>Entitlement &amp; Accrual</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div class="grid-3">
+        {% include "leave/policy_config/_field.html" with field=form.annual_entitlement required=True %}
+        {% include "leave/policy_config/_field.html" with field=form.accrual_period required=True %}
+        {% include "leave/policy_config/_field.html" with field=form.calculation_period required=True %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Application Rules ───────────────────────────────── -->
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon orange"><i class="fas fa-clipboard-list"></i></div>
+      <h6>Application Rules</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div class="grid-3">
+        {% include "leave/policy_config/_field.html" with field=form.min_notice_days %}
+        {% include "leave/policy_config/_field.html" with field=form.max_consecutive_days %}
+        {% include "leave/policy_config/_field.html" with field=form.min_days_per_application %}
+        {% include "leave/policy_config/_field.html" with field=form.max_spells_per_year %}
+        {% include "leave/policy_config/_field.html" with field=form.retrospective_application_working_days %}
+      </div>
+      <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+        {% include "leave/policy_config/_toggle.html" with field=form.allow_half_day %}
+        {% include "leave/policy_config/_toggle.html" with field=form.half_day_only_as_prefix_suffix %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Eligibility ─────────────────────────────────────── -->
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon teal"><i class="fas fa-user-check"></i></div>
+      <h6>Eligibility &amp; Combination</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+        {% include "leave/policy_config/_toggle.html" with field=form.requires_confirmation %}
+        {% include "leave/policy_config/_toggle.html" with field=form.cannot_combine_with_any %}
+      </div>
+      <div class="form-group">
+        <label for="{{ form.can_club_with.id_for_label }}">{{ form.can_club_with.label }}</label>
+        {{ form.can_club_with }}
+        <div class="help-text">Select leave types this leave can be combined with (e.g. SL + EL in medical emergency).</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Carry Forward ───────────────────────────────────── -->
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon purple"><i class="fas fa-arrow-right"></i></div>
+      <h6>Carry Forward &amp; Accumulation</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+        {% include "leave/policy_config/_toggle.html" with field=form.allow_carry_forward %}
+        {% include "leave/policy_config/_toggle.html" with field=form.lapse_unused_at_period_end %}
+      </div>
+      <div class="grid-2">
+        {% include "leave/policy_config/_field.html" with field=form.max_carry_forward_days %}
+        {% include "leave/policy_config/_field.html" with field=form.max_accumulation_days %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Encashment ──────────────────────────────────────── -->
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon orange"><i class="fas fa-coins"></i></div>
+      <h6>Encashment Rules</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-bottom:16px;">
+        {% include "leave/policy_config/_toggle.html" with field=form.is_encashable %}
+        {% include "leave/policy_config/_toggle.html" with field=form.encashable_on_separation %}
+        {% include "leave/policy_config/_toggle.html" with field=form.no_encashment_on_misconduct %}
+      </div>
+      <div class="grid-3" id="encashmentFields">
+        {% include "leave/policy_config/_field.html" with field=form.encashment_max_times_per_year %}
+        {% include "leave/policy_config/_field.html" with field=form.encashment_min_days %}
+        {% include "leave/policy_config/_field.html" with field=form.encashment_min_balance_after %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Advance Leave ───────────────────────────────────── -->
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon blue"><i class="fas fa-fast-forward"></i></div>
+      <h6>Advance Leave</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div style="margin-bottom:14px;">
+        {% include "leave/policy_config/_toggle.html" with field=form.allow_advance_leave %}
+      </div>
+      <div style="max-width:280px;">
+        {% include "leave/policy_config/_field.html" with field=form.max_advance_leave_days %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Short Leave ─────────────────────────────────────── -->
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon pink"><i class="fas fa-clock"></i></div>
+      <h6>Short Leave Rules</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div class="grid-2">
+        {% include "leave/policy_config/_field.html" with field=form.max_short_leaves_per_month %}
+        {% include "leave/policy_config/_field.html" with field=form.max_short_leave_hours_per_occasion %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Paternity ───────────────────────────────────────── -->
+  <div class="form-section">
+    <div class="form-section-header" onclick="toggleSection(this)">
+      <div class="section-icon teal"><i class="fas fa-baby"></i></div>
+      <h6>Paternity Leave Rules</h6>
+      <i class="fas fa-chevron-down toggle-icon"></i>
+    </div>
+    <div class="form-section-body">
+      <div class="grid-3">
+        {% include "leave/policy_config/_field.html" with field=form.paternity_days_before_birth %}
+        {% include "leave/policy_config/_field.html" with field=form.paternity_days_after_birth %}
+        {% include "leave/policy_config/_field.html" with field=form.paternity_max_times_in_tenure %}
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Action bar ──────────────────────────────────────── -->
+  <div class="action-bar">
+    <a href="{% url 'leave:policy_config_list' %}" class="btn-cancel">
+      <i class="fas fa-times"></i> Cancel
+    </a>
+    <button type="submit" class="btn-save">
+      <i class="fas fa-save"></i>
+      {% if is_edit %}Save Changes{% else %}Create Policy Version{% endif %}
+    </button>
+  </div>
+
+</form>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+/* Section collapse/expand */
+function toggleSection(header) {
+  const body = header.nextElementSibling;
+  const icon = header.querySelector('.toggle-icon');
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    icon.classList.remove('collapsed');
+  } else {
+    body.style.display = 'none';
+    icon.classList.add('collapsed');
+  }
+}
+
+/* Encashment fields toggle */
+const encashCb = document.getElementById('{{ form.is_encashable.id_for_label }}');
+const encFields = document.getElementById('encashmentFields');
+function toggleEncashmentFields() {
+  if (encashCb) {
+    encFields.style.opacity = encashCb.checked ? '1' : '.4';
+    encFields.querySelectorAll('input').forEach(i => i.disabled = !encashCb.checked);
+  }
+}
+if (encashCb) {
+  encashCb.addEventListener('change', toggleEncashmentFields);
+  toggleEncashmentFields();
+}
+
+/* Carry forward fields toggle */
+const cfCb = document.getElementById('{{ form.allow_carry_forward.id_for_label }}');
+if (cfCb) {
+  cfCb.addEventListener('change', function () {
+    const cfField = document.getElementById('{{ form.max_carry_forward_days.id_for_label }}');
+    if (cfField) cfField.closest('.form-group').style.opacity = this.checked ? '1' : '.4';
+  });
+}
+
+/* Initialize Select2 if available */
+if (typeof $.fn.select2 !== 'undefined') {
+  $('.select2').select2({ theme: 'bootstrap4', width: '100%' });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,14 @@
+{# templates/leave/policy_config/_field.html #}
+{# Usage: {% include "leave/policy_config/_field.html" with field=form.some_field required=True %} #}
+<div class="form-group">
+  <label for="{{ field.id_for_label }}">
+    {{ field.label }}{% if required %} <span class="req">*</span>{% endif %}
+  </label>
+  {{ field }}
+  {% if field.errors %}
+    <div class="invalid-feedback d-block">{{ field.errors.0 }}</div>
+  {% endif %}
+  {% if field.help_text %}
+    <div class="help-text">{{ field.help_text }}</div>
+  {% endif %}
+</div>

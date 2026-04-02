@@ -1,0 +1,9 @@
+{# templates/leave/policy_config/_toggle.html #}
+{# Usage: {% include "leave/policy_config/_toggle.html" with field=form.some_bool_field %} #}
+<div class="toggle-group">
+  {{ field }}
+  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+  {% if field.errors %}
+    <div class="invalid-feedback d-block">{{ field.errors.0 }}</div>
+  {% endif %}
+</div>

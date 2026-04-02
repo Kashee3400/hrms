@@ -1,245 +1,444 @@
 {% extends 'hrms_app/base.html' %}
 {% load static hrms_tag humanize i18n %}
+
 {% block title %}
-{{ user.get_full_name }} | {{ tour_application.from_destination }}
+{{ user.get_full_name }} | {{ tour_application.from_destination }} to {{ tour_application.to_destination }}
 {% endblock %}
+
 {% block extrastyle %}
 <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
 {% endblock %}
+
 {% block content %}
 {% render_breadcrumb 'Tour Detail' urls %}
 
+<!-- Form Errors -->
 {% if form.non_field_errors %}
-<div class="notifications">
-  {% for error in form.non_field_errors %}
-  <div class="notification error">{{ error }}</div>
-  {% endfor %}
+<div class="container my-3">
+    {% for error in form.non_field_errors %}
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Error:</strong> {{ error }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
 </div>
 {% endif %}
-<div class="bg-light my-3">
-  <div class="row">
-    <div class="col-md-6 col-lg-6 col-sm-12">
-      <div class="card-header d-flex align-items-center justify-content-between flex-wrap">
-        <div class="d-flex align-items-center">
-          {% if tour_application.applied_by.personal_detail.avatar %}
-          <img src="{{ tour_application.applied_by.personal_detail.get_avatar_url }}" class="rounded-circle me-3"
-            alt="Avatar" style="width: 50px; height: 50px;" />
-          {% endif %}
-          <div>
-            <h5 class="card-title mb-0">{{ tour_application.applied_by }}</h5>
-            <small class="card-subtitle text-uppercase">{{ tour_application.slug }}</small>
-          </div>
-        </div>
-        <a class="btn btn-sm btn-info mt-2 mt-md-0" href="{{ pdf_url }}">{% trans 'Download PDF' %}</a>
-      </div>
 
-      <ul class="list-group list-group-flush">
-        <li class="list-group-item d-flex justify-content-between">
-          <strong>Boarding:</strong>
-          <span>
-            {{ tour_application.from_destination }}
-            <span class="badge bg-warning text-sm text-dark ms-2">{{ tour_application.start_date }} - {{ tour_application.start_time }}</span>
-          </span>
-        </li>
+<div class="container my-4">
+    <!-- Main Content Row -->
+    <div class="row g-4">
+        <!-- Left Column: Tour Details -->
+        <div class="col-lg-6">
+            <!-- Card Header with User Info -->
+            <div class="card">
+                <div class="card-header bg-light d-flex align-items-center justify-content-between flex-wrap py-3">
+                    <div class="d-flex align-items-center">
+                        {% if tour_application.applied_by.personal_detail.avatar %}
+                        <img src="{{ tour_application.applied_by.personal_detail.get_avatar_url }}" 
+                             class="rounded-circle me-3" alt="Avatar" style="width: 50px; height: 50px;" />
+                        {% else %}
+                        <div class="rounded-circle me-3 bg-secondary d-flex align-items-center justify-content-center" 
+                             style="width: 50px; height: 50px; color: white;">
+                            {{ tour_application.applied_by.get_full_name|first }}
+                        </div>
+                        {% endif %}
+                        <div>
+                            <h5 class="card-title mb-1">{{ tour_application.applied_by.get_full_name }}</h5>
+                            <small class="text-muted text-uppercase">{{ tour_application.slug }}</small>
+                        </div>
+                    </div>
+                    <a class="btn btn-sm btn-info mt-2 mt-md-0" href="{{ pdf_url }}" target="_blank">
+                        <i class="fas fa-file-pdf me-1"></i> {% trans 'Download PDF' %}
+                    </a>
+                </div>
 
-        <li class="list-group-item d-flex justify-content-between">
-          <strong>Destination:</strong>
-          <span>
-            {{ tour_application.to_destination }}
-            <span class="badge bg-warning text-sm text-dark ms-2">
-              {% if tour_application.extended_end_date and tour_application.extended_end_time %}
-              {{ tour_application.extended_end_date }} - {{ tour_application.extended_end_time }}
-              {% else %}
-              {{ tour_application.end_date }} - {{ tour_application.end_time }}
-              {% endif %}
-            </span>
-          </span>
-        </li>
-        <li class="list-group-item d-flex justify-content-between">
-          <strong>Total:</strong>
-          <span class="fw-bold text-uppercase">
-            {{ tour_application.formatted_duration }}
-          </span>
-        </li>
+                <!-- Tour Details List -->
+                <ul class="list-group list-group-flush">
+                    <!-- Boarding Point -->
+                    <li class="list-group-item">
+                        <div class="row">
+                            <div class="col-sm-4">
+                                <strong>{% trans 'Boarding:' %}</strong>
+                            </div>
+                            <div class="col-sm-8">
+                                <div>{{ tour_application.from_destination }}</div>
+                                <small class="text-muted">
+                                    {{ tour_application.start_date|date:'d M Y' }} 
+                                    at 
+                                    {{ tour_application.start_time|time:'h:i A' }}
+                                </small>
+                            </div>
+                        </div>
+                    </li>
 
-        <li class="list-group-item d-flex justify-content-between">
-          <strong>Status:</strong>
-          <span class="fw-bold text-uppercase {{ tour_application.status }}">{{ tour_application.status|upper }}</span>
-        </li>
+                    <!-- Destination -->
+                    <li class="list-group-item">
+                        <div class="row">
+                            <div class="col-sm-4">
+                                <strong>{% trans 'Destination:' %}</strong>
+                            </div>
+                            <div class="col-sm-8">
+                                <div>{{ tour_application.to_destination }}</div>
+                                <small class="text-muted">
+                                    {% if tour_application.extended_end_date and tour_application.extended_end_time %}
+                                        <span class="text-warning">
+                                            (Extended) {{ tour_application.extended_end_date|date:'d M Y' }} 
+                                            at 
+                                            {{ tour_application.extended_end_time|time:'h:i A' }}
+                                        </span>
+                                    {% else %}
+                                        {{ tour_application.end_date|date:'d M Y' }} 
+                                        at 
+                                        {{ tour_application.end_time|time:'h:i A' }}
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </li>
 
-        <li class="list-group-item d-flex justify-content-between">
-          <strong>Applied At:</strong>
-          <span>{{ tour_application.updated_at }}</span>
-        </li>
+                    <!-- Duration -->
+                    <li class="list-group-item">
+                        <div class="row">
+                            <div class="col-sm-4">
+                                <strong>{% trans 'Duration:' %}</strong>
+                            </div>
+                            <div class="col-sm-8">
+                                <span class="badge bg-primary">{{ tour_application.formatted_duration }}</span>
+                            </div>
+                        </div>
+                    </li>
 
-        {% if tour_application.created_at %}
-        <li class="list-group-item d-flex justify-content-between">
-          <strong>Last Updated At:</strong>
-          <span>{{ tour_application.created_at }}</span>
-        </li>
-        {% endif %}
+                    <!-- Status -->
+                    <li class="list-group-item">
+                        <div class="row align-items-center">
+                            <div class="col-sm-4">
+                                <strong>{% trans 'Status:' %}</strong>
+                            </div>
+                            <div class="col-sm-8">
+                                {% with status=tour_application.status %}
+                                    {% if status == 'approved' %}
+                                        <span class="badge bg-success">{{ tour_application.get_status_display }}</span>
+                                    {% elif status == 'rejected' %}
+                                        <span class="badge bg-danger">{{ tour_application.get_status_display }}</span>
+                                    {% elif status == 'pending' %}
+                                        <span class="badge bg-warning text-dark">{{ tour_application.get_status_display }}</span>
+                                    {% elif status == 'pending_cancellation' %}
+                                        <span class="badge bg-info">{{ tour_application.get_status_display }}</span>
+                                    {% elif status == 'extended' %}
+                                        <span class="badge bg-primary">{{ tour_application.get_status_display }}</span>
+                                    {% elif status == 'cancelled' %}
+                                        <span class="badge bg-secondary">{{ tour_application.get_status_display }}</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark">{{ tour_application.get_status_display }}</span>
+                                    {% endif %}
+                                {% endwith %}
+                            </div>
+                        </div>
+                    </li>
 
-        <li class="list-group-item">
-          <strong>Reason:</strong>
-          <div class="mt-1">{{ tour_application.remarks|safe }}</div>
-        </li>
-      </ul>
-    </div>
+                    <!-- Applied Date -->
+                    <li class="list-group-item">
+                        <div class="row">
+                            <div class="col-sm-4">
+                                <strong>{% trans 'Applied:' %}</strong>
+                            </div>
+                            <div class="col-sm-8">
+                                {{ tour_application.created_at|date:'d M Y h:i A' }}
+                            </div>
+                        </div>
+                    </li>
 
-    <div class="col-md-6 col-lg-6 col-sm-12 card card-rounded">
-      <div class="card-header mt-2">
-        <h5>{% trans 'Follow-ups' %}</h5>
-      </div>
-      <div class="card-body">
-        <ul class="list-group">
-          {% for log in tour_application.logs.all|dictsortreversed:'timestamp' %}
-          <li class="list-group-item">
-            <strong>{{ log.action }}</strong> by {{ log.action_by_name }} - {{ log.timestamp }} ({{ log.timestamp }})<p
-              class="mb-0">{{ log.comments }}</p>
-          </li>
-          {% empty %}
-          <li class="list-group-item">No logs available.</li>
-          {% endfor %}
-        </ul>
-      </div>
-    </div>
-  </div>
-  {% if not is_locked %}
-  <div class="card mt-4">
-    <div class="card-body">
-      {% if tour_application.extended_end_date or tour_application.extended_end_time %}
-      <h5 class="mb-3">{% blocktrans with name=tour_application.applied_by %}{{ name }} has asked for extension of
-        tour{% endblocktrans %}</h5>
-      <ul class="list-group mb-3">
-        <li class="list-group-item d-flex justify-content-between">
-          <strong>{% trans 'From:' %}</strong>
-          <span>{{ tour_application.end_date }} {{ tour_application.end_time }}</span>
-        </li>
-        <li class="list-group-item d-flex justify-content-between">
-          <strong>{% trans 'To:' %}</strong>
-          <span>{{ tour_application.extended_end_date }} {{ tour_application.extended_end_time }}</span>
-        </li>
-      </ul>
-      {% endif %}
+                    <!-- Last Updated -->
+                    <li class="list-group-item">
+                        <div class="row">
+                            <div class="col-sm-4">
+                                <strong>{% trans 'Last Updated:' %}</strong>
+                            </div>
+                            <div class="col-sm-8">
+                                {{ tour_application.updated_at|date:'d M Y h:i A' }}
+                            </div>
+                        </div>
+                    </li>
 
-      <form id="tour-update-form" method="post">
-        {% csrf_token %}
-
-        {% if form.non_field_errors %}
-        <div class="alert alert-danger">
-          {% for error in form.non_field_errors %}
-          <p class="mb-0">{{ error }}</p>
-          {% endfor %}
-        </div>
-        {% endif %}
-
-        <div class="row">
-          <!-- Status -->
-          <div class="col-12 mb-3">
-            <label for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
-            {{ form.status }}
-            {% if form.status.errors %}
-            <div class="alert alert-danger mt-2">
-              {% for error in form.status.errors %}
-              <p class="mb-0">{{ error }}</p>
-              {% endfor %}
+                    <!-- Remarks -->
+                    {% if tour_application.remarks %}
+                    <li class="list-group-item">
+                        <strong>{% trans 'Purpose:' %}</strong>
+                        <div class="mt-2">{{ tour_application.remarks|safe }}</div>
+                    </li>
+                    {% endif %}
+                </ul>
             </div>
-            {% endif %}
-          </div>
-
-          {% if not is_manager %}
-          <!-- Extension Dates/Times -->
-          <div class="col-md-6 mb-3">
-            <label for="{{ form.extended_end_date.id_for_label }}">{{ form.extended_end_date.label }}</label>
-            {{ form.extended_end_date }}
-          </div>
-          <div class="col-md-6 mb-3">
-            <label for="{{ form.extended_end_time.id_for_label }}">{{ form.extended_end_time.label }}</label>
-            {{ form.extended_end_time }}
-          </div>
-          {% endif %}
-
-          <!-- Reason -->
-          <div class="col-12 mb-3">
-            <label for="{{ form.reason.id_for_label }}">{{ form.reason.label }}</label>
-            {{ form.reason }}
-          </div>
-
-          <!-- Buttons -->
-          <div class="col-12 d-flex gap-2">
-            <button type="button" class="btn btn-sm btn-primary" onclick="$('#updateDialog').modal('show')">
-              <i class="fas fa-check-circle me-1"></i>
-              {% if is_manager %}
-              {% trans 'Update' %}
-              {% else %}
-              {% trans 'Submit' %}
-              {% endif %}
-            </button>
-
-            {% if not is_manager %}
-            <a class="btn btn-sm btn-danger" href="{{ delete_url }}">{% trans 'Delete' %}</a>
-            {% if tour_application.status == 'pending' %}
-            <a class="btn btn-sm btn-warning" href="{{ edit_url }}">{% trans 'Edit' %}</a>
-            {% endif %}
-            {% endif %}
-          </div>
         </div>
-      </form>
+
+        <!-- Right Column: Follow-ups Log -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-light py-3">
+                    <h5 class="mb-0">{% trans 'Activity Log' %}</h5>
+                </div>
+                <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+                    {% if tour_application.logs.all %}
+                    <ul class="list-group list-group-flush">
+                        {% for log in tour_application.logs.all|dictsortreversed:'timestamp' %}
+                        <li class="list-group-item py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong class="text-uppercase">{{ log.action }}</strong>
+                                    <div class="small text-muted">
+                                        by {{ log.action_by_name }}
+                                    </div>
+                                </div>
+                                <span class="badge bg-light text-dark small">{{ log.timestamp|timesince }} ago</span>
+                            </div>
+                            {% if log.comments %}
+                            <div class="mt-2 p-2 bg-light rounded small">
+                                {{ log.comments|safe }}
+                            </div>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="alert alert-info mb-0">
+                        {% trans 'No activity yet.' %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-  {% endif %}
 
-  <!-- Update Modal -->
-  <div class="modal fade" id="updateDialog" tabindex="-1" aria-labelledby="updateDialogLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="updateDialogLabel">Are you sure?</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <!-- Extension Notification (if applicable) -->
+    {% if tour_application.extended_end_date and tour_application.extended_end_time %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
+                <strong>{% trans 'Extension Request' %}</strong>
+                <div class="mt-2">
+                    {{ tour_application.applied_by.get_full_name }} {% trans 'has requested an extension for this tour.' %}
+                </div>
+                <div class="mt-2">
+                    <strong>{% trans 'Original End:' %}</strong> {{ tour_application.end_date|date:'d M Y' }} 
+                    at {{ tour_application.end_time|time:'h:i A' }}<br>
+                    <strong>{% trans 'Extended End:' %}</strong> {{ tour_application.extended_end_date|date:'d M Y' }} 
+                    at {{ tour_application.extended_end_time|time:'h:i A' }}
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         </div>
-        <div class="modal-body">
-          {% if is_manager %}
-          You want to update the tour from {{ tour_application.from_destination }} to {{ tour_application.to_destination
-          }} of {{ tour_application.applied_by }}.
-          {% else %}
-          You want to cancel your tour from {{ tour_application.from_destination }} to {{
-          tour_application.to_destination }}.
-          {% endif %}
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="button" class="btn btn-primary" onclick="submitForm()">Submit</button>
-        </div>
-      </div>
     </div>
-  </div>
+    {% endif %}
+
+    <!-- Status Update Form (if not locked) -->
+    {% if not is_locked %}
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light py-3">
+                    <h5 class="mb-0">
+                        {% if is_manager %}
+                            {% trans 'Review Tour Application' %}
+                        {% elif is_employee %}
+                            {% trans 'Manage Your Tour' %}
+                        {% elif is_admin %}
+                            {% trans 'Update Tour Status' %}
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="tour-update-form" method="post" novalidate>
+                        {% csrf_token %}
+
+                        <!-- Status Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.status.id_for_label }}" class="form-label">
+                                <strong>{{ form.status.label }}</strong>
+                            </label>
+                            {{ form.status }}
+                            {% if form.status.help_text %}
+                            <small class="form-text text-muted d-block mt-1">{{ form.status.help_text|safe }}</small>
+                            {% endif %}
+                            {% if form.status.errors %}
+                            <div class="alert alert-danger mt-2 mb-0">
+                                {% for error in form.status.errors %}
+                                <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Extension Fields (only for employees) -->
+                        {% if is_employee and form.extended_end_date %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.extended_end_date.id_for_label }}" class="form-label">
+                                    <strong>{{ form.extended_end_date.label }}</strong>
+                                </label>
+                                {{ form.extended_end_date }}
+                                {% if form.extended_end_date.help_text %}
+                                <small class="form-text text-muted d-block mt-1">{{ form.extended_end_date.help_text|safe }}</small>
+                                {% endif %}
+                                {% if form.extended_end_date.errors %}
+                                <div class="alert alert-danger mt-2 mb-0">
+                                    {% for error in form.extended_end_date.errors %}
+                                    <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.extended_end_time.id_for_label }}" class="form-label">
+                                    <strong>{{ form.extended_end_time.label }}</strong>
+                                </label>
+                                {{ form.extended_end_time }}
+                                {% if form.extended_end_time.help_text %}
+                                <small class="form-text text-muted d-block mt-1">{{ form.extended_end_time.help_text|safe }}</small>
+                                {% endif %}
+                                {% if form.extended_end_time.errors %}
+                                <div class="alert alert-danger mt-2 mb-0">
+                                    {% for error in form.extended_end_time.errors %}
+                                    <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Admin Extended Fields -->
+                        {% if is_admin and form.extended_end_date %}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.extended_end_date.id_for_label }}" class="form-label">
+                                    {{ form.extended_end_date.label }}
+                                </label>
+                                {{ form.extended_end_date }}
+                                {% if form.extended_end_date.errors %}
+                                <div class="alert alert-danger mt-2 mb-0">
+                                    {% for error in form.extended_end_date.errors %}
+                                    <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.extended_end_time.id_for_label }}" class="form-label">
+                                    {{ form.extended_end_time.label }}
+                                </label>
+                                {{ form.extended_end_time }}
+                                {% if form.extended_end_time.errors %}
+                                <div class="alert alert-danger mt-2 mb-0">
+                                    {% for error in form.extended_end_time.errors %}
+                                    <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Reason/Remarks Field -->
+                        <div class="mb-3">
+                            <label for="{{ form.reason.id_for_label }}" class="form-label">
+                                <strong>{{ form.reason.label }}</strong>
+                            </label>
+                            {{ form.reason }}
+                            {% if form.reason.help_text %}
+                            <small class="form-text text-muted d-block mt-1">{{ form.reason.help_text|safe }}</small>
+                            {% endif %}
+                            {% if form.reason.errors %}
+                            <div class="alert alert-danger mt-2 mb-0">
+                                {% for error in form.reason.errors %}
+                                <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="d-flex gap-2 flex-wrap">
+                            <button type="button" class="btn btn-primary" onclick="showConfirmDialog()">
+                                <i class="fas fa-check-circle me-1"></i>
+                                {% if is_manager %}
+                                    {% trans 'Submit Review' %}
+                                {% elif is_employee %}
+                                    {% trans 'Submit Request' %}
+                                {% elif is_admin %}
+                                    {% trans 'Update' %}
+                                {% endif %}
+                            </button>
+
+                            {% if is_employee %}
+                                {% if tour_application.is_editable %}
+                                <a class="btn btn-warning" href="{{ edit_url }}">
+                                    <i class="fas fa-edit me-1"></i> {% trans 'Edit' %}
+                                </a>
+                                {% endif %}
+                                <a class="btn btn-danger" href="{{ delete_url }}" 
+                                   onclick="return confirm('{% trans 'Are you sure?' %}');">
+                                    <i class="fas fa-trash me-1"></i> {% trans 'Delete' %}
+                                </a>
+                            {% endif %}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmDialog" tabindex="-1" aria-labelledby="confirmDialogLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmDialogLabel">{% trans 'Confirm Action' %}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {% if is_manager %}
+                    {% trans 'Are you sure you want to proceed with the review of this tour application?' %}
+                {% elif is_employee %}
+                    {% trans 'Are you sure you want to submit your request for this tour?' %}
+                {% elif is_admin %}
+                    {% trans 'Are you sure you want to update this tour?' %}
+                {% endif %}
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans 'Cancel' %}</button>
+                <button type="button" class="btn btn-primary" onclick="submitForm()">{% trans 'Confirm' %}</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  function submitForm() {
-    document.getElementById('tour-update-form').submit()
-  }
+    function showConfirmDialog() {
+        const form = document.getElementById('tour-update-form');
+        if (form.reportValidity()) {
+            const confirmDialog = new bootstrap.Modal(document.getElementById('confirmDialog'));
+            confirmDialog.show();
+        }
+    }
+
+    function submitForm() {
+        document.getElementById('tour-update-form').submit();
+    }
+
+    // Bootstrap Modal initialization
+    document.addEventListener('DOMContentLoaded', function() {
+        // Auto-hide alerts after 5 seconds
+        const alerts = document.querySelectorAll('.alert:not(.alert-dismissible)');
+        alerts.forEach(alert => {
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        });
+    });
 </script>
-{% comment %}
-<script>
-  $(document).ready(function () {
-    $('#id_extended_end_date').closest('.col-md-6').hide()
-    $('#id_extended_end_time').closest('.col-md-6').hide()
-    $('#id_status').change(function () {
-      var selectedStatus = $(this).val()
-      if (selectedStatus === 'extended') {
-        $('#id_extended_end_date').closest('.col-md-6').show()
-        $('#id_extended_end_time').closest('.col-md-6').show()
-      } else {
-        // Hide fields and clear their values
-        $('#id_extended_end_date').closest('.col-md-6').hide()
-        $('#id_extended_end_time').closest('.col-md-6').hide()
-        $('#id_extended_end_date').val('')
-        $('#id_extended_end_time').val('')
-      }
-    })
-  })
-</script> {% endcomment %}
 {% endblock %}

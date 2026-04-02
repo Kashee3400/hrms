@@ -5,7 +5,13 @@ from ..views.attendance_view import BulkAttendanceView, AttendancePreviewAjaxVie
     AttendanceStatsAjaxView
 from ..views.leave_bulk import BulkLeaveCreateView,BulkLeaveHistoryView
 from ..views.leave_bulk import LeaveBalanceInitializerView
-
+from ..views.apply_leave import ApplyOrUpdateLeaveView
+from ..views.tour_views import (
+    ApplyTourView,
+    TourApplicationDetailView,
+    TourApplicationUpdateView,
+    TourTrackerView,GenerateTourPDFView
+    )
 class CustomSite:
     def __init__(self):
         self._registry = {}
@@ -61,8 +67,8 @@ site.register_view('', views.DashboardView, name='home')
 site.register_view('attendance/<slug:slug>/', views.EventDetailPageView, name='event_detail')
 site.register_view('attendance-log/<slug:slug>/', views.AttendanceLogActionView, name='attendance_log_action')
 site.register_view('attendance-regularization/', views.AttendanceLogListView, name='regularization')
-site.register_view('leave/apply/<int:leave_type>/', views.ApplyOrUpdateLeaveView, name='apply_leave_with_id')
-site.register_view('leave/edit/<slug:slug>/', views.ApplyOrUpdateLeaveView, name='update_leave')
+site.register_view('leave/apply/<int:leave_type>/', ApplyOrUpdateLeaveView, name='apply_leave_with_id')
+site.register_view('leave/edit/<slug:slug>/', ApplyOrUpdateLeaveView, name='update_leave')
 site.register_view('leave/<slug:slug>/', views.LeaveApplicationDetailView, name='leave_application_detail')
 site.register_view('leave/<slug:slug>/update', views.LeaveApplicationUpdateView, name='leave_application_update')
 
@@ -76,11 +82,11 @@ site.register_view('leave/initializer', LeaveBalanceInitializerView, name='leave
 site.register_view('delete/<str:model_name>/<int:pk>/', views.GenericDeleteView, name='generic_delete')
 site.register_view('leave-transaction/', views.LeaveTransactionCreateView, name='leave_transaction_create'),
 site.register_view('leave-balance-update/', views.LeaveBalanceUpdateView, name='leave_bal_up'),
-site.register_view('tour-tracker/', views.TourTrackerView, name='tour_tracker')
-site.register_view('apply-tour/', views.ApplyTourView, name='apply_tour')
-site.register_view('tour/<slug:slug>/', views.TourApplicationDetailView, name='tour_application_detail')
-site.register_view('tour/<slug:slug>/update', views.TourApplicationUpdateView, name='tour_application_update')
-site.register_view('tour/<slug:slug>/pdf', views.GenerateTourPDFView, name='generate_tour_pdf')
+site.register_view('tour-tracker/', TourTrackerView, name='tour_tracker')
+site.register_view('apply-tour/', ApplyTourView, name='apply_tour')
+site.register_view('tour/<slug:slug>/', TourApplicationDetailView, name='tour_application_detail')
+site.register_view('tour/<slug:slug>/update', TourApplicationUpdateView, name='tour_application_update')
+site.register_view('tour/<slug:slug>/pdf', GenerateTourPDFView, name='generate_tour_pdf')
 site.register_view('employees/', views.EmployeeListView, name='employees')
 site.register_view('employee-profile/<int:pk>/', views.EmployeeProfileView, name='employee_profile')
 site.register_view('personal-detail-update/<int:pk>/', views.PersonalDetailUpdateView, name='personal_detail_update')

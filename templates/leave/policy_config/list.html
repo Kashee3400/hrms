@@ -1,0 +1,970 @@
+{% extends "hrms_app/base.html" %}
+{% load static %}
+
+{% block title %}Leave Policy Configuration{% endblock %}
+
+{% block extrastyle %}
+<style>
+  /* ── Variables ─────────────────────────────────────── */
+  :root {
+    --brand:        #4361ee;
+    --brand-dark:   #3451d1;
+    --success:      #2ec4b6;
+    --warning:      #ff9f1c;
+    --danger:       #e63946;
+    --text-main:    #1a1f36;
+    --text-muted:   #6b7280;
+    --border:       #e5e7eb;
+    --surface:      #ffffff;
+    --surface-alt:  #f8fafc;
+    --radius:       10px;
+    --shadow-sm:    0 1px 3px rgba(0,0,0,.08);
+    --shadow-md:    0 4px 16px rgba(0,0,0,.10);
+    --shadow-lg:    0 8px 32px rgba(0,0,0,.14);
+    --transition:   .18s ease;
+  }
+
+  /* ── Page header ───────────────────────────────────── */
+  .pc-header {
+    background: linear-gradient(135deg, #1a1f36 0%, #2d3561 100%);
+    border-radius: var(--radius);
+    padding: 28px 32px;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .pc-header h1 {
+    color: #fff;
+    font-size: 1.45rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -.3px;
+  }
+  .pc-header p {
+    color: rgba(255,255,255,.65);
+    margin: 4px 0 0;
+    font-size: .875rem;
+  }
+  .pc-header-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  /* ── Stats bar ─────────────────────────────────────── */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition);
+  }
+  .stat-card:hover { box-shadow: var(--shadow-md); }
+  .stat-icon {
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .stat-icon.blue   { background: rgba(67,97,238,.12);  color: var(--brand); }
+  .stat-icon.green  { background: rgba(46,196,182,.12); color: var(--success); }
+  .stat-icon.orange { background: rgba(255,159,28,.12); color: var(--warning); }
+  .stat-val  { font-size: 1.55rem; font-weight: 700; color: var(--text-main); line-height: 1; }
+  .stat-lbl  { font-size: .75rem; color: var(--text-muted); margin-top: 3px; }
+
+  /* ── Table card ─────────────────────────────────────── */
+  .table-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .table-card-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .table-card-header h5 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+  .search-box {
+    position: relative;
+    width: 240px;
+  }
+  .search-box input {
+    padding-left: 36px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: .875rem;
+    height: 36px;
+    width: 100%;
+    outline: none;
+    transition: border-color var(--transition);
+  }
+  .search-box input:focus { border-color: var(--brand); }
+  .search-box i {
+    position: absolute;
+    left: 11px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: .85rem;
+  }
+
+  /* ── Policy table ───────────────────────────────────── */
+  .policy-table { width: 100%; border-collapse: collapse; }
+  .policy-table thead th {
+    background: var(--surface-alt);
+    padding: 11px 16px;
+    font-size: .78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .policy-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background var(--transition);
+  }
+  .policy-table tbody tr:last-child { border-bottom: none; }
+  .policy-table tbody tr:hover { background: var(--surface-alt); }
+  .policy-table td { padding: 14px 16px; vertical-align: middle; font-size: .875rem; }
+
+  /* ── Leave type badge ───────────────────────────────── */
+  .lt-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    color: var(--text-main);
+  }
+  .lt-code {
+    display: inline-block;
+    background: var(--brand);
+    color: #fff;
+    font-size: .7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: .5px;
+  }
+
+  /* ── Policy summary chips ───────────────────────────── */
+  .policy-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: .72rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+  .chip.active { background: rgba(46,196,182,.1); border-color: var(--success); color: #1a9e94; }
+  .chip i { font-size: .65rem; }
+
+  /* ── Status badge ───────────────────────────────────── */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 12px;
+    border-radius: 20px;
+    font-size: .75rem;
+    font-weight: 600;
+  }
+  .status-pill.active   { background: rgba(46,196,182,.12); color: #0e9e93; }
+  .status-pill.inactive { background: rgba(239,68,68,.1);   color: #dc2626; }
+  .status-pill.no-config{ background: rgba(255,159,28,.1);  color: #b45309; }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-dot.active   { background: var(--success); }
+  .status-dot.inactive { background: var(--danger);  }
+  .status-dot.pending  { background: var(--warning); }
+
+  /* ── Version count badge ────────────────────────────── */
+  .version-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(67,97,238,.08);
+    color: var(--brand);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: .75rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .version-badge:hover { background: rgba(67,97,238,.18); }
+
+  /* ── Action buttons ─────────────────────────────────── */
+  .btn-action {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 12px;
+    border-radius: 7px;
+    font-size: .78rem;
+    font-weight: 500;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: all var(--transition);
+    text-decoration: none;
+  }
+  .btn-edit    { background: rgba(67,97,238,.08);  color: var(--brand);   border-color: rgba(67,97,238,.2); }
+  .btn-edit:hover { background: var(--brand); color: #fff; }
+  .btn-new     { background: rgba(46,196,182,.1);  color: #0e9e93; border-color: rgba(46,196,182,.25); }
+  .btn-new:hover { background: var(--success); color: #fff; }
+  .btn-history { background: rgba(255,159,28,.1);  color: #b45309; border-color: rgba(255,159,28,.25); }
+  .btn-history:hover { background: var(--warning); color: #fff; }
+  .btn-compare { background: rgba(139,92,246,.1); color: #7c3aed; border-color: rgba(139,92,246,.25); }
+  .btn-compare:hover { background: #7c3aed; color: #fff; }
+
+  .btn-primary-solid {
+    background: var(--brand);
+    color: #fff;
+    border: none;
+    padding: 9px 20px;
+    border-radius: 8px;
+    font-size: .875rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex; align-items: center; gap: 7px;
+    text-decoration: none;
+    transition: background var(--transition), transform var(--transition);
+  }
+  .btn-primary-solid:hover { background: var(--brand-dark); color: #fff; transform: translateY(-1px); }
+
+  /* ── No config row ──────────────────────────────────── */
+  .no-config-row td { background: rgba(255,159,28,.03); }
+
+  /* ── MODAL base ─────────────────────────────────────── */
+  .pc-modal .modal-content {
+    border: none;
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+  }
+  .pc-modal .modal-header {
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+  .pc-modal .modal-title { font-size: 1.05rem; font-weight: 700; }
+  .pc-modal .modal-body  { padding: 24px 28px; }
+  .pc-modal .modal-footer {
+    padding: 16px 28px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* ── History timeline ───────────────────────────────── */
+  .timeline { position: relative; padding-left: 28px; }
+  .timeline::before {
+    content: "";
+    position: absolute;
+    left: 10px; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--border);
+    border-radius: 2px;
+  }
+  .timeline-item {
+    position: relative;
+    padding: 0 0 22px 20px;
+  }
+  .timeline-item:last-child { padding-bottom: 0; }
+  .timeline-dot {
+    position: absolute;
+    left: -18px; top: 4px;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid var(--surface);
+    box-shadow: 0 0 0 2px var(--border);
+  }
+  .timeline-dot.active  { background: var(--success); box-shadow: 0 0 0 3px rgba(46,196,182,.25); }
+  .timeline-dot.closed  { background: var(--text-muted); }
+  .timeline-header {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .timeline-date {
+    font-size: .8rem;
+    font-weight: 700;
+    color: var(--text-main);
+  }
+  .timeline-body {
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: .8rem;
+    color: var(--text-muted);
+  }
+  .timeline-body .tl-row {
+    display: flex; justify-content: space-between;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .timeline-body .tl-row:last-child { border: none; }
+  .tl-label { font-weight: 500; color: var(--text-main); }
+  .compare-check {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: .75rem;
+    background: rgba(139,92,246,.08);
+    color: #7c3aed;
+    border: 1px solid rgba(139,92,246,.2);
+    border-radius: 6px;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: background var(--transition);
+    margin-top: 6px;
+  }
+  .compare-check:hover,
+  .compare-check.selected { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+
+  /* ── Compare diff table ─────────────────────────────── */
+  .diff-header {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-radius: 10px 10px 0 0;
+    overflow: hidden;
+    margin-bottom: 1px;
+  }
+  .diff-header-cell {
+    padding: 12px 16px;
+    font-size: .8rem;
+    font-weight: 700;
+    text-align: center;
+  }
+  .diff-header-cell.label { background: var(--surface-alt); color: var(--text-muted); text-align: left; }
+  .diff-header-cell.ver   { color: #fff; }
+  .diff-header-cell.ver-a { background: var(--brand); }
+  .diff-header-cell.ver-b { background: #7c3aed; }
+
+  .diff-group-label {
+    font-size: .7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--text-muted);
+    padding: 10px 16px 4px;
+    background: var(--surface-alt);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .diff-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .diff-row:last-child { border-radius: 0 0 10px 10px; overflow: hidden; }
+  .diff-row.changed { background: rgba(255,159,28,.04); }
+  .diff-cell {
+    padding: 9px 16px;
+    font-size: .8rem;
+    vertical-align: middle;
+  }
+  .diff-cell.label { font-weight: 500; color: var(--text-main); border-right: 1px solid var(--border); }
+  .diff-cell.val-a { border-right: 1px solid var(--border); }
+  .diff-cell.changed-a { color: var(--danger); font-weight: 600; }
+  .diff-cell.changed-b { color: var(--success); font-weight: 600; }
+  .diff-unchanged     { color: var(--text-muted); }
+  .changed-indicator {
+    display: inline-block;
+    width: 6px; height: 6px;
+    background: var(--warning);
+    border-radius: 50%;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  /* ── Compare summary bar ────────────────────────────── */
+  .compare-summary {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 16px;
+    font-size: .85rem;
+  }
+  .cs-count {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--warning);
+  }
+
+  /* ── Empty state ─────────────────────────────────────── */
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: var(--text-muted);
+  }
+  .empty-state i { font-size: 2.5rem; margin-bottom: 12px; opacity: .35; display: block; }
+
+  /* ── Responsive ─────────────────────────────────────── */
+  @media (max-width: 768px) {
+    .pc-header { flex-direction: column; align-items: flex-start; }
+    .search-box { width: 100%; }
+    .diff-header, .diff-row { grid-template-columns: 1fr; }
+    .diff-group-label { display: none; }
+    .stats-bar { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ── Breadcrumb ──────────────────────────────────────────── -->
+<nav aria-label="breadcrumb" style="margin-bottom: 16px;">
+  <ol class="breadcrumb" style="font-size:.82rem; margin:0;">
+    {% for crumb in breadcrumb %}
+      {% if forloop.last %}
+        <li class="breadcrumb-item active">{{ crumb.label }}</li>
+      {% else %}
+        <li class="breadcrumb-item"><a href="{% if crumb.url == '#' or not crumb.url %}#{% else %}{% url crumb.url %}{% endif %}">{{ crumb.label }}</a></li>
+      {% endif %}
+    {% endfor %}
+  </ol>
+</nav>
+
+<!-- ── Page header ──────────────────────────────────────────── -->
+<div class="pc-header">
+  <div>
+    <h1><i class="fas fa-sliders-h" style="margin-right:10px; opacity:.8;"></i>Leave Policy Configuration</h1>
+    <p>Manage versioned policy rules for each leave type. Changes take effect from the configured date.</p>
+  </div>
+  <div class="pc-header-actions">
+    <button class="btn-primary-solid" id="btnOpenCompareModal" disabled>
+      <i class="fas fa-code-branch"></i> Compare Versions
+      <span id="compareCountBadge" style="background:rgba(255,255,255,.25);border-radius:20px;padding:1px 8px;font-size:.75rem;display:none;"></span>
+    </button>
+  </div>
+</div>
+
+<!-- ── Stats bar ────────────────────────────────────────────── -->
+<div class="stats-bar">
+  <div class="stat-card">
+    <div class="stat-icon blue"><i class="fas fa-layer-group"></i></div>
+    <div>
+      <div class="stat-val">{{ rows|length }}</div>
+      <div class="stat-lbl">Leave Types</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+    <div>
+      <div class="stat-val">{% with count=0 %}{% for r in rows %}{% if r.has_policy %}{% with count=count|add:1 %}{% endwith %}{% endif %}{% endfor %}{{ rows|length }}{% endwith %}</div>
+      <div class="stat-lbl">Configured</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon orange"><i class="fas fa-history"></i></div>
+    <div>
+      <div class="stat-val">{% with total=0 %}{% for r in rows %}{% endfor %}—{% endwith %}</div>
+      <div class="stat-lbl">Total Versions</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Main table ────────────────────────────────────────────── -->
+<div class="table-card">
+  <div class="table-card-header">
+    <h5><i class="fas fa-table" style="margin-right:8px; color:var(--brand);"></i>Leave Types &amp; Active Policies</h5>
+    <div class="search-box">
+      <i class="fas fa-search"></i>
+      <input type="text" id="tableSearch" placeholder="Search leave types…">
+    </div>
+  </div>
+
+  <div style="overflow-x: auto;">
+    <table class="policy-table" id="policyTable">
+      <thead>
+        <tr>
+          <th style="width:200px;">Leave Type</th>
+          <th>Effective Period</th>
+          <th>Key Rules</th>
+          <th style="width:100px; text-align:center;">Status</th>
+          <th style="width:100px; text-align:center;">Versions</th>
+          <th style="width:220px; text-align:right; padding-right:20px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr class="{% if not row.has_policy %}no-config-row{% endif %}" data-name="{{ row.leave_type.leave_type|lower }}">
+
+          <!-- Leave Type -->
+          <td>
+            <div class="lt-badge">
+              {% if row.leave_type.leave_type_short_code %}
+                <span class="lt-code" style="background: {{ row.leave_type.color_hex|default:'#4361ee' }}">
+                  {{ row.leave_type.leave_type_short_code }}
+                </span>
+              {% endif %}
+              {{ row.leave_type.leave_type }}
+            </div>
+          </td>
+
+          <!-- Effective Period -->
+          <td>
+            {% if row.active_policy %}
+              <span style="font-size:.82rem; color:var(--text-main); font-weight:500;">
+                {{ row.active_policy.effective_from|date:"d M Y" }}
+              </span>
+              <span style="color:var(--text-muted); font-size:.78rem;"> → Present</span>
+            {% else %}
+              <span style="color:var(--text-muted); font-size:.82rem; font-style:italic;">No policy configured</span>
+            {% endif %}
+          </td>
+
+          <!-- Key Rules chips -->
+          <td>
+            {% if row.active_policy %}
+              <div class="policy-chips">
+                <span class="chip active">
+                  <i class="fas fa-calendar-day"></i>
+                  {{ row.active_policy.annual_entitlement|floatformat:0 }}d/yr
+                </span>
+                <span class="chip">
+                  <i class="fas fa-sync-alt"></i>
+                  {{ row.active_policy.get_accrual_period_display }}
+                </span>
+                {% if row.active_policy.max_consecutive_days %}
+                  <span class="chip">
+                    <i class="fas fa-calendar-week"></i>
+                    Max {{ row.active_policy.max_consecutive_days|floatformat:0 }}d
+                  </span>
+                {% endif %}
+                {% if row.active_policy.allow_carry_forward %}
+                  <span class="chip active">
+                    <i class="fas fa-arrow-right"></i>
+                    Carry Fwd
+                  </span>
+                {% endif %}
+                {% if row.active_policy.is_encashable %}
+                  <span class="chip active">
+                    <i class="fas fa-coins"></i>
+                    Encashable
+                  </span>
+                {% endif %}
+                {% if row.active_policy.requires_confirmation %}
+                  <span class="chip">
+                    <i class="fas fa-user-check"></i>
+                    Post-Probation
+                  </span>
+                {% endif %}
+                {% if row.active_policy.cannot_combine_with_any %}
+                  <span class="chip">
+                    <i class="fas fa-ban"></i>
+                    No Combine
+                  </span>
+                {% endif %}
+              </div>
+            {% else %}
+              <span style="color:var(--warning); font-size:.8rem;">
+                <i class="fas fa-exclamation-triangle"></i>
+                Policy not set — using legacy LeaveType defaults
+              </span>
+            {% endif %}
+          </td>
+
+          <!-- Status -->
+          <td style="text-align:center;">
+            {% if row.has_policy %}
+              <span class="status-pill active">
+                <span class="status-dot active"></span> Active
+              </span>
+            {% else %}
+              <span class="status-pill no-config">
+                <span class="status-dot pending"></span> Legacy
+              </span>
+            {% endif %}
+          </td>
+
+          <!-- Version count -->
+          <td style="text-align:center;">
+            {% if row.version_count > 0 %}
+              <span class="version-badge"
+                    onclick="loadHistory({{ row.leave_type.pk }}, '{{ row.leave_type.leave_type }}')"
+                    title="View version history">
+                <i class="fas fa-history"></i>
+                {{ row.version_count }} ver{% if row.version_count > 1 %}sions{% else %}sion{% endif %}
+              </span>
+            {% else %}
+              <span style="color:var(--text-muted); font-size:.78rem;">—</span>
+            {% endif %}
+          </td>
+
+          <!-- Actions -->
+          <td style="text-align:right; padding-right: 16px;">
+            <div style="display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap;">
+              {% if row.active_policy %}
+                <a href="{% url 'leave:policy_config_edit' row.active_policy.pk %}"
+                   class="btn-action btn-edit" title="Edit active policy">
+                  <i class="fas fa-pen"></i> Edit
+                </a>
+              {% endif %}
+              <a href="{% url 'leave:policy_config_create' row.leave_type.pk %}"
+                 class="btn-action btn-new" title="Create new policy version">
+                <i class="fas fa-plus"></i> New Version
+              </a>
+              {% if row.version_count > 0 %}
+                <button class="btn-action btn-history"
+                        onclick="loadHistory({{ row.leave_type.pk }}, '{{ row.leave_type.leave_type }}')"
+                        title="View history">
+                  <i class="fas fa-clock"></i>
+                </button>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6">
+            <div class="empty-state">
+              <i class="fas fa-layer-group"></i>
+              <p>No leave types found. Create leave types first.</p>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     MODAL 1 — Version History Timeline
+═════════════════════════════════════════════════════════════ -->
+<div class="modal fade pc-modal" id="historyModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-history" style="color:var(--warning); margin-right:8px;"></i>
+          Policy Version History — <span id="historyLeaveTypeName"></span>
+        </h5>
+        <button type="button" class="close" data-dismiss="modal">
+          <span>&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" id="historyModalBody">
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="mt-3 text-muted">Loading history…</p>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content:space-between; align-items:center;">
+        <small class="text-muted" id="historyCompareHint" style="display:none;">
+          <i class="fas fa-info-circle"></i>
+          Select 2 versions above to compare them
+        </small>
+        <div>
+          <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-sm" id="btnCompareSelected"
+                  style="background:#7c3aed; color:#fff; display:none;"
+                  onclick="runCompare()">
+            <i class="fas fa-code-branch"></i> Compare Selected
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════════
+     MODAL 2 — Side-by-side Compare
+═════════════════════════════════════════════════════════════ -->
+<div class="modal fade pc-modal" id="compareModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-code-branch" style="color:#7c3aed; margin-right:8px;"></i>
+          Policy Comparison — <span id="compareLeaveTypeName"></span>
+        </h5>
+        <button type="button" class="close" data-dismiss="modal">
+          <span>&times;</span>
+        </button>
+      </div>
+      <div class="modal-body" id="compareModalBody">
+        <div class="text-center py-5">
+          <div class="spinner-border" role="status" style="color:#7c3aed;"></div>
+          <p class="mt-3 text-muted">Loading comparison…</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-sm" onclick="$('#compareModal').modal('hide'); $('#historyModal').modal('show');"
+                style="background:rgba(67,97,238,.1); color:var(--brand); border:1px solid rgba(67,97,238,.2);">
+          <i class="fas fa-arrow-left"></i> Back to History
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+/* ────────────────────────────────────────────────────────
+   State
+──────────────────────────────────────────────────────── */
+let compareSelected   = [];   // [{ id, label }, { id, label }]
+let historyLeaveTypeId = null;
+
+/* ────────────────────────────────────────────────────────
+   Table search
+──────────────────────────────────────────────────────── */
+document.getElementById('tableSearch').addEventListener('input', function () {
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('#policyTable tbody tr').forEach(tr => {
+    const name = tr.getAttribute('data-name') || '';
+    tr.style.display = name.includes(q) ? '' : 'none';
+  });
+});
+
+/* ────────────────────────────────────────────────────────
+   Load history timeline (AJAX)
+──────────────────────────────────────────────────────── */
+function loadHistory(leaveTypeId, leaveTypeName) {
+  historyLeaveTypeId = leaveTypeId;
+  compareSelected    = [];
+  updateCompareUI();
+
+  document.getElementById('historyLeaveTypeName').textContent = leaveTypeName;
+  document.getElementById('historyModalBody').innerHTML = `
+    <div class="text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-3 text-muted">Loading history…</p>
+    </div>`;
+  $('#historyModal').modal('show');
+
+  fetch(`{% url 'leave:policy_config_history' 0 %}`.replace('/0/', `/${leaveTypeId}/`), {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(r => r.json())
+  .then(data => renderHistory(data))
+  .catch(() => {
+    document.getElementById('historyModalBody').innerHTML =
+      `<div class="alert alert-danger">Failed to load history. Please try again.</div>`;
+  });
+}
+
+function renderHistory(data) {
+  if (!data.versions || data.versions.length === 0) {
+    document.getElementById('historyModalBody').innerHTML =
+      `<div class="empty-state"><i class="fas fa-history"></i><p>No versions found.</p></div>`;
+    return;
+  }
+
+  document.getElementById('historyCompareHint').style.display =
+    data.versions.length > 1 ? 'inline' : 'none';
+
+  let html = `<div class="timeline">`;
+  data.versions.forEach((v, idx) => {
+    const isActive = v.is_active;
+    const to       = v.effective_to ? v.effective_to : 'Present';
+    const label    = `${v.effective_from} → ${to}`;
+
+    html += `
+    <div class="timeline-item">
+      <div class="timeline-dot ${isActive ? 'active' : 'closed'}"></div>
+      <div class="timeline-header">
+        <span class="timeline-date">${v.effective_from}</span>
+        <span class="status-pill ${isActive ? 'active' : 'inactive'}" style="font-size:.7rem; padding:2px 10px;">
+          <span class="status-dot ${isActive ? 'active' : 'inactive'}"></span>
+          ${isActive ? 'Active' : 'Closed ' + (v.effective_to || '')}
+        </span>
+        <small class="text-muted">by ${v.created_by} &nbsp;·&nbsp; ${v.created_at}</small>
+      </div>
+      <div class="timeline-body">
+        <div class="tl-row"><span class="tl-label">Entitlement</span><span>${v.annual_entitlement} days/year</span></div>
+        <div class="tl-row"><span class="tl-label">Accrual</span><span>${v.accrual_period}</span></div>
+        <div class="tl-row"><span class="tl-label">Max Consecutive</span><span>${v.max_consecutive_days ?? '—'}</span></div>
+        <div class="tl-row"><span class="tl-label">Min Per Application</span><span>${v.min_days_per_application ?? '—'}</span></div>
+        <div class="tl-row"><span class="tl-label">Max Spells/Year</span><span>${v.max_spells_per_year ?? '—'}</span></div>
+      </div>`;
+
+    if (data.versions.length > 1) {
+      html += `
+      <div class="compare-check" id="cmp-${v.id}" onclick="toggleCompare(${v.id}, '${label}', this)">
+        <i class="fas fa-code-branch"></i> Select for Compare
+      </div>`;
+    }
+
+    html += `</div>`;
+  });
+  html += `</div>`;
+  document.getElementById('historyModalBody').innerHTML = html;
+}
+
+/* ────────────────────────────────────────────────────────
+   Compare selection logic
+──────────────────────────────────────────────────────── */
+function toggleCompare(id, label, el) {
+  const existing = compareSelected.findIndex(x => x.id === id);
+  if (existing > -1) {
+    compareSelected.splice(existing, 1);
+    el.classList.remove('selected');
+    el.innerHTML = `<i class="fas fa-code-branch"></i> Select for Compare`;
+  } else {
+    if (compareSelected.length >= 2) {
+      // Deselect oldest
+      const old = compareSelected.shift();
+      const oldEl = document.getElementById(`cmp-${old.id}`);
+      if (oldEl) {
+        oldEl.classList.remove('selected');
+        oldEl.innerHTML = `<i class="fas fa-code-branch"></i> Select for Compare`;
+      }
+    }
+    compareSelected.push({ id, label });
+    el.classList.add('selected');
+    el.innerHTML = `<i class="fas fa-check"></i> Selected`;
+  }
+  updateCompareUI();
+}
+
+function updateCompareUI() {
+  const btn    = document.getElementById('btnCompareSelected');
+  const badge  = document.getElementById('compareCountBadge');
+  const topBtn = document.getElementById('btnOpenCompareModal');
+
+  if (compareSelected.length === 2) {
+    btn.style.display    = 'inline-flex';
+    badge.style.display  = 'inline';
+    badge.textContent    = '2 selected';
+    topBtn.disabled      = false;
+  } else {
+    btn.style.display    = 'none';
+    badge.style.display  = 'none';
+    topBtn.disabled      = compareSelected.length < 2;
+  }
+}
+
+/* ────────────────────────────────────────────────────────
+   Run compare (AJAX)
+──────────────────────────────────────────────────────── */
+function runCompare() {
+  if (compareSelected.length < 2) return;
+
+  const [a, b] = compareSelected;
+  const url = `{% url 'leave:policy_config_compare' %}?a=${a.id}&b=${b.id}`;
+
+  $('#historyModal').modal('hide');
+  document.getElementById('compareModalBody').innerHTML = `
+    <div class="text-center py-5">
+      <div class="spinner-border" style="color:#7c3aed;" role="status"></div>
+      <p class="mt-3 text-muted">Comparing versions…</p>
+    </div>`;
+  $('#compareModal').modal('show');
+
+  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.json())
+    .then(data => renderCompare(data))
+    .catch(() => {
+      document.getElementById('compareModalBody').innerHTML =
+        `<div class="alert alert-danger">Failed to load comparison.</div>`;
+    });
+}
+
+// Top-level compare button
+document.getElementById('btnOpenCompareModal').addEventListener('click', runCompare);
+
+function renderCompare(data) {
+  document.getElementById('compareLeaveTypeName').textContent = data.leave_type;
+
+  const vA = data.version_a;
+  const vB = data.version_b;
+
+  // Summary bar
+  let html = `
+  <div class="compare-summary">
+    <div>
+      <div class="cs-count">${data.changed_count}</div>
+      <div style="font-size:.75rem; color:var(--text-muted);">fields changed</div>
+    </div>
+    <div style="flex:1; border-left:1px solid var(--border); padding-left:16px;">
+      <div style="display:flex; gap:20px; flex-wrap:wrap;">
+        <div>
+          <div style="font-size:.7rem; font-weight:700; color:var(--brand); text-transform:uppercase; letter-spacing:.5px;">Version A</div>
+          <div style="font-size:.85rem; font-weight:600;">${vA.effective_from} → ${vA.effective_to}</div>
+          ${vA.is_active ? '<span class="status-pill active" style="font-size:.7rem; padding:2px 8px;"><span class="status-dot active"></span> Active</span>' : ''}
+        </div>
+        <div style="display:flex; align-items:center; color:var(--text-muted);">
+          <i class="fas fa-arrows-alt-h fa-lg"></i>
+        </div>
+        <div>
+          <div style="font-size:.7rem; font-weight:700; color:#7c3aed; text-transform:uppercase; letter-spacing:.5px;">Version B</div>
+          <div style="font-size:.85rem; font-weight:600;">${vB.effective_from} → ${vB.effective_to}</div>
+          ${vB.is_active ? '<span class="status-pill active" style="font-size:.7rem; padding:2px 8px;"><span class="status-dot active"></span> Active</span>' : ''}
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // Diff table header
+  html += `
+  <div class="diff-header">
+    <div class="diff-header-cell label">Field</div>
+    <div class="diff-header-cell ver ver-a">Version A &nbsp; ${vA.effective_from}</div>
+    <div class="diff-header-cell ver ver-b">Version B &nbsp; ${vB.effective_from}</div>
+  </div>`;
+
+  // Group rows
+  let currentGroup = null;
+  data.diff.forEach(row => {
+    if (row.group !== currentGroup) {
+      currentGroup = row.group;
+      html += `<div class="diff-group-label"><i class="fas fa-tag" style="margin-right:5px;"></i>${row.group}</div>`;
+    }
+    const changed = row.changed;
+    const valA    = formatVal(row.value_a);
+    const valB    = formatVal(row.value_b);
+
+    html += `
+    <div class="diff-row ${changed ? 'changed' : ''}">
+      <div class="diff-cell label">
+        ${changed ? '<span class="changed-indicator"></span>' : ''}
+        ${row.label}
+      </div>
+      <div class="diff-cell val-a ${changed ? 'changed-a' : 'diff-unchanged'}">${valA}</div>
+      <div class="diff-cell val-b ${changed ? 'changed-b' : 'diff-unchanged'}">${valB}</div>
+    </div>`;
+  });
+
+  document.getElementById('compareModalBody').innerHTML = html;
+}
+
+function formatVal(val) {
+  if (val === null || val === undefined) return '<span style="color:#ccc;">—</span>';
+  if (val === true)  return '<i class="fas fa-check" style="color:var(--success);"></i> Yes';
+  if (val === false) return '<i class="fas fa-times" style="color:#ccc;"></i> No';
+  return String(val);
+}
+</script>
+{% endblock %}
