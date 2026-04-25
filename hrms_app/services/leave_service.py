@@ -148,92 +148,29 @@ class LeaveDomainService:
     # VALIDATION: Probation Rules  ← FIX 1 + FIX 2
     # ─────────────────────────────────────────────────────────
 
-    @classmethod
-    def validate_probation_rules(cls, user, leave_type, reference_date: date):
+    @staticmethod
+    def validate_probation_rules(user, leave_type, reference_date: date):
         """
-        Validate whether the user is eligible for this leave type
-        based on their probation/confirmation status.
-
-        FIX 1: No longer hardcodes leave_type_short_code == "EL".
-               Reads `requires_confirmation` flag from LeavePolicyConfig
-               (versioned — uses reference_date to get the correct policy version).
-
-        FIX 2: No longer hardcodes 180-day probation period.
-               The confirmation_date on the employee profile is the
-               authoritative source. Falls back to DOJ + 180 days
-               only if no config-based check applies.
-
-        This method is now the canonical probation check.
-        LeavePolicyManager._validate_probation() calls the same logic
-        via the policy config. Avoid calling both in the same flow.
+        Prevent EL leave during 180-day probation period.
         """
-        reference_date = cls._normalize_date(reference_date)
 
-        # ── Step 1: Check LeavePolicyConfig for this leave type ──────────
-        policy = LeavePolicyConfig.get_active_policy(leave_type, reference_date)
-
-        if policy is not None:
-            # Policy-driven check: use requires_confirmation flag
-            if not policy.requires_confirmation:
-                return   # This leave type doesn't require confirmation → allow
-
-            # Get confirmation date from employee profile
-            profile = (
-                getattr(user, "employee_profile", None)
-                or getattr(user, "personal_detail", None)
-                or getattr(user, "profile", None)
-            )
-
-            confirmation_date = (
-                getattr(profile, "confirmation_date", None)
-                or getattr(profile, "probation_end_date", None)
-            )
-
-            if confirmation_date is None:
-                raise ValidationError(
-                    _(
-                        "Your confirmation date is not set. "
-                        "You cannot apply for %(leave)s until your probation is confirmed. "
-                        "Please contact HR."
-                    ) % {"leave": leave_type.leave_type}
-                )
-
-            confirmation_date = cls._normalize_date(confirmation_date)
-
-            if reference_date < confirmation_date:
-                raise ValidationError(
-                    _(
-                        "%(leave)s is only available after your confirmation date "
-                        "(%(date)s). Your applied start date (%(ref)s) falls within "
-                        "the probation period."
-                    ) % {
-                        "leave": leave_type.leave_type,
-                        "date":  confirmation_date,
-                        "ref":   reference_date,
-                    }
-                )
-            return   # Passed policy-based check
-
-        # ── Step 2: Legacy fallback (no policy config exists yet) ─────────
-        # Keeps backward compatibility with original 180-day DOJ check.
-        # Only applies to EL (leave_type_short_code == "EL") as before.
-        if leave_type.leave_type_short_code != "EL":
+        if not hasattr(user, "personal_detail") or not user.personal_detail.doj:
             return
 
-        profile = getattr(user, "personal_detail", None)
-        if not profile or not getattr(profile, "doj", None):
-            return
+        if leave_type.leave_type_short_code == "EL":
+            doj = user.personal_detail.doj
 
-        doj = cls._normalize_date(profile.doj)
+            # ✅ Normalize to date
+            if isinstance(reference_date, datetime):
+                reference_date = reference_date.date()
 
-        if (reference_date - doj).days < 180:
-            raise ValidationError(
-                _(
-                    "You are within the 180-day probation period and cannot apply "
-                    "for Earned Leave (EL)."
+            if isinstance(doj, datetime):
+                doj = doj.date()
+
+            if (reference_date - doj).days < 180:
+                raise ValidationError(
+                    _("You are in the probation period and cannot apply for Earned Leave (EL).")
                 )
-            )
-
 
 
 # from datetime import date,datetime
