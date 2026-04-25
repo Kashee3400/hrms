@@ -724,13 +724,24 @@ class TourForm(forms.ModelForm):
                 raise ValidationError(_("End date must be after start date."))
             if start_date == end_date and start_time and end_time and start_time >= end_time:
                 raise ValidationError(_("End time must be after start time on the same day."))
-        today = now().date()
-        if approval_type == settings.PRE_APPROVAL and start_date and start_date < today:
-            raise ValidationError(_("For Pre Approval, the start date must be today or a future date."))
-        
-        if approval_type == settings.POST_APPROVAL and start_date and start_date >= today:
-            raise ValidationError(_("For Post Approval, the start date must be in the past."))
-        
+        current_system_time = now() # Returns aware datetime
+        user_start_timestamp = datetime.combine(start_date, start_time)
+
+        # If your project uses timezones (USE_TZ=True), make the user's time aware
+        if settings.USE_TZ and user_start_timestamp.tzinfo is None:
+            from django.utils.timezone import get_current_timezone
+            user_start_timestamp = make_aware(user_start_timestamp, get_current_timezone())
+
+        # 1. Pre-Approval: Must be in the future
+        if approval_type == settings.PRE_APPROVAL:
+            if user_start_timestamp < current_system_time:
+                raise ValidationError(_("For Pre-Approval, the start time must be in the future."))
+
+        # 2. Post-Approval: Must be in the past
+        if approval_type == settings.POST_APPROVAL:
+            if user_start_timestamp >= current_system_time:
+                raise ValidationError(_("For Post-Approval, the start time must be in the past (already started/completed)."))
+
         if self.user and start_date and end_date:
             self._validate_attendance_conflict(start_date, end_time, start_time)
             self._validate_leave_conflict(start_date, end_date, start_time, end_time)
