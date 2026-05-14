@@ -23,8 +23,9 @@ from hrms_app.utility.attendanceutils import (
     get_days_in_month,
     get_non_stl_leave_logs,
 )
+import subprocess
+import os
 from ..utility.report_utils import get_monthly_presence_html_table
-
 from ..utility.attendance_mapper import AttendanceMapper
 logger = logging.getLogger(__name__)
 
@@ -206,7 +207,7 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
         if request.GET.get("export") == "true":
             form = AttendanceReportFilterForm(request.GET)
             if form.is_valid():
-                return self._export_table_data(form.cleaned_data)
+                return self._export_table_data_pdf(form.cleaned_data)
 
         return super().get(request, *args, **kwargs)
 
@@ -231,6 +232,76 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
             response["Content-Disposition"] = f"attachment; filename={filename}"
             return response
 
+    def _export_table_data_pdf(self, form_data):
+
+        table_data = self._get_filtered_table_data(
+            form_data,
+            self.request.GET.get("q", "")
+        )
+
+        df = pd.read_html(table_data)[0]
+
+        excel_filename = (
+            f"monthly_presence_data_"
+            f"{form_data['from_date']}_to_"
+            f"{form_data['to_date']}.xlsx"
+        )
+
+        pdf_filename = excel_filename.replace(".xlsx", ".pdf")
+
+        # Create Excel
+        with pd.ExcelWriter(
+            excel_filename,
+            engine="xlsxwriter"
+        ) as writer:
+
+            df.to_excel(
+                writer,
+                index=False,
+                sheet_name="Report"
+            )
+
+            workbook = writer.book
+            worksheet = writer.sheets["Report"]
+
+            # Landscape mode
+            worksheet.set_landscape()
+
+            # Fit to page
+            worksheet.fit_to_pages(1, 0)
+
+            # Small font columns
+            worksheet.set_default_row(18)
+
+            # Auto column width
+            for i, col in enumerate(df.columns):
+                width = max(df[col].astype(str).map(len).max(), len(col))
+                worksheet.set_column(i, i, min(width + 2, 20))
+
+        # Convert Excel to PDF using LibreOffice
+        subprocess.run([
+            "libreoffice",
+            "--headless",
+            "--convert-to",
+            "pdf",
+            excel_filename,
+            "--outdir",
+            os.getcwd()
+        ])
+
+        # Return PDF
+        with open(pdf_filename, "rb") as pdf_file:
+
+            response = HttpResponse(
+                pdf_file.read(),
+                content_type="application/pdf"
+            )
+
+            response["Content-Disposition"] = (
+                f'attachment; filename="{pdf_filename}"'
+            )
+
+            return response
 
 class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/leave_balance_report.html"

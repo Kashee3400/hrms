@@ -219,16 +219,23 @@
           className: 'btn btn-sm btn-outline-primary',
           text: '<i class="fas fa-copy"></i> Copy'
         },
+        // {
+        //   extend: 'csv',
+        //   className: 'btn btn-sm btn-outline-success',
+        //   text: '<i class="fas fa-file-csv"></i> CSV'
+        // },
         {
-          extend: 'csv',
-          className: 'btn btn-sm btn-outline-success',
-          text: '<i class="fas fa-file-csv"></i> CSV'
+          extend: 'pdfHtml5',
+          className: 'btn btn-sm btn-outline-danger',
+          text: '<i class="fas fa-file-pdf"></i> PDF',
+          orientation: 'landscape', // optional
+          pageSize: 'A4' // optional
         },
-        {
-          extend: 'excel',
-          className: 'btn btn-sm btn-outline-success',
-          text: '<i class="fas fa-file-excel"></i> Excel'
-        }
+        // {
+        //   extend: 'excel',
+        //   className: 'btn btn-sm btn-outline-success',
+        //   text: '<i class="fas fa-file-excel"></i> Excel'
+        // }
       ],
       language: {
         lengthMenu: "Show _MENU_ employees per page",
