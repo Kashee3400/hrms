@@ -123,6 +123,7 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             leave_logs=leave_logs,
             holidays=holidays,
             tour_logs=tour_logs,
+            detailed=False,
         )
         
         return attendance_data
@@ -157,36 +158,205 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             ("attendance_report", {"label": "Attendance Report"}),
         ]
 
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.units import mm
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.pdfgen import canvas as rl_canvas
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Page-numbering canvas  ("Page X of Y" at bottom-right)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class _NumberedCanvas(rl_canvas.Canvas):
+    """Defers page numbers until all pages are known, then stamps each one."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._saved_page_states = []
+
+    def showPage(self):
+        self._saved_page_states.append(dict(self.__dict__))
+        self._startPage()
+
+    def save(self):
+        total = len(self._saved_page_states)
+        for state in self._saved_page_states:
+            self.__dict__.update(state)
+            page_w, _ = landscape(A4)
+            self.setFont("Helvetica", 8)
+            self.drawCentredString(page_w / 2, 6 * mm, f'Page {self._pageNumber} of {total}')
+            super().showPage()
+        super().save()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PDF builder  (pure-Python, no LibreOffice)
+# ─────────────────────────────────────────────────────────────────────────────
+def _format_date_header(d):
+    return str(d)
+
+def _build_attendance_pdf(df: pd.DataFrame) -> bytes:
+    """
+    Convert an attendance DataFrame into PDF bytes.
+
+    Expected columns:
+        'Employee Code' | 'Name' | 'Attendance' | <date1> | <date2> | ...
+
+    'Attendance' holds row-type labels:
+        Status / In Time / Out Time / Duration / Leave / Tour / Reg
+    """
+
+    PAGE_SIZE = landscape(A4)
+    LM = RM = 8 * mm
+    TM = BM = 12 * mm
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=PAGE_SIZE,
+        leftMargin=LM,
+        rightMargin=RM,
+        topMargin=TM,
+        bottomMargin=BM,
+    )
+
+    # ── paragraph styles ──────────────────────────────────────────────────────
+    hs_fixed = ParagraphStyle(          # fixed columns header (Employee Code / Name / Attendance)
+        "hs_fixed",
+        fontSize=7,
+        fontName="Helvetica-Bold",
+        alignment=TA_CENTER,
+        leading=8,
+    )
+    hs_date = ParagraphStyle(           # date columns header  (21-Apr, 22-Apr …)
+        "hs_date",
+        fontSize=6,
+        fontName="Helvetica-Bold",
+        alignment=TA_CENTER,
+        leading=7,
+    )
+    cell_left = ParagraphStyle(         # data — left-aligned  (code / name / attendance label)
+        "cell_left",
+        fontSize=6.5,
+        fontName="Helvetica",
+        alignment=TA_LEFT,
+        leading=7.5,
+    )
+    cell_center = ParagraphStyle(       # data — centred  (P / A / H / times / durations)
+        "cell_center",
+        fontSize=6.5,
+        fontName="Helvetica",
+        alignment=TA_CENTER,
+        leading=7.5,
+    )
+
+    # ── column widths ─────────────────────────────────────────────────────────
+    fixed_cols = ["Employee Code", "Name", "Attendance"]
+    date_cols  = [c for c in df.columns if c not in fixed_cols]
+    
+
+    usable_w = PAGE_SIZE[0] - LM - RM
+    w_code   = 20 * mm
+    w_name   = 32 * mm
+    w_att    = 14 * mm
+    date_w   = max(
+        (usable_w - w_code - w_name - w_att) / max(len(date_cols), 1),
+        6.5 * mm,
+    )
+    col_widths = [w_code, w_name, w_att] + [date_w] * len(date_cols)
+
+    # ── build table rows ──────────────────────────────────────────────────────
+    header_row = (
+        [
+            Paragraph("Employee Code", hs_fixed),
+            Paragraph("Name",          hs_fixed),
+            Paragraph("Attendance",    hs_fixed),
+        ]
+        + [Paragraph(_format_date_header(d), hs_date) for d in date_cols]
+    )
+    table_rows = [header_row]
+
+    for _, row in df.iterrows():
+        data_row = (
+            [
+                Paragraph(str(row.get("Employee Code", "")), cell_left),
+                Paragraph(str(row.get("Name",          "")), cell_left),
+                Paragraph(str(row.get("Attendance",    "")), cell_left),
+            ]
+            + [Paragraph(str(row.get(d, "")), cell_center) for d in date_cols]
+        )
+        table_rows.append(data_row)
+
+    # ── table style ───────────────────────────────────────────────────────────
+    ts = TableStyle([
+        # Header row — bordered box on every cell, pure white, bold
+        ("BOX",           (0, 0), (-1,  0), 0.5, colors.black),
+        ("INNERGRID",     (0, 0), (-1,  0), 0.5, colors.black),
+        ("BACKGROUND",    (0, 0), (-1,  0), colors.white),
+        ("FONTNAME",      (0, 0), (-1,  0), "Helvetica-Bold"),
+        ("ALIGN",         (0, 0), (-1,  0), "CENTER"),
+        ("VALIGN",        (0, 0), (-1,  0), "MIDDLE"),
+
+        # Data rows — completely borderless, pure white
+        ("BACKGROUND",    (0, 1), (-1, -1), colors.white),
+        ("FONTNAME",      (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE",      (0, 1), (-1, -1), 6.5),
+        ("VALIGN",        (0, 1), (-1, -1), "MIDDLE"),
+
+        # Padding for all cells
+        ("TOPPADDING",    (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 2),
+    ])
+
+    table = Table(table_rows, colWidths=col_widths, repeatRows=1)
+    table.setStyle(ts)
+
+    doc.build([table], canvasmaker=_NumberedCanvas)
+    buf.seek(0)
+    return buf.read()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Django view
+# ─────────────────────────────────────────────────────────────────────────────
 
 class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/present_absent_detailed_report.html"
     permission_denied_message = _("You are not authorized to access this page.")
     title = _("Attendance Detailed Report")
 
+    # ── context ───────────────────────────────────────────────────────────────
+
     def get_context_data(self, **kwargs):
-        """Prepare context data for rendering the template."""
         context = super().get_context_data(**kwargs)
         form = AttendanceReportFilterForm(self.request.GET)
         if form.is_valid():
-            # Get filtered data and generate HTML table
-            table_data = self._get_filtered_table_data(form.cleaned_data,self.request.GET.get("q",""))
-            context.update(
-                {
-                    "html_table": table_data,
-                    "form": form,
-                    "urls": self._get_breadcrumb_urls(),
-                    "query":self.request.GET.get("q","")
-                }
+            table_data = self._get_filtered_table_data(
+                form.cleaned_data,
+                self.request.GET.get("q", ""),
             )
+            context.update({
+                "html_table": table_data,
+                "form":       form,
+                "urls":       self._get_breadcrumb_urls(),
+                "query":      self.request.GET.get("q", ""),
+            })
         else:
             context.update({"form": form, "urls": self._get_breadcrumb_urls()})
 
         context["title"] = self.title
         return context
 
-    def _get_filtered_table_data(self, form_data,query):
-        """Generate HTML table data based on form filters."""
+    # ── helpers ───────────────────────────────────────────────────────────────
+
+    def _get_filtered_table_data(self, form_data, query):
         return get_monthly_presence_html_table(
             converted_from_datetime=form_data.get("from_date"),
             converted_to_datetime=form_data.get("to_date"),
@@ -196,14 +366,14 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
         )
 
     def _get_breadcrumb_urls(self):
-        """Generate breadcrumb URLs for the template."""
         return [
-            ("dashboard", {"label": "Dashboard"}),
-            ("detailed_attendance_report", {"label": "Detailed Attendance Report"}),
+            ("dashboard",                   {"label": "Dashboard"}),
+            ("detailed_attendance_report",  {"label": "Detailed Attendance Report"}),
         ]
 
+    # ── GET handler ───────────────────────────────────────────────────────────
+
     def get(self, request, *args, **kwargs):
-        """Handle GET requests, including export functionality."""
         if request.GET.get("export") == "true":
             form = AttendanceReportFilterForm(request.GET)
             if form.is_valid():
@@ -211,97 +381,56 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
 
         return super().get(request, *args, **kwargs)
 
+    # ── Excel export (unchanged) ──────────────────────────────────────────────
+
     def _export_table_data(self, form_data):
-        """Export filtered table data to an Excel file."""
-        table_data = self._get_filtered_table_data(form_data,self.request.GET.get("q",""))
-
-        # Convert HTML table to DataFrame
-        df = pd.read_html(table_data)[0]  # Assuming only one table in HTML content
-        filename = f"monthly_presence_data_from_{form_data['from_date']}_to_{form_data['to_date']}.xlsx"
-
-        # Create an Excel writer object
+        table_data = self._get_filtered_table_data(
+            form_data,
+            self.request.GET.get("q", ""),
+        )
+        df = pd.read_html(table_data)[0]
+        filename = (
+            f"monthly_presence_data_from_"
+            f"{form_data['from_date']}_to_{form_data['to_date']}.xlsx"
+        )
         with pd.ExcelWriter(filename, engine="xlsxwriter") as excel_writer:
             df.to_excel(excel_writer, index=False, sheet_name="Sheet1")
 
-        # Prepare the response with the Excel file
         with open(filename, "rb") as excel_file:
             response = HttpResponse(
                 excel_file.read(),
-                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                content_type=(
+                    "application/vnd.openxmlformats-officedocument"
+                    ".spreadsheetml.sheet"
+                ),
             )
             response["Content-Disposition"] = f"attachment; filename={filename}"
             return response
 
-    def _export_table_data_pdf(self, form_data):
+    # ── PDF export ────────────────────────────────────────────────────────────
 
+    def _export_table_data_pdf(self, form_data):
+        # 1. Fetch the HTML table and parse it into a DataFrame
         table_data = self._get_filtered_table_data(
             form_data,
-            self.request.GET.get("q", "")
+            self.request.GET.get("q", ""),
         )
-
         df = pd.read_html(table_data)[0]
+        df = df.fillna("")  
+        # 2. Build PDF entirely in memory — no temp files, no LibreOffice
+        pdf_bytes = _build_attendance_pdf(df)
 
-        excel_filename = (
+        # 3. Stream back as a downloadable PDF
+        pdf_filename = (
             f"monthly_presence_data_"
             f"{form_data['from_date']}_to_"
-            f"{form_data['to_date']}.xlsx"
+            f"{form_data['to_date']}.pdf"
         )
-
-        pdf_filename = excel_filename.replace(".xlsx", ".pdf")
-
-        # Create Excel
-        with pd.ExcelWriter(
-            excel_filename,
-            engine="xlsxwriter"
-        ) as writer:
-
-            df.to_excel(
-                writer,
-                index=False,
-                sheet_name="Report"
-            )
-
-            workbook = writer.book
-            worksheet = writer.sheets["Report"]
-
-            # Landscape mode
-            worksheet.set_landscape()
-
-            # Fit to page
-            worksheet.fit_to_pages(1, 0)
-
-            # Small font columns
-            worksheet.set_default_row(18)
-
-            # Auto column width
-            for i, col in enumerate(df.columns):
-                width = max(df[col].astype(str).map(len).max(), len(col))
-                worksheet.set_column(i, i, min(width + 2, 20))
-
-        # Convert Excel to PDF using LibreOffice
-        subprocess.run([
-            "libreoffice",
-            "--headless",
-            "--convert-to",
-            "pdf",
-            excel_filename,
-            "--outdir",
-            os.getcwd()
-        ])
-
-        # Return PDF
-        with open(pdf_filename, "rb") as pdf_file:
-
-            response = HttpResponse(
-                pdf_file.read(),
-                content_type="application/pdf"
-            )
-
-            response["Content-Disposition"] = (
-                f'attachment; filename="{pdf_filename}"'
-            )
-
-            return response
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = (
+            f'attachment; filename="{pdf_filename}"'
+        )
+        return response
 
 class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/leave_balance_report.html"

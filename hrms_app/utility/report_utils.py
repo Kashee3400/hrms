@@ -173,7 +173,7 @@ def generate_monthly_presence_data_detailed(
     
     process_logs(logs, monthly_presence_data, converted_from_datetime, converted_to_datetime)
     process_leaves(leaves, monthly_presence_data)
-    process_tours(all_tours, monthly_presence_data)
+    process_tours(all_tours, monthly_presence_data,detailed=True)
 
     return monthly_presence_data
 
@@ -438,10 +438,10 @@ def process_leaves(leaves, monthly_presence_data):
             }
 
 
-def process_tours(all_tours, monthly_presence_data):
+def process_tours(all_tours, monthly_presence_data,detailed):
     for tour in all_tours:
         daily_durations = calculate_daily_tour_durations(
-            tour.start_date, tour.start_time, tour.end_date, tour.end_time
+            tour.start_date, tour.start_time, tour.end_date, tour.end_time,detailed
         )
         emp_code = tour.applied_by.personal_detail.employee_code
         for date, short_code, duration in daily_durations:
@@ -469,7 +469,7 @@ def get_office_closers(start_date, end_date):
     )
 
 
-def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
+def calculate_daily_tour_durations(start_date, start_time, end_date, end_time,detailed):
     # Combine date and time into datetime objects
     start_datetime = datetime.combine(start_date, start_time or datetime.min.time())
     end_datetime = datetime.combine(end_date, end_time or datetime.min.time())
@@ -499,7 +499,11 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time):
         total_duration = duration + log_duration
         total_hours = total_duration.total_seconds() / 3600
         # Determine the short code based on the total hours
-        short_code = "T" if total_hours >= 8 else "TH"
+        # short_code = "T" if total_hours >= 8 else "TH"
+        if detailed :
+            short_code = "T" if total_hours >= 8 else "TH" 
+        else:
+            short_code = "P" if total_hours >= 8 else "PH"
         # Append the result for the current day
         daily_durations.append((current_datetime.date(), short_code, total_duration))
         # Move to the next day

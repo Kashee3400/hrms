@@ -84,7 +84,7 @@ class AttendanceMapper:
         new_priority = self.STATUS_HIERARCHY.get(new_status, 0)
         return new_priority > existing_priority
     
-    def map_attendance_data(self, attendance_logs, leave_logs, holidays, tour_logs):
+    def map_attendance_data(self, attendance_logs, leave_logs, holidays, tour_logs,detailed=False):
         """Main method to aggregate all attendance data"""
         
         # OPTIMIZATION: Pre-load office closures once (avoid repeated queries)
@@ -95,7 +95,7 @@ class AttendanceMapper:
         
         # Process in order of priority to avoid unnecessary overrides
         self._process_attendance_logs(attendance_logs)
-        self._process_tour_logs(tour_logs)
+        self._process_tour_logs(tour_logs,detailed)
         self._process_holidays(holidays)
         self._process_leave_logs(leave_logs)
         self._add_sundays()
@@ -157,16 +157,17 @@ class AttendanceMapper:
 
             self._set_status(employee_id, log_date, status, color)
     
-    def _process_tour_logs(self, tour_logs):
+    def _process_tour_logs(self, tour_logs,detailed):
         """Process tour logs"""
         for log in tour_logs:
             employee_id = log.applied_by.id
             daily_durations = calculate_daily_tour_durations(
-                log.start_date, log.start_time, log.end_date, log.end_time
+                log.start_date, log.start_time, log.end_date, log.end_time,detailed
             )
             
             for date, short_code, _ in daily_durations:
-                self._set_status(employee_id, date, short_code, "#06c1c4")
+                self._set_status(employee_id, date, short_code, "#06B900")
+                # self._set_status(employee_id, date, short_code, "#06c1c4")
     
     def _process_holidays(self, holidays):
         """
