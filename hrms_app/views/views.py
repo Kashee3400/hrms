@@ -1697,7 +1697,7 @@ class EventListView(View):
 
 
 from django.utils.dateparse import parse_date, parse_datetime
-
+from django.db.models import OuterRef, Subquery
 
 class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, FilterView):
     model = AttendanceLog
@@ -1743,6 +1743,7 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
             status__in=[settings.PENDING, settings.RECOMMEND],
             is_submitted=True,
             is_regularisation=True,
+            reg_status__isnull=False
         )
         return self.filter_by_date_range(qs_current_user)
 
@@ -1754,8 +1755,8 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
                     is_regularisation=True,
                     status__in=[settings.PENDING, settings.RECOMMEND],
                     is_submitted=True,
-                )
-                
+                    # reg_status__isnull=False
+                )                
                 .order_by("applied_by__first_name")
             )
             return self.filter_by_date_range(qs_all)
@@ -1774,9 +1775,22 @@ class AttendanceLogListView(ModelPermissionRequiredMixin, SingleTableMixin, Filt
         user = self.request.user
         start_month = self.request.GET.get("start_month")
         end_month = self.request.GET.get("end_month")
+        
+        latest_history = AttendanceLogHistory.objects.filter(
+            attendance_log=OuterRef('pk')
+        ).order_by('-modified_at')
 
-        # Base queryset: only approved ones
-        qs_all = self.model.objects.filter(regularized=True)
+        qs_all = self.model.objects.filter(
+            regularized=True
+        ).filter(
+            history__id=Subquery(
+                latest_history.values('id')[:1]
+            )
+        ).exclude(
+            history__previous_data__reg_status__isnull=True
+        ).exclude(
+            history__previous_data__reg_status=''
+        )
 
         # Date filtering
         if start_month:
