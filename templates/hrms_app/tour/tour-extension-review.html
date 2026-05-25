@@ -1,0 +1,1055 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag humanize i18n %}
+
+{% block title %}{% trans 'Review Extension Request' %} | {{ extension_request.tour.from_destination }} → {{ extension_request.tour.to_destination }}{% endblock %}
+
+{% block extrastyle %}
+<style>
+    :root {
+        --brand: #1a56db;
+        --brand-light: #eff6ff;
+        --brand-dark: #1e40af;
+        --surface: #ffffff;
+        --surface-alt: #f8fafc;
+        --border: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-muted: #64748b;
+        --radius: 12px;
+        --radius-sm: 8px;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, .06);
+        --shadow: 0 4px 16px rgba(0, 0, 0, .08);
+        --shadow-lg: 0 12px 40px rgba(0, 0, 0, .14);
+        --transition: .2s cubic-bezier(.4, 0, .2, 1);
+    }
+
+    .page-wrap {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 3rem;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        font-size: .8rem;
+        font-weight: 600;
+        color: var(--text-muted);
+        text-decoration: none;
+        margin-bottom: 1.25rem;
+        transition: color var(--transition);
+    }
+
+    .back-link:hover {
+        color: var(--brand);
+    }
+
+    /* ── Page heading ── */
+    .page-heading {
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: .75rem;
+    }
+
+    .page-heading h2 {
+        font-size: 1.35rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin: 0 0 .3rem;
+    }
+
+    .page-heading p {
+        font-size: .875rem;
+        color: var(--text-muted);
+        margin: 0;
+    }
+
+    /* ── Status pill ── */
+    .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .3rem .85rem;
+        border-radius: 999px;
+        font-size: .75rem;
+        font-weight: 700;
+        letter-spacing: .03em;
+        text-transform: uppercase;
+    }
+
+    .status-pill::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+    }
+
+    .status-pill.pending {
+        background: #fef9c3;
+        color: #92400e;
+    }
+
+    .status-pill.pending::before {
+        background: #d97706;
+        animation: pulse 1.5s infinite;
+    }
+
+    .status-pill.approved {
+        background: #dcfce7;
+        color: #15803d;
+    }
+
+    .status-pill.approved::before {
+        background: #16a34a;
+    }
+
+    .status-pill.rejected {
+        background: #fee2e2;
+        color: #b91c1c;
+    }
+
+    .status-pill.rejected::before {
+        background: #dc2626;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1
+        }
+
+        50% {
+            opacity: .35
+        }
+    }
+
+    /* ── Card ── */
+    .card-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+        margin-bottom: 1.25rem;
+        transition: box-shadow var(--transition);
+    }
+
+    .card-section:hover {
+        box-shadow: var(--shadow);
+    }
+
+    .card-section__head {
+        background: var(--surface-alt);
+        border-bottom: 1px solid var(--border);
+        padding: .85rem 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: .5rem;
+        font-size: .78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .05em;
+        color: var(--text-muted);
+    }
+
+    .card-section__head svg {
+        width: 15px;
+        height: 15px;
+        stroke: var(--brand);
+        flex-shrink: 0;
+    }
+
+    .card-section__body {
+        padding: 1.25rem;
+    }
+
+    /* ── Employee info strip ── */
+    .emp-strip {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .emp-avatar {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: 2px solid var(--border);
+        object-fit: cover;
+        flex-shrink: 0;
+    }
+
+    .emp-avatar-init {
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, var(--brand) 0%, #7c3aed 100%);
+        color: #fff;
+        font-weight: 800;
+        font-size: 1.15rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .emp-name {
+        font-weight: 700;
+        font-size: .95rem;
+        color: var(--text-primary);
+    }
+
+    .emp-meta {
+        font-size: .78rem;
+        color: var(--text-muted);
+        margin-top: .1rem;
+    }
+
+    /* ── Diff table ── */
+    .diff-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: .85rem;
+    }
+
+    .diff-table th {
+        background: var(--surface-alt);
+        padding: .6rem 1rem;
+        text-align: left;
+        font-size: .72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .06em;
+        color: var(--text-muted);
+        border-bottom: 1px solid var(--border);
+    }
+
+    .diff-table td {
+        padding: .75rem 1rem;
+        border-bottom: 1px solid var(--border);
+        vertical-align: middle;
+    }
+
+    .diff-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .diff-table .field-name {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .diff-cell-old {
+        color: #92400e;
+        background: #fff7ed;
+        border-radius: 6px;
+        padding: .3rem .65rem;
+        display: inline-block;
+    }
+
+    .diff-cell-new {
+        color: #166534;
+        background: #f0fdf4;
+        border-radius: 6px;
+        padding: .3rem .65rem;
+        display: inline-block;
+    }
+
+    .diff-cell-same {
+        color: var(--text-muted);
+        font-style: italic;
+    }
+
+    .diff-arrow {
+        color: var(--text-muted);
+        padding: 0 .5rem;
+        font-size: .9rem;
+    }
+
+    .diff-changed-row td {
+        background: #fffbeb;
+    }
+
+    /* ── Reason box ── */
+    .reason-box {
+        background: var(--surface-alt);
+        border-left: 3px solid var(--brand);
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        padding: .85rem 1rem;
+        font-size: .875rem;
+        color: var(--text-primary);
+        line-height: 1.6;
+    }
+
+    /* ── Timeline log ── */
+    .timeline {
+        position: relative;
+        padding: .25rem 0;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 17px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--border);
+        border-radius: 1px;
+    }
+
+    .tl-item {
+        display: flex;
+        gap: .9rem;
+        padding: .5rem 0;
+        position: relative;
+    }
+
+    .tl-dot {
+        flex-shrink: 0;
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        background: var(--brand-light);
+        border: 2px solid var(--brand);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: .68rem;
+        font-weight: 800;
+        color: var(--brand);
+        z-index: 1;
+    }
+
+    .tl-body {
+        flex: 1;
+        padding-bottom: .4rem;
+    }
+
+    .tl-action {
+        font-size: .78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--text-primary);
+    }
+
+    .tl-meta {
+        font-size: .73rem;
+        color: var(--text-muted);
+        margin-top: .1rem;
+    }
+
+    .tl-comment {
+        margin-top: .45rem;
+        padding: .55rem .8rem;
+        background: var(--surface-alt);
+        border-left: 3px solid var(--brand);
+        border-radius: 0 6px 6px 0;
+        font-size: .78rem;
+        color: var(--text-primary);
+        line-height: 1.5;
+    }
+
+    /* ── Form label ── */
+    .form-label-custom {
+        font-size: .78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--text-muted);
+        display: block;
+        margin-bottom: .4rem;
+    }
+
+    /* ── Buttons ── */
+    .btn-approve {
+        background: #16a34a;
+        color: #fff;
+        border: none;
+        padding: .7rem 1.6rem;
+        border-radius: var(--radius-sm);
+        font-weight: 700;
+        font-size: .9rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+    }
+
+    .btn-approve:hover {
+        background: #15803d;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 14px rgba(22, 163, 74, .3);
+    }
+
+    .btn-reject {
+        background: transparent;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+        padding: .7rem 1.4rem;
+        border-radius: var(--radius-sm);
+        font-weight: 700;
+        font-size: .9rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: .5rem;
+        transition: all var(--transition);
+    }
+
+    .btn-reject:hover {
+        background: #fee2e2;
+        border-color: #f87171;
+    }
+
+    .btn-back {
+        background: transparent;
+        color: var(--text-muted);
+        border: 1px solid var(--border);
+        padding: .7rem 1.4rem;
+        border-radius: var(--radius-sm);
+        font-weight: 600;
+        font-size: .9rem;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: .4rem;
+        transition: all var(--transition);
+    }
+
+    .btn-back:hover {
+        border-color: var(--text-muted);
+        color: var(--text-primary);
+    }
+
+    /* ── Already reviewed banner ── */
+    .reviewed-banner {
+        border-radius: var(--radius);
+        padding: 1rem 1.25rem;
+        display: flex;
+        gap: .85rem;
+        align-items: flex-start;
+        margin-bottom: 1.25rem;
+    }
+
+    .reviewed-banner.approved {
+        background: #dcfce7;
+        border: 1px solid #bbf7d0;
+    }
+
+    .reviewed-banner.rejected {
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+    }
+
+    .reviewed-banner svg {
+        flex-shrink: 0;
+        width: 20px;
+        height: 20px;
+        margin-top: .05rem;
+    }
+
+    .reviewed-banner.approved svg {
+        stroke: #16a34a;
+    }
+
+    .reviewed-banner.rejected svg {
+        stroke: #dc2626;
+    }
+
+    .reviewed-banner__title {
+        font-weight: 700;
+        font-size: .9rem;
+        margin-bottom: .2rem;
+    }
+
+    .reviewed-banner.approved .reviewed-banner__title {
+        color: #15803d;
+    }
+
+    .reviewed-banner.rejected .reviewed-banner__title {
+        color: #b91c1c;
+    }
+
+    .reviewed-banner__meta {
+        font-size: .8rem;
+        color: var(--text-muted);
+    }
+
+    /* ── Modal ── */
+    .modal-backdrop-custom {
+        position: fixed;
+        inset: 0;
+        z-index: 1050;
+        background: rgba(15, 23, 42, .55);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .25s ease;
+    }
+
+    .modal-backdrop-custom.active {
+        opacity: 1;
+        pointer-events: all;
+    }
+
+    .modal-box {
+        background: var(--surface);
+        border-radius: 16px;
+        box-shadow: var(--shadow-lg);
+        width: 100%;
+        max-width: 420px;
+        margin: 1rem;
+        overflow: hidden;
+        transform: translateY(24px) scale(.96);
+        opacity: 0;
+        transition: transform .3s cubic-bezier(.34, 1.56, .64, 1), opacity .25s ease;
+    }
+
+    .modal-backdrop-custom.active .modal-box {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+
+    .modal-icon-wrap {
+        width: 58px;
+        height: 58px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto .9rem;
+    }
+
+    .modal-icon-wrap.approve {
+        background: #dcfce7;
+    }
+
+    .modal-icon-wrap.approve svg {
+        stroke: #16a34a;
+    }
+
+    .modal-icon-wrap.reject {
+        background: #fee2e2;
+    }
+
+    .modal-icon-wrap.reject svg {
+        stroke: #dc2626;
+    }
+
+    .modal-icon-wrap svg {
+        width: 26px;
+        height: 26px;
+    }
+
+    .modal-head {
+        padding: 1.75rem 1.75rem 0;
+        text-align: center;
+    }
+
+    .modal-head h4 {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--text-primary);
+        margin: 0 0 .35rem;
+    }
+
+    .modal-head p {
+        font-size: .84rem;
+        color: var(--text-muted);
+        margin: 0;
+        line-height: 1.55;
+    }
+
+    .modal-body-inner {
+        padding: 1rem 1.75rem 0;
+    }
+
+    .modal-foot {
+        padding: 1.25rem 1.75rem 1.75rem;
+        display: flex;
+        gap: .75rem;
+    }
+
+    .modal-btn-cancel {
+        flex: 1;
+        padding: .65rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text-muted);
+        font-weight: 600;
+        font-size: .875rem;
+        cursor: pointer;
+        transition: all var(--transition);
+    }
+
+    .modal-btn-cancel:hover {
+        background: var(--surface-alt);
+    }
+
+    .modal-btn-confirm {
+        flex: 2;
+        padding: .65rem;
+        border-radius: var(--radius-sm);
+        border: none;
+        font-weight: 700;
+        font-size: .875rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: .4rem;
+        transition: all var(--transition);
+    }
+
+    .modal-btn-confirm.approve {
+        background: #16a34a;
+        color: #fff;
+    }
+
+    .modal-btn-confirm.approve:hover {
+        background: #15803d;
+        box-shadow: 0 4px 14px rgba(22, 163, 74, .3);
+    }
+
+    .modal-btn-confirm.reject {
+        background: #dc2626;
+        color: #fff;
+    }
+
+    .modal-btn-confirm.reject:hover {
+        background: #b91c1c;
+        box-shadow: 0 4px 14px rgba(220, 38, 38, .3);
+    }
+
+    @media (max-width: 576px) {
+        .modal-foot {
+            flex-direction: column-reverse;
+        }
+
+        .modal-btn-confirm,
+        .modal-btn-cancel {
+            flex: unset;
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+{% render_breadcrumb 'Review Extension Request' urls %}
+
+<div class="page-wrap">
+
+    <!-- Back -->
+    <a href="{% url 'tour_application_detail' slug=extension_request.tour.slug %}" class="back-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        {% trans 'Back to Tour Detail' %}
+    </a>
+
+    <!-- Heading -->
+    <div class="page-heading">
+        <div>
+            <h2>{% trans 'Review Extension Request' %}</h2>
+            <p>
+                {{ extension_request.tour.from_destination }} &rarr; {{ extension_request.tour.to_destination }}
+                &nbsp;&middot;&nbsp;
+                <span style="font-family:monospace;font-size:.8rem;">{{ extension_request.tour.slug }}</span>
+            </p>
+        </div>
+        <span class="status-pill {{ extension_request.status }}">{{ extension_request.get_status_display }}</span>
+    </div>
+
+    <!-- Already reviewed banner -->
+    {% if extension_request.status != 'pending' %}
+    <div class="reviewed-banner {{ extension_request.status }}">
+        {% if extension_request.status == 'approved' %}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {% else %}
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        {% endif %}
+        <div>
+            <div class="reviewed-banner__title">
+                {% if extension_request.status == 'approved' %}{% trans 'Request Approved' %}{% else %}{% trans 'Request
+                Rejected' %}{% endif %}
+            </div>
+            <div class="reviewed-banner__meta">
+                {% trans 'Reviewed by' %} {{ extension_request.reviewed_by.get_full_name }}
+                &middot; {{ extension_request.reviewed_at|date:'d M Y, h:i A' }}
+                {% if extension_request.review_comments %}
+                &middot; &ldquo;{{ extension_request.review_comments }}&rdquo;
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-lg-7">
+
+            <!-- Employee info -->
+            <div class="card-section">
+                <div class="card-section__head">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    {% trans 'Requested By' %}
+                </div>
+                <div class="card-section__body">
+                    <div class="emp-strip">
+                        {% if extension_request.requested_by.personal_detail.avatar %}
+                        <img src="{{ extension_request.requested_by.personal_detail.get_avatar_url }}"
+                            class="emp-avatar" alt="">
+                        {% else %}
+                        <div class="emp-avatar-init">{{ extension_request.requested_by.get_full_name|first }}</div>
+                        {% endif %}
+                        <div>
+                            <div class="emp-name">{{ extension_request.requested_by.get_full_name }}</div>
+                            <div class="emp-meta">
+                                {{ extension_request.requested_by.email }}
+                                &middot; {% trans 'Submitted' %} {{ extension_request.created_at|timesince }} {% trans
+                                'ago' %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diff table -->
+            <div class="card-section">
+                <div class="card-section__head">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    {% trans 'Proposed Changes' %}
+                </div>
+                <table class="diff-table">
+                    <thead>
+                        <tr>
+                            <th>{% trans 'Field' %}</th>
+                            <th>{% trans 'Current Value' %}</th>
+                            <th></th>
+                            <th>{% trans 'Requested Value' %}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Start Date -->
+                        <tr {% if extension_request.old_start_date !=extension_request.new_start_date
+                            %}class="diff-changed-row" {% endif %}>
+                            <td class="field-name">{% trans 'Start Date' %}</td>
+                            <td><span class="diff-cell-old">{{ extension_request.old_start_date|date:'d M Y' }}</span>
+                            </td>
+                            <td class="diff-arrow">→</td>
+                            <td>
+                                {% if extension_request.old_start_date != extension_request.new_start_date %}
+                                <span class="diff-cell-new">{{ extension_request.new_start_date|date:'d M Y' }}</span>
+                                {% else %}
+                                <span class="diff-cell-same">{% trans 'No change' %}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <!-- Start Time -->
+                        <tr {% if extension_request.old_start_time !=extension_request.new_start_time
+                            %}class="diff-changed-row" {% endif %}>
+                            <td class="field-name">{% trans 'Start Time' %}</td>
+                            <td><span class="diff-cell-old">{{ extension_request.old_start_time|time:'h:i A' }}</span>
+                            </td>
+                            <td class="diff-arrow">→</td>
+                            <td>
+                                {% if extension_request.old_start_time != extension_request.new_start_time %}
+                                <span class="diff-cell-new">{{ extension_request.new_start_time|time:'h:i A' }}</span>
+                                {% else %}
+                                <span class="diff-cell-same">{% trans 'No change' %}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <!-- End Date -->
+                        <tr {% if extension_request.old_end_date !=extension_request.new_end_date
+                            %}class="diff-changed-row" {% endif %}>
+                            <td class="field-name">{% trans 'End Date' %}</td>
+                            <td><span class="diff-cell-old">{{ extension_request.old_end_date|date:'d M Y' }}</span>
+                            </td>
+                            <td class="diff-arrow">→</td>
+                            <td>
+                                {% if extension_request.old_end_date != extension_request.new_end_date %}
+                                <span class="diff-cell-new">{{ extension_request.new_end_date|date:'d M Y' }}</span>
+                                {% else %}
+                                <span class="diff-cell-same">{% trans 'No change' %}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <!-- End Time -->
+                        <tr {% if extension_request.old_end_time !=extension_request.new_end_time
+                            %}class="diff-changed-row" {% endif %}>
+                            <td class="field-name">{% trans 'End Time' %}</td>
+                            <td><span class="diff-cell-old">{{ extension_request.old_end_time|time:'h:i A' }}</span>
+                            </td>
+                            <td class="diff-arrow">→</td>
+                            <td>
+                                {% if extension_request.old_end_time != extension_request.new_end_time %}
+                                <span class="diff-cell-new">{{ extension_request.new_end_time|time:'h:i A' }}</span>
+                                {% else %}
+                                <span class="diff-cell-same">{% trans 'No change' %}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Reason -->
+            <div class="card-section">
+                <div class="card-section__head">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                    </svg>
+                    {% trans 'Reason Given by Employee' %}
+                </div>
+                <div class="card-section__body">
+                    <div class="reason-box">{{ extension_request.reason }}</div>
+                </div>
+            </div>
+
+            <!-- Action buttons (only if pending) -->
+            {% if extension_request.status == 'pending' %}
+            <div class="d-flex gap-3 flex-wrap">
+                <button class="btn-approve" onclick="openModal('approve')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                    {% trans 'Approve Request' %}
+                </button>
+                <button class="btn-reject" onclick="openModal('reject')">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" stroke-width="2.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    {% trans 'Reject Request' %}
+                </button>
+                <a href="{% url 'tour_application_detail' slug=extension_request.tour.slug %}" class="btn-back">
+                    {% trans 'Cancel' %}
+                </a>
+            </div>
+            {% else %}
+            <a href="{% url 'tour_application_detail' slug=extension_request.tour.slug %}" class="btn-back">
+                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                </svg>
+                {% trans 'Back to Tour' %}
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- Right: Activity log -->
+        <div class="col-lg-5">
+            <div class="card-section">
+                <div class="card-section__head">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                        stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {% trans 'Tour Activity Log' %}
+                </div>
+                <div style="padding:1rem 1.25rem;max-height:480px;overflow-y:auto;">
+                    {% if extension_request.tour.logs.all %}
+                    <div class="timeline">
+                        {% for log in extension_request.tour.logs.all|dictsortreversed:'timestamp' %}
+                        <div class="tl-item">
+                            <div class="tl-dot">{{ log.action|first|upper }}</div>
+                            <div class="tl-body">
+                                <div class="tl-action">{{ log.action }}</div>
+                                <div class="tl-meta">
+                                    {% trans 'by' %} {{ log.action_by_name }}
+                                    &middot; {{ log.timestamp|timesince }} {% trans 'ago' %}
+                                </div>
+                                {% if log.comments %}
+                                <div class="tl-comment">{{ log.comments|safe }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div style="text-align:center;padding:2rem 1rem;color:var(--text-muted);">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="none" viewBox="0 0 24 24"
+                            stroke="currentColor" stroke-width="1.5"
+                            style="opacity:.35;display:block;margin:0 auto .5rem;">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                        </svg>
+                        {% trans 'No activity yet.' %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Hidden review forms -->
+<form id="form-approve" method="post" action="{% url 'tour_extension_request_review' pk=extension_request.pk %}"
+    style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="approve">
+    <input type="hidden" name="review_comments" id="approve-comments">
+</form>
+<form id="form-reject" method="post" action="{% url 'tour_extension_request_review' pk=extension_request.pk %}"
+    style="display:none;">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="reject">
+    <input type="hidden" name="review_comments" id="reject-comments">
+</form>
+
+<!-- ── Approve Modal ─────────────────────────────────────────── -->
+<div class="modal-backdrop-custom" id="approveModal">
+    <div class="modal-box">
+        <div class="modal-head">
+            <div class="modal-icon-wrap approve">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h4>{% trans 'Approve Date/Time Change?' %}</h4>
+            <p>{% trans 'The tour schedule will be updated immediately. This action cannot be undone.' %}</p>
+        </div>
+        <div class="modal-body-inner">
+            <label class="form-label-custom" style="margin-top:.25rem;">{% trans 'Comments (optional)' %}</label>
+            <textarea id="approve-comments-input" class="form-control" rows="2"
+                placeholder="{% trans 'e.g. Approved as per manager discretion...' %}"></textarea>
+        </div>
+        <div class="modal-foot">
+            <button class="modal-btn-cancel" onclick="closeModalById('approveModal')">{% trans 'Cancel' %}</button>
+            <button class="modal-btn-confirm approve" onclick="submitReview('approve')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                {% trans 'Yes, Approve' %}
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Reject Modal ──────────────────────────────────────────── -->
+<div class="modal-backdrop-custom" id="rejectModal">
+    <div class="modal-box">
+        <div class="modal-head">
+            <div class="modal-icon-wrap reject">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                    stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h4>{% trans 'Reject Date/Time Change?' %}</h4>
+            <p>{% trans 'The employee\'s request will be declined and the tour schedule will remain unchanged.' %}</p>
+        </div>
+        <div class="modal-body-inner">
+            <label class="form-label-custom" style="margin-top:.25rem;">{% trans 'Reason for Rejection' %} <span
+                    style="color:#dc2626;">*</span></label>
+            <textarea id="reject-comments-input" class="form-control" rows="2"
+                placeholder="{% trans 'Please provide a reason for the employee...' %}"></textarea>
+            <div id="reject-error" style="display:none;font-size:.78rem;color:#dc2626;margin-top:.3rem;">
+                {% trans 'Please provide a reason before rejecting.' %}
+            </div>
+        </div>
+        <div class="modal-foot">
+            <button class="modal-btn-cancel" onclick="closeModalById('rejectModal')">{% trans 'Cancel' %}</button>
+            <button class="modal-btn-confirm reject" onclick="submitReview('reject')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" stroke-width="2.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                {% trans 'Yes, Reject' %}
+            </button>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function openModal(action) {
+        closeModalById('approveModal');
+        closeModalById('rejectModal');
+        const id = action === 'approve' ? 'approveModal' : 'rejectModal';
+        document.getElementById(id).classList.add('active');
+        document.body.style.overflow = 'hidden';
+        // Focus textarea
+        setTimeout(() => {
+            const ta = document.getElementById(action + '-comments-input');
+            if (ta) ta.focus();
+        }, 320);
+    }
+
+    function closeModalById(id) {
+        document.getElementById(id).classList.remove('active');
+        document.body.style.overflow = '';
+    }
+
+    function submitReview(action) {
+        if (action === 'reject') {
+            const comments = document.getElementById('reject-comments-input').value.trim();
+            if (!comments) {
+                document.getElementById('reject-error').style.display = 'block';
+                return;
+            }
+            document.getElementById('reject-comments').value = comments;
+        } else {
+            const comments = document.getElementById('approve-comments-input').value.trim();
+            document.getElementById('approve-comments').value = comments;
+        }
+        document.getElementById('form-' + action).submit();
+    }
+
+    // Backdrop click closes
+    document.querySelectorAll('.modal-backdrop-custom').forEach(el => {
+        el.addEventListener('click', function (e) {
+            if (e.target === this) closeModalById(this.id);
+        });
+    });
+
+    // Escape key closes
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape')
+            document.querySelectorAll('.modal-backdrop-custom.active')
+                .forEach(el => closeModalById(el.id));
+    });
+
+    // Clear reject error on input
+    document.getElementById('reject-comments-input').addEventListener('input', function () {
+        if (this.value.trim())
+            document.getElementById('reject-error').style.display = 'none';
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,253 @@
+{% extends 'hrms_app/base.html' %}
+{% load static hrms_tag humanize i18n %}
+
+{% block title %}{% trans 'Request Date/Time Change' %} | {{ tour.from_destination }} → {{ tour.to_destination }}{% endblock %}
+
+{% block extrastyle %}
+<style>
+    :root {
+        --brand:        #1a56db;
+        --brand-light:  #eff6ff;
+        --brand-dark:   #1e40af;
+        --surface:      #ffffff;
+        --surface-alt:  #f8fafc;
+        --border:       #e2e8f0;
+        --text-primary: #0f172a;
+        --text-muted:   #64748b;
+        --radius:       12px;
+        --radius-sm:    8px;
+        --shadow-sm:    0 1px 3px rgba(0,0,0,.06);
+        --shadow:       0 4px 16px rgba(0,0,0,.08);
+        --transition:   .2s cubic-bezier(.4,0,.2,1);
+    }
+
+    .page-wrap { margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+
+    /* Back link */
+    .back-link {
+        display: inline-flex; align-items: center; gap: .4rem;
+        font-size: .8rem; font-weight: 600; color: var(--text-muted);
+        text-decoration: none; margin-bottom: 1.25rem;
+        transition: color var(--transition);
+    }
+    .back-link:hover { color: var(--brand); }
+
+    /* Page heading */
+    .page-heading { margin-bottom: 1.5rem; }
+    .page-heading h2 { font-size: 1.35rem; font-weight: 800; color: var(--text-primary); margin: 0 0 .3rem; }
+    .page-heading p  { font-size: .875rem; color: var(--text-muted); margin: 0; }
+
+    /* Card */
+    .card-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+        margin-bottom: 1.25rem;
+    }
+    .card-section__head {
+        background: var(--surface-alt);
+        border-bottom: 1px solid var(--border);
+        padding: .85rem 1.25rem;
+        display: flex; align-items: center; gap: .5rem;
+        font-size: .8rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .05em; color: var(--text-muted);
+    }
+    .card-section__head svg { width: 15px; height: 15px; stroke: var(--brand); }
+    .card-section__body { padding: 1.25rem; }
+
+    /* Current snapshot */
+    .snapshot-grid {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: .75rem;
+    }
+    .snapshot-cell {
+        background: var(--surface-alt);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: .75rem 1rem;
+    }
+    .snapshot-cell .sc-label { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: .3rem; }
+    .snapshot-cell .sc-value { font-size: .9rem; font-weight: 600; color: var(--text-primary); }
+    .snapshot-cell .sc-sub   { font-size: .78rem; color: var(--text-muted); margin-top: .1rem; }
+
+    /* Form labels */
+    .form-label-custom {
+        font-size: .78rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .04em; color: var(--text-muted);
+        display: block; margin-bottom: .4rem;
+    }
+    .form-label-custom .req { color: #dc2626; margin-left: .2rem; }
+
+    /* Field errors */
+    .field-error { font-size: .78rem; color: #dc2626; margin-top: .3rem; }
+
+    /* Change indicator arrow */
+    .change-arrow {
+        display: flex; align-items: center; justify-content: center;
+        color: var(--brand); font-size: 1.1rem; padding: .25rem 0;
+    }
+
+    /* Buttons */
+    .btn-submit {
+        background: var(--brand); color: #fff; border: none;
+        padding: .7rem 1.75rem; border-radius: var(--radius-sm);
+        font-weight: 700; font-size: .9rem; cursor: pointer;
+        display: inline-flex; align-items: center; gap: .5rem;
+        transition: background var(--transition), transform var(--transition), box-shadow var(--transition);
+    }
+    .btn-submit:hover { background: var(--brand-dark); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(26,86,219,.3); }
+    .btn-submit:active { transform: translateY(0); }
+
+    .btn-cancel {
+        background: transparent; color: var(--text-muted);
+        border: 1px solid var(--border); padding: .7rem 1.4rem;
+        border-radius: var(--radius-sm); font-weight: 600; font-size: .9rem;
+        cursor: pointer; text-decoration: none;
+        display: inline-flex; align-items: center; gap: .4rem;
+        transition: all var(--transition);
+    }
+    .btn-cancel:hover { border-color: var(--text-muted); color: var(--text-primary); }
+
+    /* Non-field error alert */
+    .nfe-alert {
+        background: #fee2e2; border: 1px solid #fecaca; border-radius: var(--radius-sm);
+        padding: .75rem 1rem; font-size: .875rem; color: #b91c1c;
+        margin-bottom: 1rem; display: flex; gap: .6rem; align-items: flex-start;
+    }
+    .nfe-alert svg { flex-shrink: 0; width: 18px; height: 18px; stroke: #dc2626; margin-top: .05rem; }
+
+    /* Info note */
+    .info-note {
+        background: #eff6ff; border: 1px solid #bfdbfe;
+        border-radius: var(--radius-sm); padding: .75rem 1rem;
+        font-size: .82rem; color: #1d4ed8; display: flex; gap: .6rem;
+        align-items: flex-start; margin-bottom: 1.25rem;
+    }
+    .info-note svg { flex-shrink: 0; width: 16px; height: 16px; stroke: #2563eb; margin-top: .1rem; }
+
+    @media (max-width: 520px) {
+        .snapshot-grid { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-wrap">
+
+    <!-- Back -->
+    <a href="{% url 'tour_application_detail' slug=tour.slug %}" class="back-link">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        {% trans 'Back to Tour Detail' %}
+    </a>
+
+    <!-- Heading -->
+    <div class="page-heading">
+        <h2>{% trans 'Request Date / Time Change' %}</h2>
+        <p>{{ tour.from_destination }} &rarr; {{ tour.to_destination }} &nbsp;&middot;&nbsp; <span style="font-family:monospace;font-size:.8rem;">{{ tour.slug }}</span></p>
+    </div>
+
+    <!-- Non-field errors -->
+    {% if form.non_field_errors %}
+    {% for error in form.non_field_errors %}
+    <div class="nfe-alert">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        {{ error }}
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Info note -->
+    <div class="info-note">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span>{% trans 'Your request will be sent to your manager for review. The tour dates will only change after approval.' %}</span>
+    </div>
+
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        <!-- Current snapshot -->
+        <div class="card-section">
+            <div class="card-section__head">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                {% trans 'Current Schedule' %}
+            </div>
+            <div class="card-section__body">
+                <div class="snapshot-grid">
+                    <div class="snapshot-cell">
+                        <div class="sc-label">{% trans 'Start Date' %}</div>
+                        <div class="sc-value">{{ tour.start_date|date:'d M Y' }}</div>
+                        <div class="sc-sub">{{ tour.start_time|time:'h:i A' }}</div>
+                    </div>
+                    <div class="snapshot-cell">
+                        <div class="sc-label">{% trans 'End Date' %}</div>
+                        <div class="sc-value">{{ tour.end_date|date:'d M Y' }}</div>
+                        <div class="sc-sub">{{ tour.end_time|time:'h:i A' }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New date/time fields -->
+        <div class="card-section">
+            <div class="card-section__head">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                {% trans 'Requested Changes' %}
+            </div>
+            <div class="card-section__body">
+                <div class="row g-3">
+                    <!-- New Start Date -->
+                    <div class="col-md-6">
+                        <label class="form-label-custom">{% trans 'New Start Date' %}<span class="req">*</span></label>
+                        {{ form.new_start_date }}
+                        {% if form.new_start_date.errors %}<div class="field-error">{% for e in form.new_start_date.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                    </div>
+                    <!-- New Start Time -->
+                    <div class="col-md-6">
+                        <label class="form-label-custom">{% trans 'New Start Time' %}<span class="req">*</span></label>
+                        {{ form.new_start_time }}
+                        {% if form.new_start_time.errors %}<div class="field-error">{% for e in form.new_start_time.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                    </div>
+                    <!-- New End Date -->
+                    <div class="col-md-6">
+                        <label class="form-label-custom">{% trans 'New End Date' %}<span class="req">*</span></label>
+                        {{ form.new_end_date }}
+                        {% if form.new_end_date.errors %}<div class="field-error">{% for e in form.new_end_date.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                    </div>
+                    <!-- New End Time -->
+                    <div class="col-md-6">
+                        <label class="form-label-custom">{% trans 'New End Time' %}<span class="req">*</span></label>
+                        {{ form.new_end_time }}
+                        {% if form.new_end_time.errors %}<div class="field-error">{% for e in form.new_end_time.errors %}{{ e }}{% endfor %}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reason -->
+        <div class="card-section">
+            <div class="card-section__head">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/></svg>
+                {% trans 'Reason for Change' %}
+            </div>
+            <div class="card-section__body">
+                <label class="form-label-custom">{% trans 'Reason' %}<span class="req">*</span></label>
+                {{ form.reason }}
+                {% if form.reason.errors %}<div class="field-error">{% for e in form.reason.errors %}{{ e }}{% endfor %}</div>{% endif %}
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="d-flex gap-3 flex-wrap">
+            <button type="submit" class="btn-submit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                {% trans 'Submit Request' %}
+            </button>
+            <a href="{% url 'tour_application_detail' slug=tour.slug %}" class="btn-cancel">
+                {% trans 'Cancel' %}
+            </a>
+        </div>
+    </form>
+</div>
+{% endblock %}
