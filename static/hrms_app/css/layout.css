@@ -1,0 +1,220 @@
+/**
+ * Layout.css
+ * Core layout structure: Sidebar + Navbar + Content
+ * Responsive grid system for admin dashboard
+ */
+
+/* ============================================
+   APP CONTAINER - Main Grid Layout
+   ============================================ */
+
+.app-container {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) 1fr;
+  grid-template-rows: 1fr;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+/* ============================================
+   SIDEBAR
+   ============================================ */
+
+.sidebar {
+  grid-column: 1;
+  grid-row: 1;
+  width: var(--sidebar-width);
+  height: 100vh;
+  background-color: var(--bg-primary);
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 1000;
+  transition: var(--transition);
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ============================================
+   MAIN WRAPPER - Contains Navbar + Content
+   ============================================ */
+
+.main-wrapper {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ============================================
+   NAVBAR
+   ============================================ */
+
+.navbar {
+  width: 100%;
+  height: var(--navbar-height);
+  background-color: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  padding: 0 2rem;
+  flex-shrink: 0;
+  z-index: 999;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+/* ============================================
+   CONTENT WRAPPER - Scrollable Area
+   ============================================ */
+
+.content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+}
+
+.content-wrapper::-webkit-scrollbar {
+  width: 8px;
+}
+
+.content-wrapper::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+.content-wrapper::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.content-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.content-inner {
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  gap: 2rem;
+}
+
+/* ============================================
+   PAGE CONTENT
+   ============================================ */
+
+.page-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* ============================================
+   RIGHT SIDEBAR (Notifications/Settings)
+   ============================================ */
+
+.right-sidebar {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 350px;
+  background-color: var(--bg-primary);
+  border-left: 1px solid var(--border-color);
+  transform: translateX(100%);
+  transition: var(--transition);
+  z-index: 1100;
+  overflow-y: auto;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+.right-sidebar.active {
+  transform: translateX(0);
+}
+
+.right-sidebar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.right-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.right-sidebar::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.right-sidebar::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* ============================================
+   ANIMATIONS & TRANSITIONS
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .main-wrapper,
+  .navbar,
+  .content-wrapper,
+  .right-sidebar {
+    transition: none;
+  }
+}
+
+/* ============================================
+   DARK MODE SUPPORT
+   ============================================ */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text-primary: #f3f4f6;
+    --text-secondary: #d1d5db;
+    --bg-primary: #1f2937;
+    --bg-secondary: #111827;
+    --border-color: #374151;
+  }
+
+  .sidebar {
+    background-color: var(--bg-primary);
+    border-right-color: var(--border-color);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .navbar {
+    background-color: var(--bg-primary);
+    border-bottom-color: var(--border-color);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  }
+
+  .content-wrapper {
+    background-color: var(--bg-secondary);
+  }
+
+  .right-sidebar {
+    background-color: var(--bg-primary);
+    border-left-color: var(--border-color);
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.4);
+  }
+}

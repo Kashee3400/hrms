@@ -10,7 +10,9 @@ from ..views.tour_views import (
     ApplyTourView,
     TourApplicationDetailView,
     TourApplicationUpdateView,
-    TourTrackerView,GenerateTourPDFView
+    TourTrackerView,GenerateTourPDFView,
+    # TourExtensionRequestCreateView,
+    # TourExtensionRequestReviewView
     )
 class CustomSite:
     def __init__(self):
@@ -71,7 +73,6 @@ site.register_view('leave/apply/<int:leave_type>/', views.ApplyOrUpdateLeaveView
 site.register_view('leave/edit/<slug:slug>/', views.ApplyOrUpdateLeaveView, name='update_leave')
 site.register_view('leave/<slug:slug>/', views.LeaveApplicationDetailView, name='leave_application_detail')
 site.register_view('leave/<slug:slug>/update', views.LeaveApplicationUpdateView, name='leave_application_update')
-
 site.register_view("short-leave/apply/", ShortLeaveCreateView, name='short_leave_create')
 site.register_view('short-leave/<int:pk>/edit/', ShortLeaveUpdateView, name='short_leave_update')
 
@@ -84,6 +85,8 @@ site.register_view('leave-transaction/', views.LeaveTransactionCreateView, name=
 site.register_view('leave-balance-update/', views.LeaveBalanceUpdateView, name='leave_bal_up'),
 site.register_view('tour-tracker/', TourTrackerView, name='tour_tracker')
 site.register_view('apply-tour/', ApplyTourView, name='apply_tour')
+# site.register_view('tours/<slug:slug>/extension-request/', TourExtensionRequestCreateView, name='tour_extension_request_create'),
+# site.register_view('tours/extension-request/<int:pk>/review/', TourExtensionRequestReviewView, name='tour_extension_request_review'),
 site.register_view('tour/<slug:slug>/', TourApplicationDetailView, name='tour_application_detail')
 site.register_view('tour/<slug:slug>/update', TourApplicationUpdateView, name='tour_application_update')
 site.register_view('tour/<slug:slug>/pdf', GenerateTourPDFView, name='generate_tour_pdf')

@@ -242,7 +242,8 @@ class LeaveManager {
             const holidayTitle = holidays[lookupDate] || "";
 
             // CL Rule: Exclude Sundays & Holidays
-            if (leaveTypeShortCode === 'CL' && (isSunday || holidayTitle)) {
+            const leaveTypesToCheck = ['CL', 'SL'];
+            if (leaveTypesToCheck.includes(leaveTypeShortCode) && (isSunday || holidayTitle)) {
                 calculatedDays--;
             }
 
@@ -250,7 +251,7 @@ class LeaveManager {
             let colorClass = "text-dark";
             let displayText = formattedDateStr;
 
-            if (leaveTypeShortCode === 'CL' && isSunday) {
+            if (leaveTypesToCheck.includes(leaveTypeShortCode) && isSunday) {
                 displayText += ' - Weekly Off';
                 colorClass = "text-danger";
             }

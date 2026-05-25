@@ -12,10 +12,9 @@ from django.views import View
 from django.utils import timezone
 from django.db import transaction
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION
 from django.contrib.contenttypes.models import ContentType
-from hrms_app.utility import attendanceutils as at
 from django.contrib.auth import get_user_model
 from django.utils.timezone import make_aware
 from ..utility.attendance_mapper import aggregate_attendance_data
@@ -125,8 +124,9 @@ class CreditELLeaveView(View):
             emp_credit_map = {emp["emp_code"]: emp["balance"] for emp in employee_data}
             el_type = LeaveType.objects.get(leave_type_short_code="EL")
             balances = LeaveBalanceOpenings.objects.select_related("user").filter(
-                leave_type=el_type, year=year, user__username__in=emp_codes
+                leave_type=el_type, year=year, user__id__in=emp_codes
             )
+            print(balances)
             if not balances.exists():
                 return JsonResponse(
                     {"detail": f"No EL leave balances found for year {year}."},
@@ -138,7 +138,8 @@ class CreditELLeaveView(View):
                 transactions = []
                 for balance in balances:
                     emp_code = balance.user.username
-                    days = emp_credit_map.get(emp_code)
+                    days = 7.5
+                    # days = emp_credit_map.get(emp_code)
                     if days is None:
                         errors.append(f"{emp_code}: Credit days not provided.")
                         continue

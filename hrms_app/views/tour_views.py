@@ -8,6 +8,7 @@ from ..forms.tour_form import (
     ManagerTourStatusUpdateForm,
     AdminTourStatusUpdateForm,
 )
+# from django.shortcuts import redirect
 from django.conf import settings
 from django.http import HttpResponse,HttpResponseRedirect
 from weasyprint import HTML
@@ -39,7 +40,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.views import View
 from django.utils.timezone import now
-from hrms_app.hrms.form import FilterForm
+from hrms_app.hrms.form import TourFilterForm
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -95,7 +96,7 @@ class TourPermissionMixin(LoginRequiredMixin):
 
 
 class TourTrackerView(ModelPermissionRequiredMixin, SingleTableMixin, FilterView):
-    template_name = "hrms_app/tour-tracker.html"
+    template_name = "hrms_app/tour/tour-tracker.html"
     model = UserTour
     table_class = UserTourTable
     permission_action = "view"
@@ -134,7 +135,7 @@ class TourTrackerView(ModelPermissionRequiredMixin, SingleTableMixin, FilterView
     def get_context_data(self, **kwargs):
         """Prepare the context for the template."""
         context = super().get_context_data(**kwargs)
-        form = FilterForm(self.request.GET)
+        form = TourFilterForm(self.request.GET)
         employee_tours = self.get_assigned_tours(form=form)
         context.update(
             {
@@ -170,7 +171,7 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
     model = UserTour
     form_class = TourForm
     title = _("Apply Tour")
-    template_name = "hrms_app/apply-tour.html"
+    template_name = "hrms_app/tour/apply-tour.html"
     success_url = reverse_lazy("tour_tracker")
     permission_action = "add"
 
@@ -224,7 +225,7 @@ class ApplyTourView(ModelPermissionRequiredMixin, CreateView):
 class TourApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
     model = UserTour
     form_class = TourForm
-    template_name = "hrms_app/apply-tour.html"
+    template_name = "hrms_app/tour/apply-tour.html"
     permission_action = "change"
 
     def get_object(self, queryset=None):
@@ -265,7 +266,7 @@ class TourApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
 
     def send_tour_notification(self, obj):
         current_site = Site.objects.get_current()
-        protocol = "http"  # or 'https' if applicable
+        protocol = "http"
         domain = current_site.domain
         try:
             send_tour_notifications.delay(obj.id, protocol, domain)
@@ -280,7 +281,83 @@ class TourApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
             "tour_application_detail", kwargs={"slug": self.object.slug}
         )
 
+# class TourExtensionRequestCreateView(LoginRequiredMixin, CreateView):
+#     """Employee submits a date/time change request for an approved tour."""
+#     model = TourExtensionRequest
+#     form_class = TourExtensionRequestForm
+#     template_name = "hrms_app/tour/tour-extension-request.html"
 
+#     def get_tour(self):
+#         return get_object_or_404(UserTour, slug=self.kwargs["slug"])
+
+#     def get_context_data(self, **kwargs):
+#         ctx = super().get_context_data(**kwargs)
+#         ctx['tour'] = self.get_tour()
+#         return ctx
+
+#     def get_form_kwargs(self):
+#         kwargs = super().get_form_kwargs()
+#         kwargs["tour"] = self.get_tour()
+#         return kwargs
+
+#     def form_valid(self, form):
+#         tour = self.get_tour()
+
+#         if not tour.is_extendable:
+#             messages.error(self.request, "Only approved tours can be modified.")
+#             return self.form_invalid(form)
+
+#         # Check for a pending extension request already
+#         if tour.extension_requests.filter(status="pending").exists():
+#             messages.error(self.request, "A pending extension request already exists for this tour.")
+#             return self.form_invalid(form)
+
+#         instance = form.save(commit=False)
+#         instance.tour = tour
+#         instance.requested_by = self.request.user
+#         # Snapshot old values at submission time
+#         instance.old_start_date = tour.start_date
+#         instance.old_start_time = tour.start_time
+#         instance.old_end_date = tour.end_date
+#         instance.old_end_time = tour.end_time
+#         instance.save()
+
+#         TourStatusLog.create_log(
+#             tour=tour,
+#             action_by=self.request.user,
+#             action="extension_requested",
+#             comments=f"Date/time change requested. {instance.diff_summary}. Reason: {instance.reason}",
+#         )
+
+#         messages.success(self.request, "Extension request submitted successfully.")
+#         return redirect("tour_application_detail", slug=tour.slug)
+
+
+# class TourExtensionRequestReviewView(ModelPermissionRequiredMixin, UpdateView):
+#     model = TourExtensionRequest
+#     fields = ["review_comments"]
+#     template_name = "hrms_app/tour-extension-review.html"
+#     permission_action = "change"
+
+#     def get_context_data(self, **kwargs):
+#         ctx = super().get_context_data(**kwargs)
+#         extension = self.get_object()
+#         ctx['extension_request'] = extension
+#         ctx['tour'] = extension.tour
+#         return ctx
+
+#     def post(self, request, *args, **kwargs):
+#         extension_request = self.get_object()
+#         action = request.POST.get("action")
+#         comments = request.POST.get("review_comments", "")
+#         if action == "approve":
+#             extension_request.approve(reviewed_by=request.user, comments=comments)
+#             messages.success(request, "Extension request approved.")
+#         elif action == "reject":
+#             extension_request.reject(reviewed_by=request.user, comments=comments)
+#             messages.warning(request, "Extension request rejected.")
+#         return redirect("tour_application_detail", slug=extension_request.tour.slug)
+    
 class GenerateTourPDFView(View):
     def get(self, request, slug):
         tour_details = get_object_or_404(UserTour, slug=slug)
@@ -324,7 +401,7 @@ class TourApplicationDetailView(TourPermissionMixin, DetailView):
     """Display tour application details and status update form"""
     
     model = UserTour
-    template_name = "hrms_app/tour_application_detail.html"
+    template_name = "hrms_app/tour/tour_application_detail.html"
     context_object_name = "tour_application"
     slug_field = "slug"
     slug_url_kwarg = "slug"

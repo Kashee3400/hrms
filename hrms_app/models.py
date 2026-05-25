@@ -2478,7 +2478,6 @@ class UserTour(models.Model):
     def is_approvable(self):
         """Check if tour can be approved"""
         return self.status == 'pending'
-    
     @property
     def is_extendable(self):
         """Check if tour can be extended by employee"""
@@ -2692,6 +2691,130 @@ class TourStatusLog(models.Model):
             comments=comments,
         )
 
+# class TourExtensionRequest(models.Model):
+#     """
+#     Tracks date/time modification requests for approved tours.
+#     Stores old vs new values for audit trail.
+#     """
+#     tour = models.ForeignKey(
+#         UserTour,
+#         on_delete=models.CASCADE,
+#         related_name="extension_requests",
+#         verbose_name=_("Tour"),
+#     )
+#     requested_by = models.ForeignKey(
+#         get_user_model(),
+#         on_delete=models.SET_NULL,
+#         null=True,
+#         related_name="tour_extension_requests",
+#         verbose_name=_("Requested By"),
+#     )
+
+#     # --- Old Values (snapshot at time of request) ---
+#     old_start_date = models.DateField(verbose_name=_("Old Start Date"))
+#     old_start_time = models.TimeField(null=True, blank=True, verbose_name=_("Old Start Time"))
+#     old_end_date = models.DateField(verbose_name=_("Old End Date"))
+#     old_end_time = models.TimeField(null=True, blank=True, verbose_name=_("Old End Time"))
+
+#     # --- New Requested Values ---
+#     new_start_date = models.DateField(verbose_name=_("New Start Date"))
+#     new_start_time = models.TimeField(null=True, blank=True, verbose_name=_("New Start Time"))
+#     new_end_date = models.DateField(verbose_name=_("New End Date"))
+#     new_end_time = models.TimeField(null=True, blank=True, verbose_name=_("New End Time"))
+
+#     reason = models.TextField(verbose_name=_("Reason for Change"))
+
+#     status = models.CharField(
+#         max_length=50,
+#         choices=[
+#             ("pending", _("Pending")),
+#             ("approved", _("Approved")),
+#             ("rejected", _("Rejected")),
+#         ],
+#         default="pending",
+#         verbose_name=_("Status"),
+#     )
+
+#     reviewed_by = models.ForeignKey(
+#         get_user_model(),
+#         on_delete=models.SET_NULL,
+#         null=True,
+#         blank=True,
+#         related_name="reviewed_extension_requests",
+#         verbose_name=_("Reviewed By"),
+#     )
+#     review_comments = models.TextField(null=True, blank=True, verbose_name=_("Review Comments"))
+#     reviewed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Reviewed At"))
+
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         db_table = "tbl_tour_extension_requests"
+#         verbose_name = _("Tour Extension Request")
+#         verbose_name_plural = _("Tour Extension Requests")
+#         ordering = ["-created_at"]
+
+#     def __str__(self):
+#         return f"Extension Request #{self.id} for Tour #{self.tour_id}"
+
+#     @property
+#     def diff_summary(self):
+#         """Returns a human-readable summary of what changed."""
+#         changes = []
+#         if self.old_start_date != self.new_start_date:
+#             changes.append(f"Start Date: {self.old_start_date} → {self.new_start_date}")
+#         if self.old_start_time != self.new_start_time:
+#             changes.append(f"Start Time: {self.old_start_time} → {self.new_start_time}")
+#         if self.old_end_date != self.new_end_date:
+#             changes.append(f"End Date: {self.old_end_date} → {self.new_end_date}")
+#         if self.old_end_time != self.new_end_time:
+#             changes.append(f"End Time: {self.old_end_time} → {self.new_end_time}")
+#         return " | ".join(changes) if changes else "No changes detected"
+
+#     def approve(self, reviewed_by, comments=None):
+#         from django.utils.timezone import now
+
+#         # Apply new values to the parent tour
+#         tour = self.tour
+#         tour.start_date = self.new_start_date
+#         tour.start_time = self.new_start_time
+#         tour.end_date = self.new_end_date
+#         tour.end_time = self.new_end_time
+#         # Clear legacy extension fields if you're migrating away from them
+#         tour.extended_end_date = None
+#         tour.extended_end_time = None
+#         tour.status = settings.EXTENDED
+#         tour.save()
+
+#         self.status = "approved"
+#         self.reviewed_by = reviewed_by
+#         self.review_comments = comments
+#         self.reviewed_at = now()
+#         self.save()
+
+#         TourStatusLog.create_log(
+#             tour=tour,
+#             action_by=reviewed_by,
+#             action=settings.EXTENDED,
+#             comments=f"Date/time modified. {self.diff_summary}. Reviewer note: {comments or 'N/A'}",
+#         )
+
+#     def reject(self, reviewed_by, comments=None):
+#         from django.utils.timezone import now
+
+#         self.status = "rejected"
+#         self.reviewed_by = reviewed_by
+#         self.review_comments = comments
+#         self.reviewed_at = now()
+#         self.save()
+
+#         TourStatusLog.create_log(
+#             tour=self.tour,
+#             action_by=reviewed_by,
+#             action="extension_rejected",
+#             comments=f"Extension request rejected. {self.diff_summary}. Reason: {comments or 'N/A'}",
+#         )
 
 class Bill(models.Model):
     tour = models.ForeignKey(UserTour, on_delete=models.CASCADE, verbose_name=_("Tour"))
