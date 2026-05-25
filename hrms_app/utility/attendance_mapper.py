@@ -147,7 +147,7 @@ class AttendanceMapper:
                 color = "#000000"
             else:
                 # 2️⃣ Check STL for that employee on that date - OPTIMIZATION: O(1) lookup
-                if self._stl_cache.get((employee_id, log_date), False):
+                if self._stl_cache.get((employee_id, log_date), False) and log.att_status_short_code !='A':
                     status = "P"
                     color =  "#06B900"
                 else:
