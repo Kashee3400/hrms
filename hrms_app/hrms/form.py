@@ -813,6 +813,78 @@ class TourForm(forms.ModelForm):
                     if start_date == leave_day and start_time <= shift_end:
                         raise ValidationError(f"Tour start time on {leave_day} conflicts with full-day leave.")
 
+# class TourExtensionRequestForm(forms.ModelForm):
+#     class Meta:
+#         model = TourExtensionRequest
+#         fields = ["new_start_date", "new_start_time", "new_end_date", "new_end_time", "reason"]
+#         widgets = {
+#             "new_start_date": DatePickerInput(
+#                 options={"format": "DD MMM, YYYY", "showClear": True, "useCurrent": False},
+#                 attrs={"class": "form-control"},
+#             ),
+#             "new_start_time": TimePickerInput(
+#                 options={"format": "hh:mm A", "showClear": True, "useCurrent": False},
+#                 attrs={"class": "form-control"},
+#             ),
+#             "new_end_date": DatePickerInput(
+#                 options={"format": "DD MMM, YYYY", "showClear": True, "useCurrent": False},
+#                 attrs={"class": "form-control"},
+#             ),
+#             "new_end_time": TimePickerInput(
+#                 options={"format": "hh:mm A", "showClear": True, "useCurrent": False},
+#                 attrs={"class": "form-control"},
+#             ),
+#             "reason": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+#         }
+#         labels = {
+#             "new_start_date": _("New Start Date"),
+#             "new_start_time": _("New Start Time"),
+#             "new_end_date": _("New End Date"),
+#             "new_end_time": _("New End Time"),
+#             "reason": _("Reason for Change"),
+#         }
+
+#     def __init__(self, *args, tour=None, **kwargs):
+#         self.tour = tour
+#         super().__init__(*args, **kwargs)
+#         # Pre-fill with current tour values as defaults
+#         if tour and not self.instance.pk:
+#             self.fields["new_start_date"].initial = tour.start_date
+#             self.fields["new_start_time"].initial = tour.start_time
+#             self.fields["new_end_date"].initial = tour.end_date
+#             self.fields["new_end_time"].initial = tour.end_time
+
+#     def clean(self):
+#         cleaned_data = super().clean()
+#         new_start_date = cleaned_data.get("new_start_date")
+#         new_start_time = cleaned_data.get("new_start_time")
+#         new_end_date = cleaned_data.get("new_end_date")
+#         new_end_time = cleaned_data.get("new_end_time")
+
+#         if new_start_date and new_end_date:
+#             if new_start_date > new_end_date:
+#                 raise ValidationError(_("New end date must be after new start date."))
+#             if (
+#                 new_start_date == new_end_date
+#                 and new_start_time
+#                 and new_end_time
+#                 and new_start_time >= new_end_time
+#             ):
+#                 raise ValidationError(_("New end time must be after new start time on the same day."))
+
+#         # Guard: must actually change something
+#         if self.tour:
+#             no_change = (
+#                 self.tour.start_date == new_start_date
+#                 and self.tour.start_time == new_start_time
+#                 and self.tour.end_date == new_end_date
+#                 and self.tour.end_time == new_end_time
+#             )
+#             if no_change:
+#                 raise ValidationError(_("No changes detected. Please modify at least one date or time."))
+
+#         return cleaned_data
+
 class BillForm(forms.ModelForm):
     class Meta:
         model = Bill
@@ -932,7 +1004,7 @@ class LeaveApplicationForm(forms.ModelForm):
                 required=False,  # Initially not required
                 label=_("Attachment"),
                 help_text=_(
-                    "Upload a medical certificate or supporting document (required for Sick Leave > 3 days)."
+                    "Upload a medical certificate or supporting document (required for Sick Leave > 5 days)."
                 ),
                 widget=forms.ClearableFileInput(
                     attrs={
@@ -974,13 +1046,13 @@ class LeaveApplicationForm(forms.ModelForm):
                 leaveTypeId
                 and leaveTypeId.leave_type_short_code == "SL"
                 and usedLeave
-                and int(usedLeave) > 3
+                and int(usedLeave) > 5
         ):
             if not attachment:
                 self.add_error(
                     "attachment",
                     _(
-                        "Attachment is required for Sick Leave applications exceeding 3 days."
+                        "Attachment is required for Sick Leave applications exceeding 5 days."
                     ),
                 )
 
@@ -1496,6 +1568,40 @@ class FilterForm(forms.Form):
         ),
         required=False,
     )
+
+
+class TourFilterForm(forms.Form):
+    status = forms.ChoiceField(
+        choices=settings.TOUR_STATUS_CHOICES,
+        widget=forms.Select(attrs={"class": "form-select", "id": "status-filter"}),
+        required=False,
+    )
+    from_date = forms.DateField(
+        widget=DatePickerInput(
+            options={
+                "format": "DD MMM, YYYY",
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            attrs={"class": "form-control"},
+        ),
+        required=False,
+    )
+    to_date = forms.DateField(
+        widget=DatePickerInput(
+            options={
+                "format": "DD MMM, YYYY",
+                "showClear": True,
+                "showClose": True,
+                "useCurrent": False,
+            },
+            range_from="from_date",
+            attrs={"class": "form-control"},
+        ),
+        required=False,
+    )
+
 
 
 class EmployeeChoicesForm(forms.Form):

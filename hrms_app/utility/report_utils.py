@@ -499,11 +499,7 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time,de
         total_duration = duration + log_duration
         total_hours = total_duration.total_seconds() / 3600
         # Determine the short code based on the total hours
-        # short_code = "T" if total_hours >= 8 else "TH"
-        if detailed :
-            short_code = "T" if total_hours >= 8 else "TH" 
-        else:
-            short_code = "P" if total_hours >= 8 else "PH"
+        short_code = "T" if total_hours >= 8 else "TH"
         # Append the result for the current day
         daily_durations.append((current_datetime.date(), short_code, total_duration))
         # Move to the next day

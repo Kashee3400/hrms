@@ -166,8 +166,8 @@ class AttendanceMapper:
             )
             
             for date, short_code, _ in daily_durations:
-                self._set_status(employee_id, date, short_code, "#06B900")
-                # self._set_status(employee_id, date, short_code, "#06c1c4")
+                # self._set_status(employee_id, date, short_code, "#06B900")
+                self._set_status(employee_id, date, short_code, "#06c1c4")
     
     def _process_holidays(self, holidays):
         """
