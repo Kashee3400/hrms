@@ -23,10 +23,17 @@ from hrms_app.utility.attendanceutils import (
     get_days_in_month,
     get_non_stl_leave_logs,
 )
-import subprocess
-import os
 from ..utility.report_utils import get_monthly_presence_html_table
 from ..utility.attendance_mapper import AttendanceMapper
+import io
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.units import mm
+from reportlab.lib.styles import ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.pdfgen import canvas as rl_canvas
+
 logger = logging.getLogger(__name__)
 
 
@@ -157,16 +164,6 @@ class MonthAttendanceReportView(LoginRequiredMixin, TemplateView):
             ("dashboard", {"label": "Dashboard"}),
             ("attendance_report", {"label": "Attendance Report"}),
         ]
-
-import io
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
-from reportlab.lib.units import mm
-from reportlab.lib.styles import ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.pdfgen import canvas as rl_canvas
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Page-numbering canvas  ("Page X of Y" at bottom-right)
@@ -377,7 +374,7 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
         if request.GET.get("export") == "true":
             form = AttendanceReportFilterForm(request.GET)
             if form.is_valid():
-                return self._export_table_data_pdf(form.cleaned_data)
+                return self._export_table_data(form.cleaned_data)
 
         return super().get(request, *args, **kwargs)
 
