@@ -174,15 +174,15 @@ def get_leave_logs(employee_ids, start_date=None, end_date=None):
 
 
 def get_tour_logs(employee_ids, start_date, end_date):
-    """
-    Optimization: select_related for the user.
-    """
-    return UserTour.objects.filter(
-        applied_by_id__in=employee_ids,
-        start_date__range=[start_date, end_date],
-        status=settings.APPROVED,
-    ).select_related('applied_by')
-
+    return (
+        UserTour.objects.filter(
+            applied_by_id__in=employee_ids,
+            start_date__lte=end_date,
+            end_date__gte=start_date,
+            status=settings.APPROVED,
+        )
+        .select_related("applied_by")
+    )
 
 def get_holiday_logs(start_date, end_date, employee_ids=None):
     """
