@@ -1496,6 +1496,7 @@ def make_json_serializable(data):
     """Ensure data is JSON serializable."""
     return json.loads(json.dumps(data, cls=DjangoJSONEncoder))
 
+from django.db.models import Q
 
 class EventListView(View):
 
@@ -1567,8 +1568,17 @@ class EventListView(View):
                 endDate__gte=start_date.date(), startDate__lte=end_date.date()
             )
             tour_applications = tour_applications.filter(
-                end_date__gte=start_date.date(), start_date__lte=end_date.date()
+                Q(
+                    extended_end_date__isnull=False,
+                    extended_end_date__gte=start_date.date()
+                ) |
+                Q(
+                    extended_end_date__isnull=True,
+                    end_date__gte=start_date.date()
+                ),
+                start_date__lte=end_date.date(),
             )
+            
             office_closers = office_closers.filter(
                 date__gte=start_date.date(), date__lte=end_date.date()
             )
@@ -1646,6 +1656,9 @@ class EventListView(View):
 
         # Tours
         for tour in tour_applications:
+            effective_end_date = tour.extended_end_date or tour.end_date
+            effective_end_time = tour.extended_end_time or tour.end_time
+
             events_data.append(
                 {
                     "id": tour.slug,
@@ -1657,18 +1670,23 @@ class EventListView(View):
                     ).isoformat(),
                     "end": timezone.localtime(
                         timezone.make_aware(
-                            datetime.combine(tour.end_date, tour.end_time)
+                            datetime.combine(
+                                effective_end_date,
+                                effective_end_time,
+                            )
                         )
                     ).isoformat(),
                     "url": reverse_lazy(
-                        "tour_application_detail", kwargs={"slug": tour.slug}
+                        "tour_application_detail",
+                        kwargs={"slug": tour.slug},
                     ),
                     "color": (
-                        "#B1B1B1" if tour.status == settings.PENDING else "#3a87ad"
+                        "#B1B1B1"
+                        if tour.status == settings.PENDING
+                        else "#3a87ad"
                     ),
                 }
             )
-
         # Leaves
         for leave in leave_applications:
             events_data.append(
