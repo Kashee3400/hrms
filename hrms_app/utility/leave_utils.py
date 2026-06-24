@@ -175,11 +175,11 @@ class LeavePolicyManager:
         self.validate_consecutive_leave_restrictions()
 
         if self.leave_type.leave_type_short_code == "CL":
-            self.apply_cl_policy()
+            self.apply_cl_policy(self.user)
         elif self.leave_type.leave_type_short_code == "EL":
             self.apply_el_policy()
         elif self.leave_type.leave_type_short_code == "SL":
-            self.apply_sl_policy()
+            self.apply_sl_policy(self.user)
 
 
     def validate_overlapping_leaves(self):
@@ -201,26 +201,33 @@ class LeavePolicyManager:
                 "There is an overlapping leave application in the selected date range."
             )
 
-    def apply_cl_policy(self):
+    def apply_cl_policy(self,user):
         """
         Applies Casual Leave specific policies.
         """
         self.apply_min_notice_days_policy()
         self.validate_min_days()
         self.apply_max_days_limit_policy()
-        self.apply_sl_policy()
+        self.apply_sl_policy(user)
         
         
-    def apply_sl_policy(self):
+    def apply_sl_policy(self,user):
         current_date = timezone.now().date()
         non_working_days = get_non_working_days(start=self.end_date.date(),end=current_date)
         gap = (current_date - self.end_date.date()).days + 1
         gap = gap - non_working_days
         app_setting = AppSetting.objects.filter(key="CL_SL_WORKING_DAY_LIMIT").first()
+        if not user:
+            raise ValidationError("User information is missing.")
+
+        if not app_setting.allowed_users.filter(id=user.id).exists():
+            raise ValidationError(
+                "You are not authorized to apply for this leave."
+            )
         if app_setting.beyond_policy:
             return
         if gap > int(app_setting.value):
-            raise ValidationError(f"{self.leave_type.leave_type_short_code} application denied.You can apply within 3 working days.")
+            raise ValidationError(f"{self.leave_type.leave_type_short_code} application denied.You can apply within {int(app_setting.value)-1} working days.")
 
     def validate_min_days(self):
         if float(self.booked_leave) < float(self.leave_type.min_days_limit):
