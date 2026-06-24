@@ -2691,131 +2691,77 @@ class TourStatusLog(models.Model):
             comments=comments,
         )
 
-# class TourExtensionRequest(models.Model):
-#     """
-#     Tracks date/time modification requests for approved tours.
-#     Stores old vs new values for audit trail.
-#     """
-#     tour = models.ForeignKey(
-#         UserTour,
-#         on_delete=models.CASCADE,
-#         related_name="extension_requests",
-#         verbose_name=_("Tour"),
-#     )
-#     requested_by = models.ForeignKey(
-#         get_user_model(),
-#         on_delete=models.SET_NULL,
-#         null=True,
-#         related_name="tour_extension_requests",
-#         verbose_name=_("Requested By"),
-#     )
+_DATETIME_FIELDS = ["start_date", "start_time", "end_date", "end_time"]
 
-#     # --- Old Values (snapshot at time of request) ---
-#     old_start_date = models.DateField(verbose_name=_("Old Start Date"))
-#     old_start_time = models.TimeField(null=True, blank=True, verbose_name=_("Old Start Time"))
-#     old_end_date = models.DateField(verbose_name=_("Old End Date"))
-#     old_end_time = models.TimeField(null=True, blank=True, verbose_name=_("Old End Time"))
 
-#     # --- New Requested Values ---
-#     new_start_date = models.DateField(verbose_name=_("New Start Date"))
-#     new_start_time = models.TimeField(null=True, blank=True, verbose_name=_("New Start Time"))
-#     new_end_date = models.DateField(verbose_name=_("New End Date"))
-#     new_end_time = models.TimeField(null=True, blank=True, verbose_name=_("New End Time"))
+class TourDateTimeChangeLog(models.Model):
+    tour       = models.ForeignKey(
+        "UserTour",
+        on_delete=models.CASCADE,
+        related_name="datetime_change_logs",
+        verbose_name=_("Tour"),
+    )
+    changed_by = models.ForeignKey(
+        get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="tour_datetime_changes",
+        verbose_name=_("Changed By"),
+    )
 
-#     reason = models.TextField(verbose_name=_("Reason for Change"))
+    # ── Previous ──────────────────────────────────────────────────────────
+    previous_start_date = models.DateField(null=True, blank=True)
+    previous_start_time = models.TimeField(null=True, blank=True)
+    previous_end_date   = models.DateField(null=True, blank=True)
+    previous_end_time   = models.TimeField(null=True, blank=True)
 
-#     status = models.CharField(
-#         max_length=50,
-#         choices=[
-#             ("pending", _("Pending")),
-#             ("approved", _("Approved")),
-#             ("rejected", _("Rejected")),
-#         ],
-#         default="pending",
-#         verbose_name=_("Status"),
-#     )
+    # ── New ───────────────────────────────────────────────────────────────
+    new_start_date = models.DateField(null=True, blank=True)
+    new_start_time = models.TimeField(null=True, blank=True)
+    new_end_date   = models.DateField(null=True, blank=True)
+    new_end_time   = models.TimeField(null=True, blank=True)
 
-#     reviewed_by = models.ForeignKey(
-#         get_user_model(),
-#         on_delete=models.SET_NULL,
-#         null=True,
-#         blank=True,
-#         related_name="reviewed_extension_requests",
-#         verbose_name=_("Reviewed By"),
-#     )
-#     review_comments = models.TextField(null=True, blank=True, verbose_name=_("Review Comments"))
-#     reviewed_at = models.DateTimeField(null=True, blank=True, verbose_name=_("Reviewed At"))
+    changed_fields = models.JSONField(default=list)
+    reason         = models.TextField(null=True, blank=True, verbose_name=_("Reason"))
+    changed_at     = models.DateTimeField(auto_now_add=True)
 
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        verbose_name        = _("Tour Date/Time Change Log")
+        verbose_name_plural = _("Tour Date/Time Change Logs")
+        ordering            = ["-changed_at"]
 
-#     class Meta:
-#         db_table = "tbl_tour_extension_requests"
-#         verbose_name = _("Tour Extension Request")
-#         verbose_name_plural = _("Tour Extension Requests")
-#         ordering = ["-created_at"]
+    def __str__(self):
+        return f"Change on {self.tour} at {self.changed_at:%Y-%m-%d %H:%M}"
 
-#     def __str__(self):
-#         return f"Extension Request #{self.id} for Tour #{self.tour_id}"
+    @classmethod
+    def create_from_diff(cls, tour, previous_snapshot, changed_by, reason=""):
+        """
+        Snapshot `previous_snapshot` (dict) vs current `tour` state
+        and persist only if something actually changed.
+        Returns the log instance or None if nothing changed.
+        """
+        changed_fields = [
+            f for f in _DATETIME_FIELDS
+            if previous_snapshot.get(f) != getattr(tour, f)
+        ]
+        if not changed_fields:
+            return None
 
-#     @property
-#     def diff_summary(self):
-#         """Returns a human-readable summary of what changed."""
-#         changes = []
-#         if self.old_start_date != self.new_start_date:
-#             changes.append(f"Start Date: {self.old_start_date} → {self.new_start_date}")
-#         if self.old_start_time != self.new_start_time:
-#             changes.append(f"Start Time: {self.old_start_time} → {self.new_start_time}")
-#         if self.old_end_date != self.new_end_date:
-#             changes.append(f"End Date: {self.old_end_date} → {self.new_end_date}")
-#         if self.old_end_time != self.new_end_time:
-#             changes.append(f"End Time: {self.old_end_time} → {self.new_end_time}")
-#         return " | ".join(changes) if changes else "No changes detected"
-
-#     def approve(self, reviewed_by, comments=None):
-#         from django.utils.timezone import now
-
-#         # Apply new values to the parent tour
-#         tour = self.tour
-#         tour.start_date = self.new_start_date
-#         tour.start_time = self.new_start_time
-#         tour.end_date = self.new_end_date
-#         tour.end_time = self.new_end_time
-#         # Clear legacy extension fields if you're migrating away from them
-#         tour.extended_end_date = None
-#         tour.extended_end_time = None
-#         tour.status = settings.EXTENDED
-#         tour.save()
-
-#         self.status = "approved"
-#         self.reviewed_by = reviewed_by
-#         self.review_comments = comments
-#         self.reviewed_at = now()
-#         self.save()
-
-#         TourStatusLog.create_log(
-#             tour=tour,
-#             action_by=reviewed_by,
-#             action=settings.EXTENDED,
-#             comments=f"Date/time modified. {self.diff_summary}. Reviewer note: {comments or 'N/A'}",
-#         )
-
-#     def reject(self, reviewed_by, comments=None):
-#         from django.utils.timezone import now
-
-#         self.status = "rejected"
-#         self.reviewed_by = reviewed_by
-#         self.review_comments = comments
-#         self.reviewed_at = now()
-#         self.save()
-
-#         TourStatusLog.create_log(
-#             tour=self.tour,
-#             action_by=reviewed_by,
-#             action="extension_rejected",
-#             comments=f"Extension request rejected. {self.diff_summary}. Reason: {comments or 'N/A'}",
-#         )
-
+        return cls.objects.create(
+            tour=tour,
+            changed_by=changed_by,
+            previous_start_date=previous_snapshot["start_date"],
+            previous_start_time=previous_snapshot["start_time"],
+            previous_end_date=previous_snapshot["end_date"],
+            previous_end_time=previous_snapshot["end_time"],
+            new_start_date=tour.start_date,
+            new_start_time=tour.start_time,
+            new_end_date=tour.end_date,
+            new_end_time=tour.end_time,
+            changed_fields=changed_fields,
+            reason=reason,
+        )
+        
 class Bill(models.Model):
     tour = models.ForeignKey(UserTour, on_delete=models.CASCADE, verbose_name=_("Tour"))
     bill_amount = models.DecimalField(
@@ -2860,6 +2806,7 @@ class Bill(models.Model):
         verbose_name = _("Tour Bill")
         verbose_name_plural = _("Tour Bills")
 
+
 class AppSetting(models.Model):
     key = models.CharField(
         max_length=255,
@@ -2882,6 +2829,12 @@ class AppSetting(models.Model):
         auto_now=True,
         verbose_name="Last Updated",
         help_text="Timestamp of the last update to this setting."
+    )
+    allowed_users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name="allowed_app_settings",
+        help_text="Only selected users can use this setting. Leave blank to allow all users."
     )
     beyond_policy = models.BooleanField(
         default=True,

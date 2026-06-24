@@ -185,13 +185,6 @@ def get_leave_balances(user, request):
             year=current_year,
         )
 
-        # Pending leaves for performance
-        pending_leaves = LeaveApplication.objects.filter(
-            appliedBy=user,
-            status=settings.PENDING,
-            endDate__year=current_year,
-        )
-
         for leave_type in leave_types:
 
             # ----------------------------

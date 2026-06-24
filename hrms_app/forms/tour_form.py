@@ -85,13 +85,47 @@ class TourApplicationForm(BaseUserTourForm):
         
         return cleaned_data
 
+class TourDateTimeUpdateForm(forms.ModelForm):
+    reason = forms.CharField(
+        required=True,
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": _("Reason for updating date/time...")}),
+        label=_("Reason for Change"),
+        help_text=_("Please provide a reason for updating the tour dates."),
+    )
+
+    class Meta:
+        model = UserTour
+        fields = ["start_date", "start_time", "end_date", "end_time"]
+        widgets = {
+            "start_date": DatePickerInput(options={"format": "YYYY-MM-DD"}),
+            "start_time": TimePickerInput(options={"format": "HH:mm"}),
+            "end_date":   DatePickerInput(
+                options={"format": "YYYY-MM-DD"},
+                range_from="start_date",   # disables dates before start_date in the picker UI
+            ),
+            "end_time":   TimePickerInput(
+                options={"format": "HH:mm"},
+                range_from="start_time",
+            ),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get("start_date")
+        end_date   = cleaned_data.get("end_date")
+
+        if start_date and end_date and end_date < start_date:
+            raise forms.ValidationError(_("End date cannot be before start date."))
+
+        return cleaned_data
+
 
 class EmployeeTourStatusUpdateForm(BaseUserTourForm):
     """Form for employees to manage their tour status"""
     
     status = forms.ChoiceField(
         choices=[
-            ('extended', _('Request Extension')),
+            # ('extended', _('Request Extension')),
             ('pending_cancellation', _('Request Cancellation')),
         ],
         widget=forms.Select(attrs={"class": "form-select"}),

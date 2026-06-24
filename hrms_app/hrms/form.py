@@ -745,20 +745,27 @@ class TourForm(forms.ModelForm):
         if self.user and start_date and end_date:
             self._validate_attendance_conflict(start_date, end_time, start_time)
             self._validate_leave_conflict(start_date, end_date, start_time, end_time)
-        self._apply_tour_policy(end_date)
+        self._apply_tour_policy(end_date,self.user)
 
         return cleaned_data
     
-    def _apply_tour_policy(self,end_date):
+    def _apply_tour_policy(self,end_date,user):
         current_date = timezone.now().date()
         non_working_days = get_non_working_days(start=end_date,end=current_date)
         gap = (current_date - end_date).days + 1
         gap = gap - non_working_days
         app_setting = AppSetting.objects.filter(key="TOUR_LIMIT").first()
+        if not user:
+            raise ValidationError("User information is missing.")
+
+        if not app_setting.allowed_users.filter(id=user.id).exists():
+            raise ValidationError(
+                "You are not authorized to apply for this tour."
+            )
         if app_setting and app_setting.beyond_policy:
             return
         if gap > int(app_setting.value):
-            raise ValidationError(f"Tour application denied.You can apply within {app_setting.value} working days.")
+            raise ValidationError(f"Tour application denied.You can apply within {int(app_setting.value)-1} working days.")
 
 
     def _validate_attendance_conflict(self, start_date, tour_end_time, tour_start_time):

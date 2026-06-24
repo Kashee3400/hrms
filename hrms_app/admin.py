@@ -1045,6 +1045,7 @@ class AppSettingAdmin(admin.ModelAdmin):
     search_fields = ("key", "description")
     list_filter = ("updated_at",)
     readonly_fields = ("updated_at",)
+    filter_horizontal = ("allowed_users",)
     ordering = ("key",)
 
 
