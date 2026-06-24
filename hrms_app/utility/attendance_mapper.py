@@ -162,7 +162,11 @@ class AttendanceMapper:
         for log in tour_logs:
             employee_id = log.applied_by.id
             daily_durations = calculate_daily_tour_durations(
-                log.start_date, log.start_time, log.end_date, log.end_time,detailed
+                log.start_date,
+                log.start_time,
+                log.extended_end_date or log.end_date,
+                log.extended_end_time or log.end_time,
+                detailed,
             )
             
             for date, short_code, _ in daily_durations:

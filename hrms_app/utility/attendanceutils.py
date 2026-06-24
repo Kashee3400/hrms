@@ -173,12 +173,20 @@ def get_leave_logs(employee_ids, start_date=None, end_date=None):
     )
 
 
+from django.db.models.functions import Coalesce
+
 def get_tour_logs(employee_ids, start_date, end_date):
     return (
-        UserTour.objects.filter(
+        UserTour.objects.annotate(
+            effective_end_date=Coalesce(
+                "extended_end_date",
+                "end_date",
+            )
+        )
+        .filter(
             applied_by_id__in=employee_ids,
             start_date__lte=end_date,
-            end_date__gte=start_date,
+            effective_end_date__gte=start_date,
             status=settings.APPROVED,
         )
         .select_related("applied_by")
@@ -200,31 +208,7 @@ def get_holiday_logs(start_date, end_date, employee_ids=None):
         qs = Holiday.objects.filter(base_query & user_query)
     else:
         qs = Holiday.objects.filter(base_query)
-
-    # Distinct is needed because an employee might match multiple groups if you have groups logic,
-    # or the join might duplicate rows.
     return qs.distinct().prefetch_related('applicable_users')
-
-# def get_attendance_logs(employee_ids, start_date, end_date):
-#     return AttendanceLog.objects.filter(
-#         applied_by_id__in=employee_ids, start_date__date__range=[start_date, end_date]
-#     )
-
-
-# def get_leave_logs(employee_ids, start_date=None, end_date=None):
-#     return LeaveDay.objects.filter(
-#         leave_application__appliedBy_id__in=employee_ids,
-#         date__range=[start_date, end_date],
-#         leave_application__status=settings.APPROVED,
-#     )
-
-
-# def get_tour_logs(employee_ids, start_date, end_date):
-#     return UserTour.objects.filter(
-#         applied_by_id__in=employee_ids,
-#         start_date__range=[start_date, end_date],
-#         status=settings.APPROVED,
-#     )
 
 
 def str_to_date(value):

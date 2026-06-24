@@ -441,7 +441,7 @@ def process_leaves(leaves, monthly_presence_data):
 def process_tours(all_tours, monthly_presence_data,detailed):
     for tour in all_tours:
         daily_durations = calculate_daily_tour_durations(
-            tour.start_date, tour.start_time, tour.end_date, tour.end_time,detailed
+            tour.start_date, tour.start_time, tour.extended_end_date or tour.end_date, tour.extended_end_time or tour.end_time,detailed
         )
         emp_code = tour.applied_by.personal_detail.employee_code
         for date, short_code, duration in daily_durations:
