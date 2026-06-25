@@ -211,24 +211,31 @@ class LeavePolicyManager:
         self.apply_sl_policy(user)
         
         
-    def apply_sl_policy(self,user):
+    def apply_sl_policy(self, user):
         current_date = timezone.now().date()
-        non_working_days = get_non_working_days(start=self.end_date.date(),end=current_date)
+        non_working_days = get_non_working_days(
+            start=self.end_date.date(),
+            end=current_date
+        )
         gap = (current_date - self.end_date.date()).days + 1
-        gap = gap - non_working_days
-        app_setting = AppSetting.objects.filter(key="CL_SL_WORKING_DAY_LIMIT").first()
-        if not user:
-            raise ValidationError("User information is missing.")
-
-        if not app_setting.allowed_users.filter(id=user.id).exists():
-            raise ValidationError(
-                "You are not authorized to apply for this leave."
-            )
+        gap -= non_working_days
+        app_setting = AppSetting.objects.filter(
+            key="CL_SL_WORKING_DAY_LIMIT"
+        ).first()
+        if not app_setting:
+            return
+        if gap <= int(app_setting.value):
+            return
         if app_setting.beyond_policy:
             return
-        if gap > int(app_setting.value):
-            raise ValidationError(f"{self.leave_type.leave_type_short_code} application denied.You can apply within {int(app_setting.value)-1} working days.")
-
+        if not user:
+            raise ValidationError("User information is missing.")
+        if not app_setting.allowed_users.filter(id=user.id).exists():
+            raise ValidationError(
+                f"{self.leave_type.leave_type_short_code} application denied. "
+                f"You can apply within {int(app_setting.value) - 1} working days."
+            )
+        return
     def validate_min_days(self):
         if float(self.booked_leave) < float(self.leave_type.min_days_limit):
             raise ValidationError(
