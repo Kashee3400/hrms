@@ -450,9 +450,7 @@ class TourApplicationDetailView(TourPermissionMixin, DetailView):
     
     def get_status_form(self, user, tour):
         """Get the appropriate form based on user role"""
-        if self._is_admin(user):
-            return AdminTourStatusUpdateForm(instance=tour)
-        elif self._is_manager(user, tour):
+        if self._is_manager(user, tour) or self._is_admin(user):
             return ManagerTourStatusUpdateForm(instance=tour)
         elif self._is_employee(user, tour):
             return EmployeeTourStatusUpdateForm(instance=tour)
