@@ -547,7 +547,7 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
             endDate__year=year,
             status=settings.APPROVED,
         ).exclude(
-            leave_type__leave_type_short_code__in=["CO", "STL"]
+            leave_type__leave_type_short_code__in=["CO", "STL","PAT"]
         )
 
         if search_query:

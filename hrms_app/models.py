@@ -2552,8 +2552,6 @@ class UserTour(models.Model):
                 self.total = time(hour=hours % 24, minute=minutes, second=seconds)
             else:
                 self.total = None 
-
-        # Call the parent class's save method to save the object
         super().save(*args, **kwargs)
 
     def approve(self, action_by, reason=None):
