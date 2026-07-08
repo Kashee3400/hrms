@@ -20,7 +20,8 @@ from django_ckeditor_5.widgets import CKEditor5Widget
 from bootstrap_datepicker_plus.widgets import DatePickerInput
 
 from ..models import LeaveType, LeaveApplication
-from ..manager.leave_policy import LeavePolicyManager
+# from ..manager.leave_policy import LeavePolicyManager
+from ..utility.leave_utils import LeavePolicyManager
 from ..services.leave_service import LeaveDomainService
 
 
@@ -198,7 +199,7 @@ class LeaveApplicationForm(forms.ModelForm):
                 end_date=endDate,
                 start_day_choice=startDayChoice,
                 end_day_choice=endDayChoice,
-                booked_leave=usedLeave,          # ← FIX 3: was bookedLeave=
+                bookedLeave=usedLeave,
                 exclude_application_id=exclude_application_id,
             )
             policy_manager.validate_policies()

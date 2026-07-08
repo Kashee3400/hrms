@@ -335,8 +335,8 @@ class LeavePolicyManager:
             start=last_end_date, end=self.start_date.date()
         )
         if (
-            self.leave_type.leave_type_short_code == "CL"
-            and last_leave.leave_type.leave_type_short_code == "CL"
+            (self.leave_type.leave_type_short_code == "CL" or self.leave_type.leave_type_short_code == "SL")
+            and last_leave.leave_type.leave_type_short_code in ["CL","SL"]
         ):
             days_between -= non_work_days
         if (
