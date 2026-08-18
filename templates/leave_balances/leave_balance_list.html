@@ -336,7 +336,12 @@
         </div>
 
         <div class="mt-auto">
-          {% if leave_balance.is_active and leave_balance.total_balance > 0 %}
+          {% if leave_balance.is_active and leave_balance.leave_type.leave_type_short_code == "LWP" %}
+          <a href="{{ leave_balance.url }}?next={{ request.path }}"
+            class="btn btn-outline-primary w-100 btn-apply-custom d-flex align-items-center justify-content-center gap-2">
+            {% trans 'Apply' %} <i class="fas fa-arrow-right" style="font-size: 0.8rem;"></i>
+          </a>
+          {% elif leave_balance.is_active and leave_balance.total_balance > 0 %}
           <a href="{{ leave_balance.url }}?next={{ request.path }}"
             class="btn btn-outline-primary w-100 btn-apply-custom d-flex align-items-center justify-content-center gap-2">
             {% trans 'Apply' %} <i class="fas fa-arrow-right" style="font-size: 0.8rem;"></i>
