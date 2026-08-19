@@ -143,12 +143,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             {} if user.is_superuser else {"appliedBy_id__in": employee_ids}
         )
         counts = {
-            "regularization": AttendanceLog.objects.filter(
-                is_regularisation=True,
-                is_submitted=True,
-                status=settings.PENDING,
-                **filter_kwargs,
-            ).count(),
             "leave": LeaveApplication.objects.filter(
                 status=settings.PENDING, **leave_filter_kwargs
             ).count(),
@@ -169,12 +163,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 "title": _("Tours"),
                 "icon": "fas fa-plane-departure",
                 "link": reverse("tour_tracker"),
-            },
-            {
-                "key": "regularization",
-                "title": _("Regularizations"),
-                "icon": "fas fa-check-circle",
-                "link": reverse("regularization"),
             },
         ]
 

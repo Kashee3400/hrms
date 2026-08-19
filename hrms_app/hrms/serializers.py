@@ -1,5 +1,6 @@
 # serializers.py
 from rest_framework import serializers
+from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from hrms_app.models import *
 from hrms_app.utility.leave_utils import LeavePolicyManager

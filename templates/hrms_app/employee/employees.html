@@ -7,13 +7,65 @@
 
 {% block extracss %}
   <link rel="stylesheet" href="{% static 'hrms_app/css/status.css' %}" />
+  <style>
+    .employee-toolbar .form-control,
+    .employee-toolbar .form-select,
+    .employee-toolbar .btn {
+      height: 38px;
+      font-size: 13.5px;
+    }
+
+    .employee-toolbar .input-group-text {
+      padding: 0 12px;
+    }
+
+    .employee-card {
+      border: 1px solid #e8eaf2;
+      border-radius: 12px;
+    }
+
+    .employee-card .card-body {
+      padding: 1rem;
+    }
+
+    .employee-card .avatar {
+      width: 72px;
+      height: 72px;
+      object-fit: cover;
+    }
+
+    .employee-card .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.15rem;
+      text-align: center;
+    }
+
+    .employee-card .card-subtitle {
+      font-size: 0.78rem;
+    }
+
+    .employee-card ul li {
+      font-size: 0.82rem;
+      color: #5C6178;
+    }
+
+    .employee-card .badge {
+      font-size: 0.72rem;
+      font-weight: 600;
+    }
+
+    .employee-card .btn-sm {
+      font-size: 0.78rem;
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
   {% render_breadcrumb 'Employees' urls %}
   <div class="bg-white px-2 py-4">
     <div class="container bg-light py-2">
-      <form method="get" action="{% url 'employees' %}">
+      <form method="get" action="{% url 'employees' %}" class="employee-toolbar">
         <div class="row g-2 align-items-center justify-content-between text-center text-md-start">
           <!-- Search Input -->
           <div class="col-12 col-md-4 col-lg-3">
@@ -64,12 +116,12 @@
       <div class="row">
         {% for user in users %}
           <div class="col-md-4 col-sm-12 col-lg-3 mt-3">
-            <div class="card">
+            <div class="card employee-card">
               <div class="card-body">
                 <div class="d-flex flex-column align-items-center">
                   <img src="{{user.personal_detail.get_avatar_url}}"
-                    class="avatar rounded-circle mb-2 img-fluid"
-                    style="max-width: 100px; max-height: 100px; width: auto; height: auto;" />
+                    class="avatar rounded-circle mb-2"
+                    onerror="this.onerror=null;this.src='{% static 'images/faces/face8.jpg' %}';" />
                   <h5 class="card-title">{{ user.personal_detail.salutation }} {{ user.get_full_name }}</h5>
                   <h6 class="card-subtitle mb-2 text-muted">{{ user.personal_detail.designation }}</h6>
                 </div>

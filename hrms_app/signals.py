@@ -1,6 +1,7 @@
 # myapp/signals.py
 from .tasks import send_leave_application_notifications
 from django.contrib.sites.models import Site
+from django.utils.text import slugify
 from .models import LeaveApplication, UserTour, Notification,LeaveBalanceOpenings,CustomUser,AttendanceLog
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save,pre_delete,pre_save

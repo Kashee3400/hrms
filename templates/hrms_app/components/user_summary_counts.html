@@ -1,23 +1,21 @@
 <style>
   /* Compact Modern Stat Card Styling */
   .hover-card {
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    border: 1px solid #f1f5f9;
-    background: #fff;
-    border-radius: 12px; /* Slightly tighter radius */
+    transition: border-color 0.2s;
+    border: 1px solid #e8eaf2;
+    background: #f8fafc;
+    border-radius: 12px;
   }
 
   .hover-card:hover {
-    transform: translateY(-4px); /* Subtle lift */
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
-    border-color: #6366f1;
+    border-color: var(--k-blue-600, #1F3BB3);
   }
 
   .icon-shape {
     width: 36px;  /* Reduced from 48px */
     height: 36px;
-    background: rgba(99, 102, 241, 0.1);
-    color: #6366f1;
+    background: var(--k-blue-100, #E8ECFB);
+    color: var(--k-blue-600, #1F3BB3);
     border-radius: 8px; /* Tighter radius */
     display: flex;
     align-items: center;
@@ -27,15 +25,15 @@
   }
 
   .hover-card:hover .icon-shape {
-    background: #6366f1;
+    background: var(--k-blue-600, #1F3BB3);
     color: #ffffff;
   }
 </style>
 
 {% for item in items %}
-<div class="pending-data flex-shrink-0 py-1 px-2" style="min-width: 180px; max-width: 180px;">
+<div class="pending-data py-1 px-2" style="flex: 0 0 170px; scroll-snap-align: start;">
   <a href="{{ item.link }}" class="text-decoration-none h-100 d-block">
-    <div class="card hover-card h-100 shadow-sm border-0">
+    <div class="card hover-card h-100 border-0">
       <div class="card-body p-2"> <div class="d-flex justify-content-between align-items-start mb-2">
           <div class="me-2 overflow-hidden">
             <p class="text-muted text-uppercase fw-bold mb-0 text-truncate"

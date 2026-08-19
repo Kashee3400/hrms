@@ -31292,4 +31292,421 @@ display: none;
   }
 }
 
-/*# sourceMappingURL=../maps/vertical-layout-light/style.css.map */
+/* =========================================================================
+   Kashi HRMS — layout redesign (navbar / sidebar / responsiveness)
+   ========================================================================= */
+:root {
+  --k-navy-900: #0F1642;
+  --k-navy-800: #151E58;
+  --k-blue-600: var(--bs-primary, #1F3BB3);
+  --k-blue-500: #3453D1;
+  --k-blue-100: #E8ECFB;
+  --k-ink-900: #161A2E;
+  --k-ink-600: #5C6178;
+  --k-ink-400: #9096AA;
+  --k-line: #E8EAF2;
+  --k-bg: #F4F5FA;
+}
+
+body {
+  font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ---- Navbar ---- */
+.navbar,
+.navbar .navbar-brand-wrapper {
+  background: #ffffff !important;
+  border-bottom: 1px solid var(--k-line);
+}
+
+.navbar .navbar-menu-wrapper .navbar-nav .nav-item .welcome-text {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 800;
+}
+
+.navbar .navbar-menu-wrapper .navbar-nav .nav-item .welcome-text .text-black {
+  color: var(--k-blue-600) !important;
+}
+
+.navbar .nested-nav {
+  background-color: var(--k-navy-900) !important;
+  border-radius: 10px;
+  flex-wrap: nowrap;
+  max-width: 100%;
+}
+
+.navbar .nested-nav .nav-item,
+.navbar .nested-nav .nav-separator {
+  flex: 0 0 auto;
+}
+
+.navbar .nested-nav .nav-link {
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.navbar .nested-nav .nav-separator {
+  margin: 0 4px;
+}
+
+@media (min-width: 992px) and (max-width: 1300px) {
+  .navbar .nested-nav .nav-link {
+    font-size: 12px;
+    padding: 6px 7px;
+  }
+
+  .navbar .nested-nav .nav-separator {
+    margin: 0 2px;
+  }
+}
+
+.navbar .nested-nav .nav-item.active .nav-link,
+.navbar .nested-nav .nav-link:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.navbar .search-form {
+  background: var(--k-bg);
+  border: 1px solid var(--k-line);
+  border-radius: 11px;
+}
+
+/* ---- Sidebar ---- */
+.sidebar,
+.sidebar .sidebar-search {
+  background: #ffffff !important;
+}
+
+.sidebar {
+  border-right: 1px solid var(--k-line);
+  width: 260px;
+  flex-shrink: 0;
+}
+
+@media (min-width: 992px) {
+  .navbar .navbar-brand-wrapper {
+    width: 260px;
+    height: 76px;
+  }
+
+  .navbar .navbar-menu-wrapper {
+    width: calc(100% - 260px);
+    height: 76px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .navbar .navbar-menu-wrapper .navbar-nav .nav-item .welcome-text {
+    font-size: 19px;
+    line-height: 24px;
+    margin-bottom: 4px;
+  }
+
+  .page-body-wrapper {
+    padding-top: 76px;
+  }
+
+  .sidebar {
+    min-height: calc(100vh - 76px);
+  }
+
+  .settings-panel {
+    top: 76px;
+  }
+}
+
+.sidebar .sidebar-search .form-control {
+  background: var(--k-bg);
+  border: 1px solid var(--k-line);
+  color: var(--k-ink-900);
+}
+
+.sidebar .sidebar-search .form-control::placeholder {
+  color: var(--k-ink-400);
+}
+
+.sidebar .sidebar-search {
+  padding: 12px 14px !important;
+}
+
+.sidebar .sidebar-search .form-control {
+  height: 36px;
+  font-size: 13px;
+}
+
+.sidebar .nav .nav-item .nav-link {
+  color: var(--k-ink-600) !important;
+  border-radius: 9px;
+  margin: 1px 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.sidebar .nav .nav-item .nav-link i.menu-icon {
+  color: var(--k-ink-400) !important;
+  font-size: 17px !important;
+  margin-right: 10px !important;
+}
+
+.sidebar .nav .nav-item .nav-link .menu-title {
+  font-size: 13px !important;
+}
+
+.sidebar .nav .nav-item.active > .nav-link .menu-title {
+  font-size: 13px !important;
+}
+
+.sidebar .nav .nav-item .nav-link:hover {
+  background: var(--k-bg);
+  color: var(--k-ink-900) !important;
+}
+
+.sidebar .nav .nav-item.active > .nav-link,
+.sidebar .nav .nav-item .nav-link.active {
+  background: var(--k-blue-100) !important;
+  color: var(--k-blue-600) !important;
+  font-weight: 700;
+  border-radius: 11px;
+}
+
+.sidebar .nav .nav-item.active > .nav-link i.menu-icon,
+.sidebar .nav .nav-item .nav-link.active i.menu-icon,
+.sidebar .nav .nav-item.active > .nav-link i.menu-arrow {
+  color: var(--k-blue-600) !important;
+}
+
+.sidebar .nav-category {
+  color: var(--k-ink-400) !important;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 14px 20px 6px !important;
+}
+
+.sidebar .nav.sub-menu .nav-item .nav-link {
+  color: var(--k-ink-600) !important;
+  margin-left: 12px;
+}
+
+.sidebar .nav.sub-menu .nav-item .nav-link.active,
+.sidebar .nav.sub-menu .nav-item .nav-link:hover {
+  color: var(--k-blue-600) !important;
+}
+
+/* ---- Mobile off-canvas sidebar (fixes squeezed layout / overflow) ---- */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 15, 40, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: 1049;
+}
+
+.sidebar-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media screen and (max-width: 991px) {
+  .sidebar-offcanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: auto;
+    height: 100vh;
+    max-height: 100vh;
+    width: 280px;
+    max-width: 82vw;
+    padding-top: 97px;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 1050;
+  }
+
+  .sidebar-offcanvas.active {
+    transform: translateX(0);
+    box-shadow: 12px 0 32px rgba(0, 0, 0, 0.25);
+  }
+
+  .content-wrapper {
+    width: 100%;
+  }
+}
+
+/* ---- Global scrollbar styling (horizontal + vertical) ---- */
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #EDEEF3;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: var(--k-blue-600);
+  background-clip: padding-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--k-blue-500);
+}
+
+*::-webkit-scrollbar-corner {
+  background: #EDEEF3;
+}
+
+*::-webkit-scrollbar-button {
+  display: block;
+  background-color: #EDEEF3;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 6px 6px;
+}
+
+*::-webkit-scrollbar-button:vertical:start:decrement {
+  height: 9px;
+  border-radius: 999px 999px 0 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpolygon points='1,7 5,3 9,7' fill='%231F3BB3'/%3E%3C/svg%3E");
+}
+
+*::-webkit-scrollbar-button:vertical:end:increment {
+  height: 9px;
+  border-radius: 0 0 999px 999px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpolygon points='1,3 5,7 9,3' fill='%231F3BB3'/%3E%3C/svg%3E");
+}
+
+*::-webkit-scrollbar-button:horizontal:start:decrement {
+  width: 9px;
+  border-radius: 999px 0 0 999px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpolygon points='7,1 3,5 7,9' fill='%231F3BB3'/%3E%3C/svg%3E");
+}
+
+*::-webkit-scrollbar-button:horizontal:end:increment {
+  width: 9px;
+  border-radius: 0 999px 999px 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpolygon points='3,1 7,5 3,9' fill='%231F3BB3'/%3E%3C/svg%3E");
+}
+
+*::-webkit-scrollbar-button:vertical:start:increment,
+*::-webkit-scrollbar-button:vertical:end:decrement,
+*::-webkit-scrollbar-button:horizontal:start:increment,
+*::-webkit-scrollbar-button:horizontal:end:decrement {
+  display: none;
+}
+
+/* ---- Main content spacing (tighter, balanced padding) ---- */
+.content-wrapper {
+  padding: 22px 28px !important;
+}
+
+@media (max-width: 767px) {
+  .content-wrapper {
+    padding: 0 16px 20px 16px !important;
+  }
+}
+
+/* ---- Page header / breadcrumb (render_breadcrumb tag) ---- */
+.row.border-bottom.py-3.mb-3 {
+  padding-top: 0.65rem !important;
+  padding-bottom: 0.65rem !important;
+  margin-bottom: 0.85rem !important;
+}
+
+.dashboard-section-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--k-ink-900);
+  margin-bottom: 0;
+}
+
+.breadcrumb {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+/* ---- Notification bell badge ---- */
+.navbar .count-indicator {
+  position: relative;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0 !important;
+}
+
+.navbar .count-indicator .badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  border-radius: 999px;
+  border: 2px solid #fff;
+}
+
+/* ---- Notification panel (#notification.settings-panel) ---- */
+.notification-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(11, 15, 40, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: 9998;
+}
+
+.notification-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#notification.settings-panel {
+  max-width: 90vw;
+  box-shadow: -12px 0 32px rgba(0, 0, 0, 0.18);
+}
+
+#notification .preview-item {
+  overflow: hidden;
+}
+
+#notification .preview-item-content {
+  min-width: 0;
+}
+
+#notification .preview-subject {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Site-wide card + small-button polish (lighter shadow, less pill-y) ---- */
+.card {
+  box-shadow: 0 1px 2px rgba(22, 26, 46, 0.04), 0 1px 3px rgba(22, 26, 46, 0.06) !important;
+}
+
+.btn.btn-sm,
+.btn-group-sm > .btn {
+  border-radius: 7px !important;
+}
+
+/* =========================================================================
+   End Kashi HRMS layout redesign
+   ========================================================================= */

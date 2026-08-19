@@ -387,6 +387,8 @@ class UploadBillView(LoginRequiredMixin, UserPassesTestMixin, FormView):
         tour = get_object_or_404(UserTour, pk=self.kwargs["pk"])
         bill = form.save(commit=False)
         bill.tour = tour
+        bill.created_by = self.request.user
+        bill.updated_by = self.request.user
         bill.save()
         tour.bills_submitted = True
         tour.save()
