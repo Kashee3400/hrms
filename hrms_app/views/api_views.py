@@ -10,8 +10,10 @@ from rest_framework.generics import (
     ListAPIView,
     UpdateAPIView,
 )
+from django.db import transaction
+from django.contrib.auth import get_user_model
 from rest_framework.exceptions import ValidationError
-
+import random
 from rest_framework import viewsets
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -1250,14 +1252,14 @@ class ExecutePopulateAttendanceView(APIView):
             user = get_object_or_404(get_user_model(),pk=userid)
             username = user.username
         
-        try:
-            call_command("pop_att", "--username", username, "--from-date", from_date, "--to-date", to_date)
-            return Response({"message": "Data synced successfully!"}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response(
-                {"error": f"Failed to sync data: {str(e)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        # try:
+        call_command("pop_att", "--username", username, "--from-date", from_date, "--to-date", to_date)
+        return Response({"message": "Data synced successfully!"}, status=status.HTTP_200_OK)
+        # except Exception as e:
+        #     return Response(
+        #         {"error": f"Failed to sync data: {str(e)}"},
+        #         status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        #     )
 
 class Top5EmployeesDurationAPIView(APIView):
     """

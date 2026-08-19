@@ -97,8 +97,13 @@ class Command(BaseCommand):
         attendance_logs = []
         full_day_hours = asettings.full_day_hours
         for date, log_times in logs.items():
-            login_date_time, logout_date_time = log_times[0], log_times[-1]
+            sorted_log_times = sorted(log_times)
+            login_date_time, logout_date_time = sorted_log_times[0], sorted_log_times[-1]
             total_duration = logout_date_time - login_date_time
+            if total_duration < timedelta(0):
+                total_duration = timedelta(0)
+            elif total_duration >= timedelta(days=1):
+                total_duration = timedelta(days=1) - timedelta(microseconds=1)
             duration = (datetime.min + total_duration).time()
             user_expected_logout_date_time = login_date_time + timedelta(hours=full_day_hours)
             user_expected_logout_time = user_expected_logout_date_time.time()
