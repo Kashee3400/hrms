@@ -37,7 +37,7 @@ class AttendanceMapper:
         "PAT": 9,     # Sick Leave Half
         "ML": 9,      # Medical Leave
         "EL": 9,      # Emergency Leave
-        "CO": 9,      # Compensatory Off
+        "C/OFF": 9,   # Compensatory Off
         "STL": 9,     # Short leave
         "LWP": 9,     # Leave Without Pay
         "T": 8,       # Tour
@@ -49,7 +49,7 @@ class AttendanceMapper:
         "OFF": 2,     # Sunday/Weekend
     }
     
-    WORKING_STATUSES = {"P", "L", "CL", "CLH", "CO", "SL", "SLH", "STL", "ML", "EL", "LWP", "PAT", "PATH", "FL", "H", "T"}
+    WORKING_STATUSES = {"P", "L", "CL", "CLH", "C/OFF", "SL", "SLH", "STL", "ML", "EL", "LWP", "PAT", "PATH", "FL", "H", "T"}
     ABSENT_STATUSES = {"A", "LWP", "AWOL"}
 
     def __init__(self, start_date_object, end_date_object):

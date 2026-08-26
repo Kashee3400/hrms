@@ -429,6 +429,8 @@ class DetailedMonthlyPresenceView(LoginRequiredMixin, TemplateView):
         )
         return response
 
+from django.db.models import Sum
+
 class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
     template_name = "hrms_app/reports/leave_balance_report.html"
     permission_denied_message = _("You are not authorized to access this page.")
@@ -535,7 +537,7 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
     def get_leave_data(self, year, monthly_headers):
         leave_balance_openings = LeaveBalanceOpenings.objects.filter(
             leave_type__leave_type_short_code__in=["EL", "SL", "CL"],year=year,
-        ).exclude(leave_type__leave_type_short_code="CO").values("user_id", "leave_type__leave_type_short_code", "opening_balance", "no_of_leaves")
+        ).exclude(leave_type__leave_type_short_code="C/OFF").values("user_id", "leave_type__leave_type_short_code", "opening_balance", "no_of_leaves")
         leave_opening_dict = defaultdict(lambda: {lt: {"opening_balance": 0, "no_of_leaves": 0} for lt in ["EL", "SL", "CL"]})
         for balance in leave_balance_openings:
             leave_opening_dict[balance["user_id"]][balance["leave_type__leave_type_short_code"]] = {
@@ -547,7 +549,7 @@ class LeaveBalanceReportView(LoginRequiredMixin, TemplateView):
             endDate__year=year,
             status=settings.APPROVED,
         ).exclude(
-            leave_type__leave_type_short_code__in=["CO", "STL","PAT"]
+            leave_type__leave_type_short_code__in=["C/OFF", "STL","PAT"]
         )
 
         if search_query:
