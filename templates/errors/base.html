@@ -1,0 +1,119 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <link rel="icon" href="{% static 'hrms_app/img/favicon.ico' %}" type="image/x-icon">
+  <title>{% block title %}Error{% endblock %} :: Kashee HRMS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand: #5E50F9;
+      --accent: {% block accent %}#5E50F9{% endblock %};
+      --ink: #0f1531;
+      --muted: #6b7280;
+      --bg: #f4f5fb;
+      --card: #ffffff;
+      --border: #e8eff4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg);
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      color: var(--ink);
+      padding: 24px;
+    }
+    .card {
+      width: 100%;
+      max-width: 480px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 36px;
+      text-align: center;
+      box-shadow: 0 10px 40px rgba(15, 21, 49, 0.06);
+    }
+    .logo {
+      height: 36px;
+      margin-bottom: 28px;
+    }
+    .code {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      background: color-mix(in srgb, var(--accent) 12%, white);
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 999px;
+      margin-bottom: 18px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      margin: 0 0 12px;
+    }
+    p.message {
+      color: var(--muted);
+      font-size: 14.5px;
+      line-height: 1.6;
+      margin: 0 0 28px;
+    }
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-block;
+      padding: 10px 22px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #ffffff;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary {
+      background: transparent;
+      color: var(--ink);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover { background: var(--bg); }
+    footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+  </style>
+  {% block extrastyle %}{% endblock %}
+</head>
+<body>
+  <div class="card">
+    <img class="logo" src="{% static 'hrms_app/img/logo.png' %}" alt="Kashee HRMS" onerror="this.style.display='none'">
+    <span class="code">{% block code %}ERROR{% endblock %}</span>
+    <h1>{% block heading %}Something went wrong{% endblock %}</h1>
+    <p class="message">{% block message %}Please try again in a moment.{% endblock %}</p>
+    <div class="actions">
+      {% block actions %}
+        <a href="/" class="btn btn-primary">Go to dashboard</a>
+        <a href="javascript:history.back()" class="btn btn-secondary">Go back</a>
+      {% endblock %}
+    </div>
+    <footer>Kashee Milk Producer Company Ltd</footer>
+  </div>
+</body>
+</html>

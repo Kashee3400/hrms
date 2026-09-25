@@ -151,9 +151,21 @@
                 {% csrf_token %}
                 <div class="row g-3">
                   {% if is_manager or user.personal_detail.designation.department.department == "admin"%}
-                    <div class="col-md-6">{{ status_form.status }}</div>
-                    <div class="col-md-6">
-                      <button type="button" class="btn btn-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#updateDialog">{% trans 'Update' %}</button>
+                    <div class="col-12">
+                      <div class="d-none">{{ status_form.status }}</div>
+                      <label class="form-label small text-muted mb-2">{% trans 'Choose an action' %}</label>
+                      <div class="d-flex flex-wrap gap-2">
+                        {% for value, label in status_form.status.field.widget.choices %}
+                          {% if value %}
+                            <button type="button"
+                                    class="btn btn-sm leave-status-btn {% if value == 'approved' or value == 'recommended' %}btn-success{% elif value == 'rejected' or value == 'not recommended' %}btn-danger{% elif value == 'cancelled' %}btn-secondary{% else %}btn-warning{% endif %}"
+                                    data-status="{{ value }}" data-label="{{ label }}"
+                                    data-bs-toggle="modal" data-bs-target="#updateDialog">
+                              {{ label }}
+                            </button>
+                          {% endif %}
+                        {% endfor %}
+                      </div>
                     </div>
                     {% elif leave_application.appliedBy == user and leave_application.status|in_list:'approved,' %}
                     <div class="col-md-6">{{ status_form.status }}</div>
@@ -172,8 +184,8 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                       </div>
                       <div class="modal-body">
-                        {% if is_manager %}
-                          You want to update the application {{ leave_application.applicationNo }} of {{ leave_application.appliedBy }}.
+                        {% if is_manager or user.personal_detail.designation.department.department == "admin" %}
+                          {% trans 'You are about to set the status of this application to' %} "<strong id="chosenActionLabel"></strong>".
                         {% else %}
                           You want to cancel your "{{ leave_application.applicationNo }}" leave.
                         {% endif %}
@@ -208,5 +220,20 @@
     function submitForm() {
       document.getElementById('leave-application-form').submit()
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var statusField = document.getElementById('{{ status_form.status.id_for_label }}')
+      var chosenActionLabel = document.getElementById('chosenActionLabel')
+      document.querySelectorAll('.leave-status-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (statusField) {
+            statusField.value = btn.dataset.status
+          }
+          if (chosenActionLabel) {
+            chosenActionLabel.textContent = btn.dataset.label
+          }
+        })
+      })
+    })
   </script>
 {% endblock %}

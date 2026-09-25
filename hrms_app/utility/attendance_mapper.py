@@ -215,8 +215,8 @@ class AttendanceMapper:
             half_status = leave_type.half_day_short_code
             color = leave_type.color_hex or "#a2a2a2"
             
-            # Determine leave duration status
-            status = leave_status if log.is_full_day else half_status
+            # Determine leave duration status (fall back to full code if no half code configured)
+            status = leave_status if log.is_full_day else (half_status or leave_status)
             
             # CL/SL (Casual/Sick Leave) has special handling
             if leave_status in ["CL", "SL"]:
@@ -232,16 +232,25 @@ class AttendanceMapper:
                 if existing_status == "OFF" and log_date.weekday() == 6:
                     continue  # Skip, keep OFF
             
-            self._set_status(employee_id, log_date, status, color)
-    
-    def _set_status(self, employee_id, date, status, color):
+            # Leave codes (e.g. EL half-day code) may be missing from STATUS_HIERARCHY,
+            # so always rank them at leave priority.
+            self._set_status(
+                employee_id, log_date, status, color,
+                priority=self.STATUS_HIERARCHY["L"],
+            )
+
+    def _set_status(self, employee_id, date, status, color, priority=None):
         """Set status for an employee on a date using hierarchy"""
         existing_status = self._get_status_for_date(
             self.attendance_data[employee_id], date
         )
-        
+
         # Only override if new status has higher priority
-        if self._should_override_status(existing_status, status):
+        if priority is None:
+            should_override = self._should_override_status(existing_status, status)
+        else:
+            should_override = priority > self.STATUS_HIERARCHY.get(existing_status, 0)
+        if should_override:
             self.attendance_data[employee_id][date] = [
                 {"status": status, "color": color}
             ]

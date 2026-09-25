@@ -1,7 +1,14 @@
+{% load i18n %}
 <!-- partial:partials/_footer.html -->
-<footer class="footer footer-fixed">
-  <div class="d-sm-flex justify-content-center justify-content-sm-between">
-    <span class="text-muted text-center text-sm-left d-block d-sm-inline-block"><a href="https://www.kasheemilk.com/?ref=23" target="_blank">Kashee Milk Producer Milk Company L.T.D</a> &nbsp;&nbsp; KMPCL.</span>
-    <span class="float-none float-sm-right d-block mt-1 mt-sm-0 text-center">Copyright © 2024. All rights reserved.</span>
+<footer class="app-footer">
+  <div class="app-footer__brand">
+    <a href="https://www.kasheemilk.com/?ref=23" target="_blank" rel="noopener">Kashee Milk Producer Milk Company L.T.D</a>
+    <span class="app-footer__divider">&bull;</span>
+    <span>KMPCL</span>
+  </div>
+  <div class="app-footer__meta">
+    <span>{% trans "Copyright" %} &copy; {% now "Y" %}. {% trans "All rights reserved." %}</span>
+    <span class="app-footer__divider">&bull;</span>
+    <span class="app-footer__credit"><i class="mdi mdi-code-tags"></i> {% trans "Developed by IT Team" %}</span>
   </div>
 </footer>

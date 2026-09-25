@@ -252,10 +252,26 @@
 
                         <!-- Status Field -->
                         <div class="mb-3">
-                            <label for="{{ form.status.id_for_label }}" class="form-label">
-                                <strong>{{ form.status.label }}</strong>
-                            </label>
-                            {{ form.status }}
+                            {% if is_manager or is_admin %}
+                                <label class="form-label"><strong>{% trans 'Choose an action' %}</strong></label>
+                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                    {% for value, label in form.status.field.choices %}
+                                        {% if value %}
+                                            <button type="button"
+                                                    class="btn tour-status-btn {% if value == 'approved' %}btn-success{% elif value == 'rejected' %}btn-danger{% elif value == 'cancelled' %}btn-secondary{% else %}btn-warning{% endif %}"
+                                                    data-status="{{ value }}" data-label="{{ label }}">
+                                                <i class="fas fa-check-circle me-1"></i>{{ label }}
+                                            </button>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <div class="d-none">{{ form.status }}</div>
+                            {% else %}
+                                <label for="{{ form.status.id_for_label }}" class="form-label">
+                                    <strong>{{ form.status.label }}</strong>
+                                </label>
+                                {{ form.status }}
+                            {% endif %}
                             {% if form.status.help_text %}
                             <small class="form-text text-muted d-block mt-1">{{ form.status.help_text|safe }}</small>
                             {% endif %}
@@ -358,24 +374,17 @@
 
                         <!-- Action Buttons -->
                         <div class="d-flex gap-2 flex-wrap">
-                            <button type="button" class="btn btn-primary" onclick="showConfirmDialog()">
-                                <i class="fas fa-check-circle me-1"></i>
-                                {% if is_manager %}
-                                    {% trans 'Submit Review' %}
-                                {% elif is_employee %}
-                                    {% trans 'Submit Request' %}
-                                {% elif is_admin %}
-                                    {% trans 'Update' %}
-                                {% endif %}
-                            </button>
-
                             {% if is_employee %}
+                                <button type="button" class="btn btn-primary" onclick="showConfirmDialog()">
+                                    <i class="fas fa-check-circle me-1"></i>
+                                    {% trans 'Submit Request' %}
+                                </button>
                                 {% if tour_application.is_editable %}
                                 <a class="btn btn-warning" href="{{ edit_url }}">
                                     <i class="fas fa-edit me-1"></i> {% trans 'Edit' %}
                                 </a>
                                 {% endif %}
-                                <a class="btn btn-danger" href="{{ delete_url }}" 
+                                <a class="btn btn-danger" href="{{ delete_url }}"
                                    onclick="return confirm('{% trans 'Are you sure?' %}');">
                                     <i class="fas fa-trash me-1"></i> {% trans 'Delete' %}
                                 </a>
@@ -398,12 +407,10 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                {% if is_manager %}
-                    {% trans 'Are you sure you want to proceed with the review of this tour application?' %}
+                {% if is_manager or is_admin %}
+                    {% trans 'You are about to' %} <strong id="chosenActionLabel"></strong> {% trans 'this tour application.' %}
                 {% elif is_employee %}
                     {% trans 'Are you sure you want to submit your request for this tour?' %}
-                {% elif is_admin %}
-                    {% trans 'Are you sure you want to update this tour?' %}
                 {% endif %}
             </div>
             <div class="modal-footer">
@@ -438,6 +445,29 @@
             setTimeout(() => {
                 alert.style.display = 'none';
             }, 5000);
+        });
+
+        // Direct status action buttons (manager/admin)
+        const statusField = document.getElementById('{{ form.status.id_for_label }}');
+        const reasonField = document.getElementById('{{ form.reason.id_for_label }}');
+        const chosenActionLabel = document.getElementById('chosenActionLabel');
+        document.querySelectorAll('.tour-status-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                if (statusField) {
+                    statusField.value = btn.dataset.status;
+                }
+                if (reasonField) {
+                    if (btn.dataset.status === 'rejected') {
+                        reasonField.setAttribute('required', 'required');
+                    } else {
+                        reasonField.removeAttribute('required');
+                    }
+                }
+                if (chosenActionLabel) {
+                    chosenActionLabel.textContent = btn.dataset.label;
+                }
+                showConfirmDialog();
+            });
         });
     });
 </script>

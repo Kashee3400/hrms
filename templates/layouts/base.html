@@ -36,31 +36,33 @@
       {% block sidebar %}
       {% include 'includes/sidebar.html' %}
       {% endblock %}
-      <div style="height: 88vh;" class="content-wrapper overflow-auto">
-        <div class="col-12">
-          {% block messages %}
-          {% if messages %}
-          <div class="messages">
-            {% for message in messages %}
-            <div class="alert {% if message.tags == 'success' %}
-                          alert-success{% elif message.tags == 'info' %}
-                          alert-info{% elif message.tags == 'warning' %}
-                          alert-warning{% elif message.tags == 'error' %}
-                          alert-danger{% else %}alert-secondary
-                          {% endif %} alert-dismissible fade show" role="alert">
-              {{ message|capfirst }}
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      <div style="height: 88vh;" class="content-wrapper">
+        <div class="content-scroll-area">
+          <div class="col-12">
+            {% block messages %}
+            {% if messages %}
+            <div class="messages">
+              {% for message in messages %}
+              <div class="alert {% if message.tags == 'success' %}
+                            alert-success{% elif message.tags == 'info' %}
+                            alert-info{% elif message.tags == 'warning' %}
+                            alert-warning{% elif message.tags == 'error' %}
+                            alert-danger{% else %}alert-secondary
+                            {% endif %} alert-dismissible fade show" role="alert">
+                {{ message|capfirst }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              </div>
+              {% endfor %}
             </div>
-            {% endfor %}
+            {% endif %}
+            {% endblock %}
           </div>
-          {% endif %}
-          {% endblock %}
+          {% block content %}
+              {% block object-tools %}
+              {% endblock %}
+              {{ content }}
+              {% endblock %}
         </div>
-        {% block content %}
-            {% block object-tools %}
-            {% endblock %}
-            {{ content }}
-            {% endblock %}
         {% include 'includes/footer.html' %}
       </div>
       {% block notification %}

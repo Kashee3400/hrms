@@ -1,0 +1,11 @@
+{% extends 'errors/base.html' %}
+{% block title %}500 - Server Error{% endblock %}
+{% block accent %}#f96868{% endblock %}
+{% block code %}500{% endblock %}
+{% block heading %}Something went wrong{% endblock %}
+{% block message %}
+  An unexpected error occurred on our end. Our team has been notified — please try again shortly.
+{% endblock %}
+{% block actions %}
+  <a href="/" class="btn btn-primary">Go to dashboard</a>
+{% endblock %}

@@ -1,0 +1,13 @@
+{% extends 'errors/base.html' %}
+{% block title %}401 - Unauthorized{% endblock %}
+{% block accent %}#f2a654{% endblock %}
+{% block code %}401{% endblock %}
+{% block heading %}Sign in required{% endblock %}
+{% block message %}
+  You need to be signed in to access this page.
+  {% if exception %}<br>{{ exception }}{% endif %}
+{% endblock %}
+{% block actions %}
+  <a href="{% url 'login' %}" class="btn btn-primary">Sign in</a>
+  <a href="/" class="btn btn-secondary">Go to dashboard</a>
+{% endblock %}

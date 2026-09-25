@@ -31707,6 +31707,84 @@ body {
   border-radius: 7px !important;
 }
 
+/* ---- Content wrapper: scroll only the main content, keep footer pinned ---- */
+.content-wrapper {
+  display: flex !important;
+  flex-direction: column;
+  overflow: hidden !important;
+}
+
+.content-wrapper .content-scroll-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ---- Footer ---- */
+.app-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 18px;
+  margin-top: 16px;
+  padding: 14px 20px;
+  background: #ffffff;
+  border: 1px solid var(--k-line);
+  border-radius: 12px;
+  font-size: 12.5px;
+  color: var(--k-ink-600);
+  flex-shrink: 0;
+}
+
+.app-footer a {
+  color: var(--k-blue-600);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.app-footer a:hover {
+  text-decoration: underline;
+}
+
+.app-footer__brand,
+.app-footer__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.app-footer__divider {
+  color: var(--k-ink-400);
+}
+
+.app-footer__credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  color: var(--k-ink-900);
+}
+
+.app-footer__credit i {
+  color: var(--k-blue-600);
+  font-size: 14px;
+}
+
+@media (max-width: 575px) {
+  .app-footer {
+    justify-content: center;
+    text-align: center;
+  }
+
+  .app-footer__brand,
+  .app-footer__meta {
+    justify-content: center;
+  }
+}
+
 /* =========================================================================
    End Kashi HRMS layout redesign
    ========================================================================= */

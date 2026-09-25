@@ -1,0 +1,9 @@
+{% extends 'errors/base.html' %}
+{% block title %}400 - Bad Request{% endblock %}
+{% block accent %}#f2a654{% endblock %}
+{% block code %}400{% endblock %}
+{% block heading %}Bad request{% endblock %}
+{% block message %}
+  The request could not be understood by the server.
+  {% if exception %}<br>{{ exception }}{% endif %}
+{% endblock %}
