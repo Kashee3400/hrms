@@ -237,7 +237,7 @@ class LeavePolicyManager:
             )
         return
     def validate_min_days(self):
-        if float(self.booked_leave) < float(self.leave_type.min_days_limit):
+        if float(self.booked_leave) < float(self.leave_type.min_days_limit or 0):
             raise ValidationError(
                 "Total day(s) leave is less than the minimum allowed days limit."
             )
