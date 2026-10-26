@@ -20,7 +20,6 @@ from django_ckeditor_5.widgets import CKEditor5Widget
 from bootstrap_datepicker_plus.widgets import DatePickerInput
 
 from ..models import LeaveType, LeaveApplication
-# from ..manager.leave_policy import LeavePolicyManager
 from ..utility.leave_utils import LeavePolicyManager
 from ..services.leave_service import LeaveDomainService
 

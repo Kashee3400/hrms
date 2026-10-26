@@ -247,14 +247,18 @@ class LeavePolicyManager:
         Applies Earned Leave specific policies.
         """
         el_allowed_days = self.leave_type.allowed_days_per_year
+        allowed_half_day = self.leave_type.allow_half_day or False
+        
         self.apply_min_notice_days_policy()
-        if (
+
+        if not allowed_half_day and (
             not isinstance(self.booked_leave, (int, float))
             or self.booked_leave % 1 != 0
         ):
             raise ValidationError(
                 f"EL can only be applied for whole days. Half days like {self.booked_leave} are not allowed."
             )
+
         self.validate_min_days()  # this function checks the minimum days allowed for that particular leave type
         self.apply_max_days_limit_policy()  # this function checks the maximum notice day for that particular leave type
         el_application_count = LeaveApplication.objects.filter(
