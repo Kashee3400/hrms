@@ -1,0 +1,68 @@
+# Production stack on the Linux server (10.10.11.4), next to erp_master.
+# nginx on the host proxies hr.kasheemilk.com to 127.0.0.1:8001.
+
+# Docker's default json-file log has no size limit and slowly fills the disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "5"
+
+x-app: &app
+  build: .
+  image: hrms_web
+  restart: always
+  env_file:
+    - .env
+  environment:
+    DEBUG: "False"
+    CELERY_BROKER_URL: redis://redis:6379/0
+    CELERY_RESULT_BACKEND: redis://redis:6379/0
+  depends_on:
+    - redis
+  logging: *default-logging
+
+services:
+  web:
+    <<: *app
+    container_name: hrms_web
+    command: daphne -b 0.0.0.0 -p 8000 hrms.asgi:application
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - ./media:/app/media
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  celery_worker:
+    <<: *app
+    container_name: hrms_celery_worker
+    command: celery -A hrms worker -l info --concurrency=2 --max-tasks-per-child=200
+    volumes:
+      - ./media:/app/media
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+
+  celery_beat:
+    <<: *app
+    container_name: hrms_celery_beat
+    command: celery -A hrms beat -l info --schedule /tmp/celerybeat-schedule
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  redis:
+    image: redis:alpine
+    container_name: hrms_redis
+    command: redis-server --maxmemory 200mb --maxmemory-policy volatile-lru
+    restart: always
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 256M

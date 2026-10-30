@@ -9,7 +9,21 @@ from django.conf.urls import handler403
 handler403 = views.custom_permission_denied
 
 
+def healthz(request):
+    """Liveness for deploys and uptime monitors: 503 when the DB is down."""
+    from django.db import connection
+    from django.http import JsonResponse
+
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 1")
+    except Exception:
+        return JsonResponse({"status": "error", "database": "error"}, status=503)
+    return JsonResponse({"status": "ok", "database": "ok"})
+
+
 urlpatterns = [
+    path("healthz/", healthz, name="healthz"),
     path("admin/doc/", include("django.contrib.admindocs.urls")),
     path("admin/", admin.site.urls),
     path(

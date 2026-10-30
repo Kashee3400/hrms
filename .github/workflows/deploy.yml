@@ -1,0 +1,88 @@
+name: Deploy HRMS to Linux Server
+
+# main = hr.kasheemilk.com on the Linux server (10.10.11.4).
+#
+# Runs on the self-hosted runner registered for this repo on that server
+# (label hrms-linux-prod). Never add pull_request triggers here: a PR's code
+# would run on the production server.
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - "**/*.md"
+  workflow_dispatch:
+
+# The deploy never uses the GitHub token (the server pulls with its own key).
+permissions:
+  contents: read
+
+# Two deploys must never touch the server at the same time.
+concurrency:
+  group: hrms-server-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, hrms-linux-prod]
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+        working-directory: /opt/hrms
+
+    steps:
+      # The server's own clone is the deploy target, not the runner workspace.
+      # Refuses to deploy if it has diverged from origin.
+      - name: Update code
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin main
+          git checkout --quiet main
+          git merge --ff-only origin/main
+          echo "Deploying $(git log --oneline -1)"
+
+      # -----------------------------------------------------------------
+      # Everything up to "Restart" runs while the live site is still up.
+      # If any of it fails, the running containers are never touched.
+      # -----------------------------------------------------------------
+      - name: Build image
+        run: docker compose build
+
+      - name: Pre-flight checks on the new image
+        run: |
+          set -euo pipefail
+          docker compose run --rm --no-deps web python manage.py check
+          docker compose run --rm --no-deps web python manage.py makemigrations --check --dry-run
+
+      - name: Migrate
+        run: docker compose run --rm --no-deps web python manage.py migrate --noinput
+
+      # -----------------------------------------------------------------
+      # Downtime (a few seconds) starts here.
+      # -----------------------------------------------------------------
+      - name: Restart
+        run: docker compose up -d
+
+      # 127.0.0.1 must be in ALLOWED_HOSTS. /healthz/ returns 503 when the DB
+      # is unreachable.
+      - name: Health check
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS -H "Host: 127.0.0.1" http://127.0.0.1:8001/healthz/; then
+              echo
+              exit 0
+            fi
+            echo "Attempt $i failed"
+            sleep 5
+          done
+          echo "Site did not become healthy"
+          docker compose logs --tail 50 web
+          exit 1
+
+      # Keep the disk from filling up with old images and build cache.
+      - name: Clean up
+        if: always()
+        run: |
+          docker image prune -f
+          docker builder prune -f --filter until=168h

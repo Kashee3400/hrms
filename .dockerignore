@@ -1,0 +1,16 @@
+# Uploads live on the SMB share mounted at ./media and are bind-mounted in.
+media/
+logs/
+
+.git/
+.github/
+**/__pycache__/
+*.pyc
+venv/
+env/
+node_modules/
+
+# Secrets come from env_file at runtime, never bake them into the image
+.env
+.env.*
+!.env.example
