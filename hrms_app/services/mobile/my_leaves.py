@@ -97,8 +97,11 @@ def get_overview(user, year):
         days_taken=Sum("usedLeave", filter=Q(status=settings.APPROVED)),
         **{group: Count("id", filter=Q(status__in=statuses)) for group, statuses in STATUS_GROUPS.items()},
     )
+    manager = user.reports_to
     return {
         "year": year,
+        # Same for every application (the employee's reporting manager).
+        "approver": (manager.get_full_name() or manager.username) if manager else None,
         "balances": leave_balances_payload(user),
         "comp_off": comp_off_payload(user, timezone.localdate()),
         "counts": {group: counts[group] for group in STATUS_GROUPS} | {"total": counts["total"]},
@@ -126,21 +129,38 @@ def list_leaves(user, *, year, status=None, leave_type=None, page=1):
 
 def get_leave(user, leave_id):
     return (
-        LeaveApplication.objects.select_related("leave_type", "appliedBy__reports_to")
+        LeaveApplication.objects.select_related(
+            "leave_type",
+            "appliedBy__reports_to__personal_detail__designation__department",
+        )
         .filter(pk=leave_id, appliedBy=user)
         .first()
     )
 
 
+def _person(user):
+    """Name + designation / department / code for the reporting-authority card."""
+    if user is None:
+        return None
+    details = getattr(user, "personal_detail", None)
+    designation = getattr(details, "designation", None)
+    return {
+        "name": user.get_full_name() or user.username,
+        "designation": str(designation) if designation else None,
+        "department": str(designation.department) if designation and designation.department_id else None,
+        "employee_code": getattr(details, "employee_code", None),
+    }
+
+
 def leave_detail(user, leave, build_url):
-    manager = leave.appliedBy.reports_to
     data = leave_item(user, leave)
     data.update(
         {
             "reason": _plain(leave.reason),
             "leave_address": leave.leave_address,
             "attachment_url": build_url(leave.attachment.url) if leave.attachment else None,
-            "approver": manager.get_full_name() if manager else None,
+            "attachment_name": leave.attachment.name.rsplit("/", 1)[-1] if leave.attachment else None,
+            "approver": _person(leave.appliedBy.reports_to),
             # The web shows the type's balance while a request is pending.
             "available_balance": (
                 LeaveDomainService.get_remaining_balance(
