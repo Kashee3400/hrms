@@ -47,20 +47,78 @@ def set_user_fields(sender, instance, **kwargs):
             instance.updated_by = user
 
 
+def _acting_user(fallback):
+    """User of the current request (e.g. the approving manager), else ``fallback``."""
+    request = getattr(settings, 'CURRENT_REQUEST', None)
+    user = getattr(request, 'user', None)
+    return user if user is not None and user.is_authenticated else fallback
+
+
+def _status_text(status):
+    return (status or '').replace('_', ' ')
+
+
+def _notify_workflow_change(instance, created, applicant, *, label, notification_type, target_url, go_route):
+    """Who hears about a leave/tour change:
+
+    - new application / cancellation request -> the applicant's manager
+    - any other status change (approve, reject, recommend…) -> the applicant
+    - saves that don't change the status -> nobody
+    """
+    status = instance.status
+    old_status = getattr(instance, '_old_status', None)
+    if not created and old_status == status:
+        return
+
+    manager = applicant.reports_to
+    if created:
+        receiver, sender = manager, applicant
+        message = f"New {label} from {applicant.get_full_name()} is {_status_text(status)}."
+    elif status == settings.PENDING_CANCELLATION:
+        receiver, sender = manager, applicant
+        message = f"{applicant.get_full_name()} requested to cancel {label}."
+    else:
+        receiver, sender = applicant, _acting_user(manager or applicant)
+        message = f"Your {label} has been {_status_text(status)}."
+
+    if receiver is None or sender is None:
+        return
+    Notification.objects.create(
+        sender=sender,
+        receiver=receiver,
+        message=message,
+        notification_type=notification_type,
+        related_object_id=instance.id,
+        related_content_type=ContentType.objects.get_for_model(type(instance)),
+        target_url=target_url,
+        go_route_mobile=go_route,
+    )
+
+
+@receiver(pre_save, sender=LeaveApplication)
+@receiver(pre_save, sender=UserTour)
+def remember_old_status(sender, instance, **kwargs):
+    """Lets post_save tell a status change from any other edit."""
+    instance._old_status = (
+        sender.objects.filter(pk=instance.pk).values_list('status', flat=True).first()
+        if instance.pk
+        else None
+    )
+
+
 @receiver(post_save, sender=LeaveApplication)
 def create_or_update_leave_log(sender, instance, created, **kwargs):
         if created:
             # Create Leave Log
             LeaveLog.create_log(instance, instance.appliedBy, 'Created')
-        Notification.objects.create(
-            sender=instance.appliedBy,
-            receiver=instance.appliedBy.reports_to,  # assuming the user who applied is the receiver
-            message=f"Leave application '{instance.applicationNo}' has been {instance.status}.",
-            notification_type=settings.LEAVE_STATUS,  # use the constant defined in your Notification model
-            related_object_id=instance.id,
-            related_content_type=ContentType.objects.get_for_model(LeaveApplication),
-            target_url=f"/leave/{instance.slug}/",  # Use the slug for URL
-            go_route_mobile = 'leave-detail'
+        _notify_workflow_change(
+            instance,
+            created,
+            instance.appliedBy,
+            label=f"leave application '{instance.applicationNo}'",
+            notification_type=settings.LEAVE_STATUS,
+            target_url=f"/leave/{instance.slug}/",
+            go_route='leave-detail',
         )
 
         # Send additional notifications if needed
@@ -78,16 +136,14 @@ def create_or_update_user_tour(sender, instance, created, **kwargs):
             # Create Tour Status Log
             TourStatusLog.create_log(tour=instance, action_by=instance.applied_by, action='Created')
     
-        # Prepare notification
-        Notification.objects.create(
-            sender=instance.applied_by,
-            receiver=instance.applied_by.reports_to,
-            message=f"Tour '{instance.slug}' has been {instance.status}.",
+        _notify_workflow_change(
+            instance,
+            created,
+            instance.applied_by,
+            label=f"tour {instance.from_destination} → {instance.to_destination}",
             notification_type=settings.TOUR_STATUS,
-            related_object_id=instance.id,
-            related_content_type=ContentType.objects.get_for_model(UserTour),
             target_url=f"/tour/{instance.slug}/",
-            go_route_mobile = 'tour-detail'
+            go_route='tour-detail',
         )
 
 
