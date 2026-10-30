@@ -1,6 +1,8 @@
 from django.urls import path, include
 from hrms_app.views.api_views import *
 from hrms_app.views.leave_balance_view import ForwardLeaveBalanceView,CreditELLeaveView,UserAttendanceAggregation
+from hrms_app.views.mobile_home_api import HomeSummaryAPIView, HomeTodayAPIView
+from hrms_app.views.mobile_device_api import DeviceTokenView, DeviceTokenDetailView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,TokenVerifyView
@@ -44,5 +46,10 @@ urlpatterns = [
         AttendanceSummaryAPIView.as_view(),
         name="attendance-summary",
     ),
+    # Mobile app
+    path("home/summary/", HomeSummaryAPIView.as_view(), name="mobile-home-summary"),
+    path("home/today/", HomeTodayAPIView.as_view(), name="mobile-home-today"),
+    path("devices/", DeviceTokenView.as_view(), name="mobile-devices"),
+    path("devices/<str:token>/", DeviceTokenDetailView.as_view(), name="mobile-device-detail"),
 
 ]

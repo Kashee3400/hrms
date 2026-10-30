@@ -1,4 +1,7 @@
 # myapp/signals.py
+import logging
+
+from django.db import transaction
 from .tasks import send_leave_application_notifications
 from django.contrib.sites.models import Site
 from django.utils.text import slugify
@@ -210,3 +213,26 @@ from .tasks import send_announcement_email_task
 def send_announcement_signal(sender, instance, created, **kwargs):
     send_announcement_email_task.delay(instance.id, created)
 
+
+
+@receiver(post_save, sender=Notification)
+def push_new_notification_to_mobile(sender, instance, created, **kwargs):
+    """Mirror every new in-app notification to the receiver's phone (FCM)."""
+    if not created or instance.receiver_id is None:
+        return
+
+    def enqueue():
+        from .tasks import send_notification_push
+
+        try:
+            send_notification_push.delay(instance.pk)
+        except Exception:
+            # Broker unavailable: send inline rather than drop the push.
+            from .services.notification_push import push_notification_to_device
+
+            try:
+                push_notification_to_device(instance)
+            except Exception:
+                logging.getLogger(__name__).exception("FCM push failed for %s", instance.pk)
+
+    transaction.on_commit(enqueue)

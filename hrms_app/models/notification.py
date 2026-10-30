@@ -226,3 +226,45 @@ class NotificationSetting(models.Model):
             ),  # Index for faster lookups by user
         ]
 
+
+
+class DeviceToken(models.Model):
+    """FCM registration token of a logged-in mobile app install."""
+
+    PLATFORM_CHOICES = [("android", "Android"), ("ios", "iOS")]
+
+    user = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name="device_tokens",
+        verbose_name=_("User"),
+    )
+    token = models.CharField(
+        max_length=255,
+        unique=True,
+        verbose_name=_("FCM Token"),
+        help_text=_("Firebase Cloud Messaging registration token."),
+    )
+    platform = models.CharField(
+        max_length=10,
+        choices=PLATFORM_CHOICES,
+        default="android",
+        verbose_name=_("Platform"),
+    )
+    is_active = models.BooleanField(
+        default=True,
+        verbose_name=_("Is Active"),
+        help_text=_("Turned off on logout or when FCM reports the token as invalid."),
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("Created At"))
+    last_seen_at = models.DateTimeField(auto_now=True, verbose_name=_("Last Seen At"))
+
+    def __str__(self):
+        return f"{self.user} ({self.platform})"
+
+    class Meta:
+        db_table = "tbl_device_token"
+        managed = True
+        verbose_name = _("Device Token")
+        verbose_name_plural = _("Device Tokens")
+        indexes = [models.Index(fields=["user", "is_active"], name="device_token_user_idx")]

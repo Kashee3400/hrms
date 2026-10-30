@@ -61,7 +61,7 @@ from .tour import (
     Bill,
 )
 from .holiday import Holiday, WishingCard, HRAnnouncement, OfficeClosure
-from .notification import Notification, NotificationSetting
+from .notification import Notification, NotificationSetting, DeviceToken
 from .misc import AppSetting, FormProgress, SentEmail, EmailOTP
 
 __all__ = [
@@ -112,6 +112,7 @@ __all__ = [
     "OfficeClosure",
     "Notification",
     "NotificationSetting",
+    "DeviceToken",
     "AppSetting",
     "FormProgress",
     "SentEmail",

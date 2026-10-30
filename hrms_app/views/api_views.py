@@ -802,8 +802,8 @@ class UserMonthlyNotificationsListView(ListAPIView):
             if end_date_parsed:
                 queryset = queryset.filter(timestamp__lte=end_date_parsed)
 
-        # Calculate unread notification count
-        unread_count = queryset.filter(is_read=False).count()
+        # Unread = received and not read (the list also includes sent ones).
+        unread_count = queryset.filter(receiver=request.user, is_read=False).count()
 
         # Paginate the queryset
         page = self.paginate_queryset(queryset)

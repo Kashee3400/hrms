@@ -88,6 +88,12 @@
                         method="post" id="{{ opts.model_name }}_form" novalidate>
                         {% csrf_token %}
                         <div class="{{ direction.panel }}">{% block form_top %}{% endblock %}</div>
+                        {% if errors %}
+                            <div class="alert alert-danger errornote">
+                                {% blocktranslate count counter=errors|length %}Please correct the error below.{% plural %}Please correct the errors below.{% endblocktranslate %}
+                                {{ adminform.form.non_field_errors }}
+                            </div>
+                        {% endif %}
                         <div>
                             {% block field_sets %}
                                 {% for fieldset in adminform %}

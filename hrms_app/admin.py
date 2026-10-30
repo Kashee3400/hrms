@@ -954,6 +954,14 @@ class NotificationAdmin(admin.ModelAdmin):
 admin.site.register(Notification, NotificationAdmin)
 
 
+@admin.register(DeviceToken)
+class DeviceTokenAdmin(admin.ModelAdmin):
+    list_display = ("user", "platform", "is_active", "last_seen_at", "created_at")
+    list_filter = ("platform", "is_active")
+    search_fields = ("user__username", "user__first_name", "user__last_name")
+    readonly_fields = ("token", "created_at", "last_seen_at")
+
+
 # @admin.register(LeaveDayChoiceAdjustment)
 # class LeaveDayChoiceAdjustmentAdmin(admin.ModelAdmin):
 #     list_display = ("start_day_choice", "end_day_choice", "adjustment_value")

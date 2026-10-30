@@ -518,3 +518,18 @@ def refresh_short_leave_task(self):
     """
     system_user = User.objects.filter(is_superuser=True).first()
     refresh_monthly_short_leave(system_user=system_user)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=30)
+def send_notification_push(self, notification_id):
+    """FCM push for a newly created in-app Notification (mobile app)."""
+    from .services.notification_push import push_notification_to_device
+
+    notification = Notification.objects.select_related("receiver").filter(pk=notification_id).first()
+    if notification is None:
+        return 0
+    try:
+        return push_notification_to_device(notification)
+    except Exception as exc:  # network / FCM outage: retry a few times
+        logger.warning("FCM push for notification %s failed: %s", notification_id, exc)
+        raise self.retry(exc=exc)
