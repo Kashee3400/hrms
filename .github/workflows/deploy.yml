@@ -53,7 +53,10 @@ jobs:
         run: |
           set -euo pipefail
           docker compose run --rm --no-deps web python manage.py check
-          docker compose run --rm --no-deps web python manage.py makemigrations --check --dry-run
+          # Our app only: django-webpush ships a model change without its
+          # migration (0006, already applied to hrms_db), which would fail
+          # a project-wide check on every deploy.
+          docker compose run --rm --no-deps web python manage.py makemigrations --check --dry-run hrms_app
 
       - name: Migrate
         run: docker compose run --rm --no-deps web python manage.py migrate --noinput
