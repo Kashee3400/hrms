@@ -9,7 +9,9 @@ stricter than the signal:
 
 - the whole date range counts, not only the start date (a leave from
   28 Sep to 2 Oct touches a locked October);
-- locks entered with only lock_month / lock_year also count.
+- a lock with no from/to dates falls back to its lock_month / lock_year.
+  When dates are set they alone decide: lock_month is only the payroll
+  label (21 Sep – 20 Oct is the "October" lock, 30 Oct stays open).
 """
 from datetime import date, datetime
 
@@ -37,12 +39,13 @@ def active_lock(start, end=None):
     """The newest lock covering any day of [start, end], or None."""
     start = _as_date(start)
     end = _as_date(end) or start
-    by_month = Q()
+    by_month = Q(pk__in=[])
     for year, month in _months(start, end):
         by_month |= Q(lock_year=year, lock_month=month)
+    undated = Q(from_date__isnull=True) | Q(to_date__isnull=True)
     return (
         LockStatus.objects.filter(is_locked="locked")
-        .filter(Q(from_date__lte=end, to_date__gte=start) | by_month)
+        .filter(Q(from_date__lte=end, to_date__gte=start) | (undated & by_month))
         .order_by("-locked_at")
         .first()
     )

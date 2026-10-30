@@ -171,10 +171,13 @@ def leave_detail(user, leave, build_url):
             "attachment_url": build_url(leave.attachment.url) if leave.attachment else None,
             "attachment_name": leave.attachment.name.rsplit("/", 1)[-1] if leave.attachment else None,
             "approver": _person(leave.appliedBy.reports_to),
-            # The web shows the type's balance while a request is pending.
+            # The web shows the type's balance while a request is pending -
+            # always the applicant's (a reviewer opens this via team_leaves).
             "available_balance": (
                 LeaveDomainService.get_remaining_balance(
-                    user=user, leave_type=leave.leave_type, target_date=_local_date(leave.startDate)
+                    user=leave.appliedBy,
+                    leave_type=leave.leave_type,
+                    target_date=_local_date(leave.startDate),
                 )
                 if leave.status == settings.PENDING
                 else None

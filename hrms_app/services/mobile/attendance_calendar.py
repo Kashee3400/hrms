@@ -139,11 +139,15 @@ def _calendar_events(user, start, end):
 
 
 def _lock(start, end):
-    """Same rule as every mobile action (services/attendance_lock.py)."""
+    """Same rule as every mobile action (services/attendance_lock.py).
+    from/to tell the app how much of the month is frozen (21 Sep – 20 Oct
+    locks only the first 20 days of October)."""
     lock = attendance_lock.active_lock(start, end)
     return {
         "is_locked": lock is not None,
         "reason": attendance_lock.lock_message(lock) if lock else None,
+        "from": lock.from_date if lock else None,
+        "to": lock.to_date if lock else None,
     }
 
 
