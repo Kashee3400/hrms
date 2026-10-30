@@ -11,6 +11,7 @@ Payload contract with the app (see the app's README):
     android.notification.channel_id: leave_tour | attendance | general
 """
 import logging
+import os
 
 from decouple import config
 
@@ -26,6 +27,9 @@ def _firebase():
     global _app
     path = config("FIREBASE_CREDENTIALS", default="")
     if not path:
+        return None
+    if not os.path.isfile(path):
+        logger.warning("FIREBASE_CREDENTIALS file not found at %s; push disabled.", path)
         return None
     try:
         import firebase_admin

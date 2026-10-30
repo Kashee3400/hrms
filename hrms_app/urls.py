@@ -3,6 +3,16 @@ from hrms_app.views.api_views import *
 from hrms_app.views.leave_balance_view import ForwardLeaveBalanceView,CreditELLeaveView,UserAttendanceAggregation
 from hrms_app.views.mobile_home_api import HomeSummaryAPIView, HomeTodayAPIView
 from hrms_app.views.mobile_device_api import DeviceTokenView, DeviceTokenDetailView
+from hrms_app.views.mobile_app_api import AppVersionAPIView
+from hrms_app.views.mobile_leave_api import (
+    LeaveApplyOptionsView,
+    LeaveApplyView,
+    LeavePreviewView,
+    MyLeaveCancelView,
+    MyLeaveDetailView,
+    MyLeaveListView,
+    MyLeaveOverviewView,
+)
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,TokenVerifyView
@@ -51,5 +61,13 @@ urlpatterns = [
     path("home/today/", HomeTodayAPIView.as_view(), name="mobile-home-today"),
     path("devices/", DeviceTokenView.as_view(), name="mobile-devices"),
     path("devices/<str:token>/", DeviceTokenDetailView.as_view(), name="mobile-device-detail"),
+    path("app/version/", AppVersionAPIView.as_view(), name="mobile-app-version"),
+    path("leave/apply-options/", LeaveApplyOptionsView.as_view(), name="mobile-leave-apply-options"),
+    path("leave/preview/", LeavePreviewView.as_view(), name="mobile-leave-preview"),
+    path("leave/apply/", LeaveApplyView.as_view(), name="mobile-leave-apply"),
+    path("leave/overview/", MyLeaveOverviewView.as_view(), name="mobile-leave-overview"),
+    path("leave/my/", MyLeaveListView.as_view(), name="mobile-leave-my-list"),
+    path("leave/my/<int:leave_id>/", MyLeaveDetailView.as_view(), name="mobile-leave-my-detail"),
+    path("leave/my/<int:leave_id>/cancel/", MyLeaveCancelView.as_view(), name="mobile-leave-my-cancel"),
 
 ]

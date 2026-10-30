@@ -30,7 +30,7 @@ ACTIVE_TOUR_STATUSES = [
 ]
 
 
-def _leave_balances(user):
+def leave_balances_payload(user):
     seen = set()
     items = []
     for row in get_dashboard_leave_balances(user):
@@ -54,7 +54,7 @@ def _leave_balances(user):
     return items
 
 
-def _comp_off(user, today):
+def comp_off_payload(user, today):
     open_offs = CompensatoryOff.objects.filter(
         user=user, status=settings.OPEN, expiry_date__gte=today
     ).order_by("expiry_date")
@@ -202,8 +202,8 @@ def get_home_summary(user):
         "date": today.isoformat(),
         "shift": shift_payload(user),
         "leave_balance_year": today.year,
-        "leave_balances": _leave_balances(user),
-        "comp_off": _comp_off(user, today),
+        "leave_balances": leave_balances_payload(user),
+        "comp_off": comp_off_payload(user, today),
         "active_tour": _active_tour(user, today),
         "month_summary": _month_summary(user, today),
         "missing_punches": _missing_punches(user, today),

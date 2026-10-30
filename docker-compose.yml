@@ -31,6 +31,8 @@ services:
       - "127.0.0.1:8001:8000"
     volumes:
       - ./media:/app/media
+      # Firebase service-account JSON for mobile push (FIREBASE_CREDENTIALS).
+      - ./secrets:/app/secrets:ro
     deploy:
       resources:
         limits:
@@ -42,6 +44,8 @@ services:
     command: celery -A hrms worker -l info --concurrency=2 --max-tasks-per-child=200
     volumes:
       - ./media:/app/media
+      # Sends the FCM pushes (send_notification_push task).
+      - ./secrets:/app/secrets:ro
     deploy:
       resources:
         limits:

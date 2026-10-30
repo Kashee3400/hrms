@@ -46,6 +46,8 @@ yarn-error.log
 
 # Security
 secrets.json
+# Firebase service-account key etc. (mounted into containers, never committed)
+secrets/
 
 *.bak
 *.dat
