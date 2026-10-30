@@ -1,0 +1,4 @@
+# Added after the base set in requirements.txt (see the Dockerfile): put new
+# packages here so a deploy downloads only them. Fold them into
+# requirements.txt now and then, when PyPI is fast from the server.
+firebase-admin==6.6.0

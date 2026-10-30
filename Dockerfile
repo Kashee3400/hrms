@@ -23,6 +23,14 @@ COPY requirements.txt /app/
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# Packages added after the base set go in requirements-extra.txt. Changing
+# requirements.txt re-downloads all ~160 packages, which over the server's
+# slow PyPI link took hours instead of the usual 2 minutes; extras install on
+# top of the cached base layer, with a pip cache so only new ones download.
+COPY requirements-extra.txt /app/
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements-extra.txt
+
 COPY . /app/
 
 # Static files are baked into the image and served by WhiteNoise. Settings
