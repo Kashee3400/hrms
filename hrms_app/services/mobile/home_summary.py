@@ -18,9 +18,9 @@ from hrms_app.models import (
 from hrms_app.services.leave_approval import is_leave_reviewer, review_queue
 from hrms_app.services.leave_balance_summary import get_dashboard_leave_balances
 from hrms_app.services.mobile import attendance_codes
-from hrms_app.services.mobile.formatters import hhmm, iso_date, shift_payload
+from hrms_app.services.mobile.formatters import hhmm, iso_date, plain_text, shift_payload
 from hrms_app.services.mobile.recent_activity import get_recent_activity
-from hrms_app.utility.leave_utils import get_employee_requested_tour
+from hrms_app.services.tour_approval import review_queue as tour_review_queue
 
 ACTIVE_TOUR_STATUSES = [
     settings.PENDING,
@@ -68,7 +68,7 @@ def comp_off_payload(user, today):
     }
 
 
-def _tour_payload(tour):
+def tour_payload(tour):
     return {
         "id": tour.pk,
         "slug": tour.slug,
@@ -84,12 +84,12 @@ def _tour_payload(tour):
         "status_display": tour.get_status_display(),
         "approval_type": tour.approval_type,
         "approval_type_display": tour.get_approval_type_display(),
-        "remarks": tour.remarks,
+        "remarks": plain_text(tour.remarks),
         "bills_submitted": tour.bills_submitted,
     }
 
 
-def _active_tour(user, today):
+def active_tour(user, today):
     """Ongoing or next upcoming tour (extended end dates count)."""
     tour = (
         UserTour.objects.filter(applied_by=user, status__in=ACTIVE_TOUR_STATUSES)
@@ -97,7 +97,7 @@ def _active_tour(user, today):
         .order_by("start_date", "start_time")
         .first()
     )
-    return _tour_payload(tour) if tour else None
+    return tour_payload(tour) if tour else None
 
 
 def _month_summary(user, today):
@@ -156,13 +156,13 @@ def _next_holiday(user, today):
 
 def _team_pending(user):
     """Only for reviewers (have employees / admin dept / superuser).
-    Same queues as the web tracker: leaves incl. cancellation requests,
-    tours incl. extensions."""
+    Same queues as the Approvals screen: leaves and tours incl.
+    cancellation requests."""
     if not is_leave_reviewer(user):
         return None
     return {
         "leaves": review_queue(user).count(),
-        "tours": get_employee_requested_tour(user).count(),
+        "tours": tour_review_queue(user).count(),
     }
 
 
@@ -174,7 +174,7 @@ def get_home_summary(user):
         "leave_balance_year": today.year,
         "leave_balances": leave_balances_payload(user),
         "comp_off": comp_off_payload(user, today),
-        "active_tour": _active_tour(user, today),
+        "active_tour": active_tour(user, today),
         "month_summary": _month_summary(user, today),
         "missing_punches": _missing_punches(user, today),
         "next_holiday": _next_holiday(user, today),

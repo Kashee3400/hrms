@@ -10,13 +10,13 @@ Rules come from the web:
 - balance effect     : approve deducts, reject/cancel of an approved leave restores
 """
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Q
 from django.utils.timezone import localtime
 
 from hrms_app.choices.leave import LeaveAccrualPeriod
-from hrms_app.hrms.form import LeaveStatusUpdateForm
 from hrms_app.models import LeaveApplication, LeaveBalanceOpenings, LeaveLog
 
 ADMIN_DEPARTMENT = "admin"
@@ -27,6 +27,14 @@ def is_admin_department(user):
     designation = getattr(details, "designation", None)
     department = getattr(designation, "department", None)
     return getattr(department, "department", None) == ADMIN_DEPARTMENT
+
+
+def admin_department_users():
+    """Active users who take the final decision on a recommended LWP."""
+    return get_user_model().objects.filter(
+        is_active=True,
+        personal_detail__designation__department__department=ADMIN_DEPARTMENT,
+    )
 
 
 def is_leave_reviewer(user):
@@ -56,17 +64,6 @@ def reviewable(user):
     if user.is_superuser or user.is_staff or is_admin_department(user):
         return LeaveApplication.objects.exclude(appliedBy=user)
     return LeaveApplication.objects.filter(appliedBy__in=user.employees.all())
-
-
-def allowed_statuses(user, leave):
-    """[(status, label)] the reviewer may set now; excludes the current status."""
-    if leave.appliedBy_id == user.pk:
-        return []
-    try:
-        choices = LeaveStatusUpdateForm(user=user, instance=leave).fields["status"].widget.choices
-    except AttributeError:  # reviewer without designation/department
-        return []
-    return [(value, label) for value, label in choices if value and value != leave.status]
 
 
 # ─────────────────────────────────────────────────────────────
@@ -140,7 +137,8 @@ def change_status(leave, new_status, actor, notes=""):
         .first()
     )
     leave.status = new_status
-    leave.save()  # signals notify the applicant / manager
+    leave._actor = actor
+    leave.save()  # signals notify the applicant and the manager
     _update_leave_balance(leave, old_status)
     LeaveLog.create_log(leave, actor, new_status, notes=notes or "")
     return leave

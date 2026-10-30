@@ -2,7 +2,11 @@
 import logging
 
 from django.db import transaction
-from .tasks import send_leave_application_notifications
+from .tasks import (
+    send_admin_leave_notification,
+    send_leave_application_notifications,
+    send_tour_notifications,
+)
 from django.contrib.sites.models import Site
 from django.utils.text import slugify
 from .models import LeaveApplication, UserTour, Notification,LeaveBalanceOpenings,CustomUser,AttendanceLog
@@ -13,6 +17,13 @@ from django.conf import settings
 from hrms_app.models import *
 from django.core.exceptions import ImproperlyConfigured
 from hrms_app.hrms.utils import check_lock_status
+from hrms_app.services.leave_approval import admin_department_users
+from hrms_app.services.workflow_messages import (
+    admin_recommendation_text,
+    build_messages,
+    leave_label,
+    tour_label,
+)
 
 # @receiver(post_save, sender=CustomUser)
 # def initialize_leave_balance(sender, instance, created, **kwargs):
@@ -54,45 +65,87 @@ def _acting_user(fallback):
     return user if user is not None and user.is_authenticated else fallback
 
 
-def _status_text(status):
-    return (status or '').replace('_', ' ')
-
-
 def _notify_workflow_change(instance, created, applicant, *, label, notification_type, target_url, go_route):
-    """Who hears about a leave/tour change:
-
-    - new application / cancellation request -> the applicant's manager
-    - any other status change (approve, reject, recommend…) -> the applicant
-    - saves that don't change the status -> nobody
+    """Tells the employee and their manager, each in their own words, when a
+    leave/tour is created or changes status. Saves that don't change the
+    status notify nobody. Returns (employee text, manager text), or None.
     """
     status = instance.status
     old_status = getattr(instance, '_old_status', None)
     if not created and old_status == status:
-        return
+        return None
 
-    manager = applicant.reports_to
-    if created:
-        receiver, sender = manager, applicant
-        message = f"New {label} from {applicant.get_full_name()} is {_status_text(status)}."
-    elif status == settings.PENDING_CANCELLATION:
-        receiver, sender = manager, applicant
-        message = f"{applicant.get_full_name()} requested to cancel {label}."
-    else:
-        receiver, sender = applicant, _acting_user(manager or applicant)
-        message = f"Your {label} has been {_status_text(status)}."
-
-    if receiver is None or sender is None:
-        return
-    Notification.objects.create(
-        sender=sender,
-        receiver=receiver,
-        message=message,
-        notification_type=notification_type,
-        related_object_id=instance.id,
-        related_content_type=ContentType.objects.get_for_model(type(instance)),
-        target_url=target_url,
-        go_route_mobile=go_route,
+    # _actor: set by services that know who decided (a JWT API request has no
+    # user at middleware level).
+    actor = getattr(instance, '_actor', None) or _acting_user(None)
+    texts = build_messages(
+        status,
+        label,
+        applicant,
+        actor=actor,
+        rerequested=getattr(instance, '_rerequested', False),
     )
+    manager = applicant.reports_to
+    for receiver, message in ((applicant, texts[0]), (manager, texts[1])):
+        if receiver is None:
+            continue
+        Notification.objects.create(
+            sender=actor or applicant,
+            receiver=receiver,
+            message=message,
+            notification_type=notification_type,
+            related_object_id=instance.id,
+            related_content_type=ContentType.objects.get_for_model(type(instance)),
+            target_url=target_url,
+            go_route_mobile=go_route,
+        )
+    return texts
+
+
+def _queue_emails(task, instance_id, texts):
+    """Queues the two emails after commit, so a rolled-back action sends none."""
+    domain = Site.objects.get_current().domain
+
+    def enqueue():
+        try:
+            task.delay(instance_id, 'http', domain, employee_text=texts[0], manager_text=texts[1])
+        except Exception:
+            logging.getLogger(__name__).exception("Could not queue the emails for %s", instance_id)
+
+    transaction.on_commit(enqueue)
+
+
+def _notify_admin_department(leave):
+    """A recommended LWP waits for the admin department: tell them too."""
+    applicant = leave.appliedBy
+    actor = getattr(leave, '_actor', None) or _acting_user(None)
+    message = admin_recommendation_text(leave_label(leave), applicant, actor)
+    admins = admin_department_users().exclude(pk__in=[applicant.pk, applicant.reports_to_id or 0])
+    receiver_ids = []
+    for admin in admins:
+        receiver_ids.append(admin.pk)
+        Notification.objects.create(
+            sender=actor or applicant,
+            receiver=admin,
+            message=message,
+            notification_type=settings.LEAVE_STATUS,
+            related_object_id=leave.id,
+            related_content_type=ContentType.objects.get_for_model(LeaveApplication),
+            target_url=f"/leave/{leave.slug}/",
+            go_route_mobile='leave-detail',
+        )
+    if not receiver_ids:
+        return
+
+    domain = Site.objects.get_current().domain
+
+    def enqueue():
+        try:
+            send_admin_leave_notification.delay(leave.id, 'http', domain, message, receiver_ids)
+        except Exception:
+            logging.getLogger(__name__).exception("Could not queue the admin email for %s", leave.id)
+
+    transaction.on_commit(enqueue)
 
 
 @receiver(pre_save, sender=LeaveApplication)
@@ -111,24 +164,19 @@ def create_or_update_leave_log(sender, instance, created, **kwargs):
         if created:
             # Create Leave Log
             LeaveLog.create_log(instance, instance.appliedBy, 'Created')
-        _notify_workflow_change(
+        texts = _notify_workflow_change(
             instance,
             created,
             instance.appliedBy,
-            label=f"leave application '{instance.applicationNo}'",
+            label=leave_label(instance),
             notification_type=settings.LEAVE_STATUS,
             target_url=f"/leave/{instance.slug}/",
             go_route='leave-detail',
         )
-
-        # Send additional notifications if needed
-        current_site = Site.objects.get_current()
-        protocol = 'http'  # or 'https' if applicable
-        domain = current_site.domain
-        try:
-            send_leave_application_notifications.delay(instance.id, protocol, domain)
-        except:
-            pass
+        if texts:
+            _queue_emails(send_leave_application_notifications, instance.id, texts)
+        if texts and instance.status == settings.RECOMMEND:
+            _notify_admin_department(instance)
 
 @receiver(post_save, sender=UserTour)
 def create_or_update_user_tour(sender, instance, created, **kwargs):
@@ -136,15 +184,18 @@ def create_or_update_user_tour(sender, instance, created, **kwargs):
             # Create Tour Status Log
             TourStatusLog.create_log(tour=instance, action_by=instance.applied_by, action='Created')
     
-        _notify_workflow_change(
+        texts = _notify_workflow_change(
             instance,
             created,
             instance.applied_by,
-            label=f"tour {instance.from_destination} → {instance.to_destination}",
+            label=tour_label(instance),
             notification_type=settings.TOUR_STATUS,
             target_url=f"/tour/{instance.slug}/",
             go_route='tour-detail',
         )
+        # The apply views email a new tour themselves.
+        if texts and not created:
+            _queue_emails(send_tour_notifications, instance.id, texts)
 
 
 @receiver(pre_save, sender=UserTour)

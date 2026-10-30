@@ -37,6 +37,11 @@ def _applicant(user, build_url):
 # rejected on the web, but it isn't "waiting").
 AWAITING = {settings.PENDING, settings.RECOMMEND, settings.PENDING_CANCELLATION}
 
+LWP_CODE = "LWP"
+DECIDE_ACTIONS = [(settings.APPROVED, "Approve"), (settings.REJECTED, "Reject")]
+RECOMMEND_ACTIONS = [(settings.RECOMMEND, "Recommend"), (settings.REJECTED, "Reject")]
+CANCEL_ACTION = (settings.CANCELLED, "Cancel Leave")
+
 
 def team_item(reviewer, leave, build_url):
     return {
@@ -94,23 +99,59 @@ def team_leave_detail(reviewer, leave, build_url):
         leave_type=leave.leave_type,
         target_date=timezone.localtime(leave.startDate).date(),
     )
+    actions = _open_actions(reviewer, leave)
     return {
         **leave_detail(reviewer, leave, build_url),
         "applicant": _applicant(leave.appliedBy, build_url),
         # The web detail page shows the applicant's balance to the reviewer.
         "applicant_balance": record.remaining_leave_balances if record else None,
-        # Button labels as on the web ("Approve", "Reject", "Recommend"…).
-        "allowed_actions": [
-            {"status": value, "label": str(label)} for value, label in _open_actions(reviewer, leave)
-        ],
+        "allowed_actions": [{"status": value, "label": label} for value, label in actions],
+        "waiting_note": None if actions else _waiting_note(leave),
     }
+
+
+def _review_actions(reviewer, leave):
+    """The mobile review rule (narrower than the web's status dropdown).
+
+    Normal leave: pending -> Approve / Reject (reporting manager).
+    LWP: pending -> Recommend / Reject (reporting manager), recommended ->
+    Approve / Reject (admin department). An admin-department manager decides
+    their own reportee's LWP directly.
+    Any leave: pending cancellation -> Cancel Leave (reporting manager).
+    Everything else, "not recommended" included, is final.
+    """
+    if leave.appliedBy_id == reviewer.pk:
+        return []
+    is_manager = leave.appliedBy.reports_to_id == reviewer.pk
+    can_decide = is_manager or reviewer.is_superuser
+    is_admin = reviewer.is_superuser or leave_approval.is_admin_department(reviewer)
+    is_lwp = leave.leave_type.leave_type_short_code == LWP_CODE
+
+    if leave.status == settings.PENDING_CANCELLATION:
+        return [CANCEL_ACTION] if can_decide else []
+    if is_lwp and leave.status == settings.RECOMMEND:
+        return DECIDE_ACTIONS if is_admin else []
+    if leave.status != settings.PENDING:
+        return []
+    if is_lwp and not (is_manager and is_admin):
+        return RECOMMEND_ACTIONS if is_manager else []
+    return DECIDE_ACTIONS if can_decide else []
 
 
 def _open_actions(reviewer, leave):
     """Allowed review actions; none while the leave's period is locked."""
     if leave_lock(leave)["is_locked"]:
         return []
-    return leave_approval.allowed_statuses(reviewer, leave)
+    return _review_actions(reviewer, leave)
+
+
+def _waiting_note(leave):
+    """Why an open application has no buttons for this reviewer."""
+    return {
+        settings.PENDING: "Waiting for the reporting manager's decision.",
+        settings.RECOMMEND: "Recommended. Waiting for the Admin department's decision.",
+        settings.PENDING_CANCELLATION: "Waiting for the reporting manager to cancel this leave.",
+    }.get(leave.status)
 
 
 def act(reviewer, leave, new_status, remark=""):
@@ -118,7 +159,7 @@ def act(reviewer, leave, new_status, remark=""):
     lock = leave_lock(leave)
     if lock["is_locked"]:
         return lock["lock_reason"]
-    allowed = {value for value, _ in leave_approval.allowed_statuses(reviewer, leave)}
+    allowed = {value for value, _ in _review_actions(reviewer, leave)}
     if new_status not in allowed:
         return "This action is not allowed for this application."
     try:

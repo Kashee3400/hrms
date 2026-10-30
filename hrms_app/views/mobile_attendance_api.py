@@ -7,8 +7,25 @@ from rest_framework.views import APIView
 
 from hrms_app.hrms.utils import create_response
 from hrms_app.services.mobile.attendance_calendar import get_month_calendar
+from hrms_app.services.mobile.holidays import get_holidays
 
 logger = logging.getLogger(__name__)
+
+
+class HolidayListView(APIView):
+    """GET /api/v1/holiday/list/?year=2026 (default: this year)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = timezone.localdate()
+        try:
+            year = int(request.query_params.get("year", today.year))
+        except ValueError:
+            return create_response("error", "year must be a number.", status_code=400)
+        if not 2000 <= year <= today.year + 1:
+            return create_response("error", "Invalid year.", status_code=400)
+        return create_response("success", "Holidays.", get_holidays(request.user, year))
 
 
 class AttendanceCalendarView(APIView):

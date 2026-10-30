@@ -4,7 +4,7 @@ from hrms_app.views.leave_balance_view import ForwardLeaveBalanceView,CreditELLe
 from hrms_app.views.mobile_home_api import HomeSummaryAPIView, HomeTodayAPIView
 from hrms_app.views.mobile_device_api import DeviceTokenView, DeviceTokenDetailView
 from hrms_app.views.mobile_app_api import AppVersionAPIView
-from hrms_app.views.mobile_attendance_api import AttendanceCalendarView
+from hrms_app.views.mobile_attendance_api import AttendanceCalendarView, HolidayListView
 from hrms_app.views.mobile_leave_api import (
     LeaveApplyOptionsView,
     LeaveApplyView,
@@ -18,6 +18,17 @@ from hrms_app.views.mobile_leave_api import (
     TeamLeaveActionView,
     TeamLeaveDetailView,
     TeamLeaveListView,
+)
+from hrms_app.views.mobile_tour_api import (
+    MyTourCancelView,
+    MyTourDetailView,
+    MyTourListView,
+    MyTourRerequestView,
+    TeamTourActionView,
+    TeamTourDetailView,
+    TeamTourListView,
+    TourApplyOptionsView,
+    TourOverviewView,
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -81,5 +92,15 @@ urlpatterns = [
     path("leave/team/", TeamLeaveListView.as_view(), name="mobile-leave-team-list"),
     path("leave/team/<int:leave_id>/", TeamLeaveDetailView.as_view(), name="mobile-leave-team-detail"),
     path("leave/team/<int:leave_id>/action/", TeamLeaveActionView.as_view(), name="mobile-leave-team-action"),
+    path("holiday/list/", HolidayListView.as_view(), name="mobile-holiday-list"),
+    path("tour/apply-options/", TourApplyOptionsView.as_view(), name="mobile-tour-apply-options"),
+    path("tour/overview/", TourOverviewView.as_view(), name="mobile-tour-overview"),
+    path("tour/my/", MyTourListView.as_view(), name="mobile-tour-my-list"),
+    path("tour/my/<int:tour_id>/", MyTourDetailView.as_view(), name="mobile-tour-my-detail"),
+    path("tour/my/<int:tour_id>/cancel/", MyTourCancelView.as_view(), name="mobile-tour-my-cancel"),
+    path("tour/my/<int:tour_id>/rerequest/", MyTourRerequestView.as_view(), name="mobile-tour-my-rerequest"),
+    path("tour/team/", TeamTourListView.as_view(), name="mobile-tour-team-list"),
+    path("tour/team/<int:tour_id>/", TeamTourDetailView.as_view(), name="mobile-tour-team-detail"),
+    path("tour/team/<int:tour_id>/action/", TeamTourActionView.as_view(), name="mobile-tour-team-action"),
 
 ]

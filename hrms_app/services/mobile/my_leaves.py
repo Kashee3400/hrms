@@ -6,19 +6,18 @@ Actions mirror the web detail page (leave_application_detail.html):
                                    the manager then cancels and the balance is restored)
 - pending / cancelled / rejected -> Edit, Delete
 """
-import html
-
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.utils import timezone
-from django.utils.html import strip_tags
 
 from hrms_app.models import LeaveApplication, LeaveLog
 from hrms_app.services import attendance_lock
 from hrms_app.services.leave_service import LeaveDomainService
 from hrms_app.services.mobile.formatters import hhmm, iso_date
+from hrms_app.services.mobile.formatters import plain_text as _plain
 from hrms_app.services.mobile.home_summary import comp_off_payload, leave_balances_payload
+from hrms_app.services.mobile.leave_apply import applied_leave_days
 
 PAGE_SIZE = 20
 CANCELLABLE = {settings.APPROVED}
@@ -33,11 +32,6 @@ STATUS_GROUPS = {
     "rejected": [settings.REJECTED],
     "cancelled": [settings.CANCELLED, settings.PENDING_CANCELLATION],
 }
-
-
-def _plain(text):
-    """CKEditor HTML -> plain text for the app."""
-    return html.unescape(strip_tags(text or "")).strip()
 
 
 def _local_date(dt):
@@ -182,10 +176,7 @@ def leave_detail(user, leave, build_url):
                 if leave.status == settings.PENDING
                 else None
             ),
-            "days": [
-                {"date": iso_date(day.date), "is_full_day": day.is_full_day}
-                for day in leave.leave_days.order_by("date")
-            ],
+            "days": applied_leave_days(leave),
             "logs": [
                 {
                     "action": log.action,

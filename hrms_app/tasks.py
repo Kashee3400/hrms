@@ -17,6 +17,7 @@ from webpush import send_user_notification
 from django.utils import timezone
 from datetime import timedelta, date,datetime
 from .services import AttendanceCacheService
+from .services.workflow_messages import build_messages, leave_label, tour_label
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,10 +41,14 @@ from decouple import config  # or use environ
 HR_EMAIL = config("HR_EMAIL", default="divyanshu.kumar@kasheemilk.com")
 
 @shared_task
-def send_leave_application_notifications(application_id, protocol, domain):
+def send_leave_application_notifications(application_id, protocol, domain, employee_text=None, manager_text=None):
     leave_application = LeaveApplication.objects.get(id=application_id)
     user = leave_application.appliedBy
     manager = user.reports_to
+    if employee_text is None or manager_text is None:
+        employee_text, manager_text = build_messages(
+            leave_application.status, leave_label(leave_application), user
+        )
 
     def create_email_context(title, content, leave_application, protocol, domain):
         return {
@@ -62,7 +67,7 @@ def send_leave_application_notifications(application_id, protocol, domain):
     # Employee email content
     employee_content = (
         f"Dear {user.first_name},\n\n"
-        f"Your leave application ({leave_application.applicationNo}) has been {leave_application.status}.\n\n"
+        f"{employee_text}\n\n"
         f"Leave Details:\n"
         f"- Start Date: {localtime(leave_application.startDate).date()}\n"
         f"- End Date: {localtime(leave_application.endDate).date()}\n"
@@ -73,13 +78,17 @@ def send_leave_application_notifications(application_id, protocol, domain):
     employee_email = user.official_email if user.official_email else user.email
     send_email("Leave Application Status", employee_content, employee_email)
 
+    if manager is None:
+        return
+
     # Manager email content
     manager_content = (
         f"Dear {manager.first_name} {manager.last_name},\n\n"
-        f"A leave application ({leave_application.applicationNo}) by {user.get_full_name()} has been {leave_application.status}.\n\n"
+        f"{manager_text}\n\n"
         f"Leave Details:\n"
+        f"- Employee: {user.get_full_name()}\n"
         f"- Start Date: {localtime(leave_application.startDate).date()}\n"
-        f"- End Date: {localtime(leave_application.startDate).date()}\n"
+        f"- End Date: {localtime(leave_application.endDate).date()}\n"
         f"- Leave Type: {leave_application.leave_type.leave_type}\n"
         f"You can review the application at the following link:"
     )
@@ -88,6 +97,35 @@ def send_leave_application_notifications(application_id, protocol, domain):
         manager_content,
         manager.official_email if manager.official_email else manager.email,
     )
+
+
+@shared_task
+def send_admin_leave_notification(application_id, protocol, domain, text, receiver_ids):
+    """A recommended LWP, for the admin department to decide."""
+    leave_application = LeaveApplication.objects.get(id=application_id)
+    user = leave_application.appliedBy
+    detail_url = f"{protocol}://{domain}{reverse('leave_application_detail', kwargs={'slug': leave_application.slug})}"
+    subject = "LWP Recommended for Approval"
+
+    for admin in USER.objects.filter(pk__in=receiver_ids):
+        email = admin.official_email if admin.official_email else admin.email
+        if not email:
+            continue
+        content = (
+            f"Dear {admin.first_name} {admin.last_name},\n\n"
+            f"{text}\n\n"
+            f"Leave Details:\n"
+            f"- Employee: {user.get_full_name()}\n"
+            f"- Start Date: {localtime(leave_application.startDate).date()}\n"
+            f"- End Date: {localtime(leave_application.endDate).date()}\n"
+            f"- Leave Type: {leave_application.leave_type.leave_type}\n"
+            f"You can review the application at the following link:"
+        )
+        message = render_to_string(
+            "email/leave_application_email.txt",
+            {"title": subject, "content": content, "detail_url": detail_url},
+        )
+        send_leave_application_email.delay(subject, message, [email])
 
 
 @shared_task
@@ -105,10 +143,12 @@ def push_notification(user,head,body,url):
 
 
 @shared_task
-def send_tour_notifications(tour_id, protocol, domain):
+def send_tour_notifications(tour_id, protocol, domain, employee_text=None, manager_text=None):
     user_tour = UserTour.objects.get(id=tour_id)
     user = user_tour.applied_by
     manager = user.reports_to
+    if employee_text is None or manager_text is None:
+        employee_text, manager_text = build_messages(user_tour.status, tour_label(user_tour), user)
 
     def create_email_context(title, content, user_tour, protocol, domain):
         return {
@@ -125,7 +165,7 @@ def send_tour_notifications(tour_id, protocol, domain):
     # Employee email content
     employee_content = (
         f"Dear {user.first_name},\n\n"
-        f"Your tour application from ({user_tour.from_destination}) to ({user_tour.to_destination})  has been {user_tour.status}.\n\n"
+        f"{employee_text}\n\n"
         f"Tour Details:\n"
         f"- Boarding : {user_tour.from_destination} ({user_tour.start_date} {user_tour.start_time})\n"
         f"- Destination:  {user_tour.to_destination} ({user_tour.end_date} {user_tour.end_time})\n"
@@ -137,11 +177,15 @@ def send_tour_notifications(tour_id, protocol, domain):
     employee_email = user.official_email if user.official_email else user.email
     send_email("Tour Application Status", employee_content, employee_email)
 
+    if manager is None:
+        return
+
     # Manager email content
     manager_content = (
         f"Dear {manager.first_name} {manager.last_name},\n\n"
-        f"A Tour application requested by {user.get_full_name()} from ({user_tour.from_destination}) to ({user_tour.to_destination})  has been {user_tour.status}.\n\n"
+        f"{manager_text}\n\n"
         f"Tour Details:\n"
+        f"- Employee: {user.get_full_name()}\n"
         f"- Boarding : {user_tour.from_destination} ({user_tour.start_date} {user_tour.start_time})\n"
         f"- Destination:  {user_tour.to_destination} ({user_tour.end_date} {user_tour.end_time})\n"
         f"- Status: {user_tour.status}\n"

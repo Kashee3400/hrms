@@ -29,6 +29,8 @@ LWP_CODE = "LWP"
 # Short leave has its own time-based form (services/mobile/short_leave.py);
 # it is listed in the options but never goes through the day-based flow.
 SHORT_LEAVE_CODE = "STL"
+# Comp-off is added by admin; employees never apply for it.
+COMP_OFF_CODE = "CO"
 # CL and SL don't count Sundays/holidays inside the range (apply_leave.js).
 OFF_DAY_EXCLUDED_CODES = {"CL", "SL"}
 SL_ATTACHMENT_ABOVE_DAYS = 5
@@ -94,7 +96,7 @@ def get_apply_options(user):
     types = []
     for row in get_dashboard_leave_balances(user):
         leave_type = row["leave_type"]
-        if leave_type.pk in seen:
+        if leave_type.pk in seen or leave_type.leave_type_short_code == COMP_OFF_CODE:
             continue
         seen.add(leave_type.pk)
         types.append(_option(user, leave_type, row["color"]))
@@ -184,6 +186,35 @@ def compute_breakdown(leave_type, start, end, start_choice, end_choice):
     return Breakdown(days=days, total=total)
 
 
+def applied_leave_days(leave):
+    """Day-wise list of an application, counted by the rule that gave its total.
+
+    The stored LeaveDay rows can't show this: they skip Sundays (except EL) but
+    keep holidays, so a CL over a holiday lists that day as a full leave day.
+    """
+    start = timezone.localtime(leave.startDate).date()
+    end = timezone.localtime(leave.endDate).date()
+    breakdown = compute_breakdown(
+        leave.leave_type, start, end, leave.startDayChoice, leave.endDayChoice
+    )
+    full_day = {
+        "single": leave.startDayChoice == FULL,
+        "start": leave.startDayChoice == FULL,
+        "end": leave.endDayChoice == FULL,
+        "middle": True,
+    }
+    return [
+        {
+            "date": day["date"],
+            "is_full_day": full_day[day["role"]],
+            "is_sunday": day["is_sunday"],
+            "holiday": day["holiday"],
+            "counted": day["counted"],
+        }
+        for day in breakdown.days
+    ]
+
+
 # ─────────────────────────────────────────────────────────────
 # Input parsing
 # ─────────────────────────────────────────────────────────────
@@ -206,6 +237,8 @@ def parse_input(user, data):
         errors["leave_type"] = "Select a valid leave type."
     elif leave_type.leave_type_short_code == SHORT_LEAVE_CODE:
         errors["leave_type"] = "Short leave uses the short leave form."
+    elif leave_type.leave_type_short_code == COMP_OFF_CODE:
+        errors["leave_type"] = "Comp-off is added by admin and can't be applied for."
 
     def parse_date(key):
         try:

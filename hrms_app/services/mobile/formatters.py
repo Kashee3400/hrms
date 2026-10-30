@@ -1,4 +1,12 @@
 """Small JSON helpers shared by the mobile API payload builders."""
+import html
+
+from django.utils.html import strip_tags
+
+
+def plain_text(text):
+    """CKEditor HTML -> plain text for the app."""
+    return html.unescape(strip_tags(text or "")).strip()
 
 
 def iso_date(value):
