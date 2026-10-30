@@ -12,15 +12,15 @@ from hrms_app.models import (
     AttendanceLog,
     CompensatoryOff,
     Holiday,
-    LeaveApplication,
-    LeaveType,
     Notification,
     UserTour,
 )
+from hrms_app.services.leave_approval import is_leave_reviewer, review_queue
 from hrms_app.services.leave_balance_summary import get_dashboard_leave_balances
+from hrms_app.services.mobile import attendance_codes
 from hrms_app.services.mobile.formatters import hhmm, iso_date, shift_payload
 from hrms_app.services.mobile.recent_activity import get_recent_activity
-from hrms_app.utility.attendance_mapper import aggregate_attendance_data
+from hrms_app.utility.leave_utils import get_employee_requested_tour
 
 ACTIVE_TOUR_STATUSES = [
     settings.PENDING,
@@ -100,50 +100,19 @@ def _active_tour(user, today):
     return _tour_payload(tour) if tour else None
 
 
-def _classify(code, leave_codes):
-    if code == "P":
-        return "present"
-    if code == "H":
-        return "half_day"
-    if code in ("A", "AWOL"):
-        return "absent"
-    if code in ("T", "TH"):
-        return "tour"
-    if code == "OFF":
-        return "off"
-    if code in leave_codes:
-        return "leave"
-    return "holiday"
-
-
 def _month_summary(user, today):
-    """Counts from the first of the month up to yesterday, using the same
-    mapper as the web calendar. Today is excluded: its log is created later."""
+    """Counts from the first of the month up to yesterday (today's log is
+    created later), using the same day codes as the Attendance calendar."""
     month_start = today.replace(day=1)
-    counts = {key: 0 for key in ("present", "half_day", "absent", "leave", "tour", "holiday", "off")}
-
     yesterday = today - timedelta(days=1)
+    counts = dict.fromkeys(attendance_codes.CATEGORIES, 0)
     if yesterday >= month_start:
-        leave_codes = set()
-        for full, half in LeaveType.objects.values_list("leave_type_short_code", "half_day_short_code"):
-            leave_codes.update(code for code in (full, half) if code)
+        codes = attendance_codes.day_codes(user, month_start, yesterday, today=today)
+        counts = attendance_codes.summarize(codes, attendance_codes.LeaveCodes.load(), yesterday)
 
-        days = aggregate_attendance_data([user.pk], month_start, yesterday).get(user.pk, {})
-        current = month_start
-        while current <= yesterday:
-            entries = days.get(current) or []
-            code = (entries[0].get("status") if entries else None) or "A"
-            counts[_classify(code, leave_codes)] += 1
-            current += timedelta(days=1)
-
-    month_logs = AttendanceLog.objects.filter(
-        applied_by=user, start_date__date__range=[month_start, today]
-    )
+    counts.update(attendance_codes.flag_counts(user, month_start, today))
     counts.update(
         {
-            "late_coming": month_logs.filter(reg_status=settings.LATE_COMING).count(),
-            "early_going": month_logs.filter(reg_status=settings.EARLY_GOING).count(),
-            "missing_punch": month_logs.filter(reg_status=settings.MIS_PUNCHING).count(),
             "from": month_start.isoformat(),
             "to": yesterday.isoformat() if yesterday >= month_start else None,
         }
@@ -186,13 +155,14 @@ def _next_holiday(user, today):
 
 
 def _team_pending(user):
-    """Only for reporting managers."""
-    if not user.is_rm:
+    """Only for reviewers (have employees / admin dept / superuser).
+    Same queues as the web tracker: leaves incl. cancellation requests,
+    tours incl. extensions."""
+    if not is_leave_reviewer(user):
         return None
-    team = user.employees.all()
     return {
-        "leaves": LeaveApplication.objects.filter(appliedBy__in=team, status=settings.PENDING).count(),
-        "tours": UserTour.objects.filter(applied_by__in=team, status=settings.PENDING).count(),
+        "leaves": review_queue(user).count(),
+        "tours": get_employee_requested_tour(user).count(),
     }
 
 

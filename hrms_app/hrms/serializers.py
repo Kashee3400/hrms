@@ -158,12 +158,16 @@ class PersonalDetailsSerializer(serializers.ModelSerializer):
     religion = ReligionSerializer(read_only=True)
     marital_status = MaritalStatusSerializer(read_only=True)
     user = CurrentUserSerializer(read_only=True)
+    # Reviews leave/tour requests: has employees, admin department or superuser
+    # (more reliable than the manually-set `user.is_rm` flag).
+    is_manager = serializers.SerializerMethodField()
 
     class Meta:
         model = PersonalDetails
         fields = [
             "id",
             "employee_code",
+            "is_manager",
             "user",
             "avatar",
             "mobile_number",
@@ -180,6 +184,11 @@ class PersonalDetailsSerializer(serializers.ModelSerializer):
             "dor",
             "dof",
         ]
+
+    def get_is_manager(self, obj):
+        from hrms_app.services.leave_approval import is_leave_reviewer
+
+        return is_leave_reviewer(obj.user)
 
 
 class ShiftSerializer(serializers.ModelSerializer):

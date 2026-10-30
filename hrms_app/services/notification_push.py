@@ -14,14 +14,33 @@ _TYPES = {
     settings.ATTENDANCE_REGULARISATION: ("Attendance", "attendance", "/attendance"),
 }
 
+# Reviewer-side screens for the same records (see the app's AppRoutes).
+_REVIEW_PREFIXES = {
+    settings.LEAVE_STATUS: "/approvals/leaves",
+    settings.TOUR_STATUS: "/approvals/tours",
+}
+
+
+def _applicant_id(notification):
+    """Who applied for the leave/tour the notification is about."""
+    obj = notification.related_object
+    return getattr(obj, "appliedBy_id", None) or getattr(obj, "applied_by_id", None)
+
 
 def app_route(notification):
-    """In-app location for the notification (see the app's AppRoutes)."""
+    """In-app location for the notification (see the app's AppRoutes).
+
+    The applicant opens their own application; anyone else (the manager)
+    opens the review screen, which has the approve/reject actions.
+    """
     _, _, prefix = _TYPES.get(notification.notification_type, (None, None, None))
     if prefix is None:
         return "/notifications"
     if prefix == "/attendance" or notification.related_object_id is None:
         return prefix
+    review_prefix = _REVIEW_PREFIXES.get(notification.notification_type)
+    if review_prefix and _applicant_id(notification) not in (None, notification.receiver_id):
+        prefix = review_prefix
     return f"{prefix}/{notification.related_object_id}"
 
 

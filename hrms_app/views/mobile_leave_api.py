@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from django.utils import timezone
 
 from hrms_app.hrms.utils import create_response
-from hrms_app.services.mobile import leave_apply, my_leaves
+from hrms_app.services.mobile import leave_apply, my_leaves, team_leaves
 
 
 def _error(errors, http_status=status.HTTP_400_BAD_REQUEST):
@@ -170,4 +170,80 @@ class MyLeaveCancelView(APIView):
             "success",
             "Cancellation requested. Your manager will review it.",
             my_leaves.leave_item(request.user, leave),
+        )
+
+
+# ─────────────────────────────────────────────────────────────
+# Team leaves (reviewers)
+# ─────────────────────────────────────────────────────────────
+
+
+class _ReviewerView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        from hrms_app.services.leave_approval import is_leave_reviewer
+
+        if not is_leave_reviewer(request.user):
+            self.permission_denied(request, message="Only reporting managers can review leave.")
+
+
+class TeamLeaveListView(_ReviewerView):
+    """GET /api/v1/leave/team/?status=pending|approved|rejected|cancelled|all&year=&q=&page=
+
+    `pending` (default) is the review queue: pending, cancellation requests
+    and, for the admin department, recommended LWP.
+    """
+
+    def get(self, request):
+        data = team_leaves.list_team_leaves(
+            request.user,
+            status=request.query_params.get("status") or "pending",
+            year=_int_param(request, "year", timezone.localdate().year),
+            search=(request.query_params.get("q") or "").strip(),
+            page=_int_param(request, "page", 1),
+            build_url=request.build_absolute_uri,
+        )
+        return create_response("success", "Team leave applications.", data)
+
+
+class TeamLeaveDetailView(_ReviewerView):
+    """GET /api/v1/leave/team/<id>/ - detail + applicant balance + allowed actions."""
+
+    def get(self, request, leave_id):
+        leave = team_leaves.get_team_leave(request.user, leave_id)
+        if leave is None:
+            return _error({"__all__": ["Leave application not found."]}, status.HTTP_404_NOT_FOUND)
+        return create_response(
+            "success",
+            "Team leave application.",
+            team_leaves.team_leave_detail(request.user, leave, request.build_absolute_uri),
+        )
+
+
+class TeamLeaveActionView(_ReviewerView):
+    """POST /api/v1/leave/team/<id>/action/ {status, remark}
+
+    `status` must be one of the detail's `allowed_actions`. Approval deducts
+    the balance; rejecting/cancelling an approved leave restores it.
+    """
+
+    def post(self, request, leave_id):
+        leave = team_leaves.get_team_leave(request.user, leave_id)
+        if leave is None:
+            return _error({"__all__": ["Leave application not found."]}, status.HTTP_404_NOT_FOUND)
+        error = team_leaves.act(
+            request.user,
+            leave,
+            (request.data.get("status") or "").strip(),
+            request.data.get("remark"),
+        )
+        if error:
+            return _error({"__all__": [error]})
+        leave.refresh_from_db()
+        return create_response(
+            "success",
+            f"Leave application {leave.status}.",
+            team_leaves.team_leave_detail(request.user, leave, request.build_absolute_uri),
         )

@@ -753,108 +753,26 @@ class LeaveApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
     permission_action = "change"
 
     def get_object(self, queryset=None):
-        self.leave_application = get_object_or_404(
-            LeaveApplication,
-            slug=self.kwargs.get("slug")
-        )
-        self.old_status = self.leave_application.status
-        return self.leave_application
-
-    @transaction.atomic
-    def update_leave_balance(self, leave_application):
-
-        if self.old_status == leave_application.status:
-            return
-
-        leave_type = leave_application.leave_type
-        leave_date = localtime(leave_application.startDate)
-
-        year = leave_date.year
-
-        # 🔹 Resolve correct period (monthly vs yearly)
-        if leave_type.accrual_period == LeaveAccrualPeriod.MONTHLY:
-            month = leave_date.month
-        else:
-            month = None
-
-        leave_balance = LeaveBalanceOpenings.objects.select_for_update().filter(
-            user=leave_application.appliedBy,
-            leave_type=leave_type,
-            year=year,
-            month=month,
-        ).first()
-
-        if not leave_balance:
-            raise ValidationError("Leave balance record not found.")
-
-        # ------------------------------
-        # APPROVE → Deduct
-        # ------------------------------
-        if (
-            leave_application.status == settings.APPROVED
-            and self.old_status in [
-                settings.PENDING,
-                settings.RECOMMEND,
-                settings.NOT_RECOMMEND,
-                settings.PENDING_CANCELLATION,
-                settings.REJECTED,
-                settings.CANCELLED,
-            ]
-            and not leave_application.is_leave_deducted
-        ):
-
-            if leave_balance.remaining_leave_balances < leave_application.usedLeave:
-                raise ValidationError("Insufficient leave balance.")
-
-            leave_balance.remaining_leave_balances -= leave_application.usedLeave
-            leave_balance.used += leave_application.usedLeave
-            leave_application.is_leave_deducted = True
-
-        # ------------------------------
-        # REJECT/CANCEL → Restore
-        # ------------------------------
-        elif (
-            leave_application.status in [settings.REJECTED, settings.CANCELLED]
-            and self.old_status in [settings.APPROVED, settings.PENDING_CANCELLATION]
-            and leave_application.is_leave_deducted
-        ):
-
-            leave_balance.remaining_leave_balances += leave_application.usedLeave
-            leave_balance.used -= leave_application.usedLeave
-            leave_application.is_leave_deducted = False
-
-        leave_balance.closing_balance = leave_balance.remaining_leave_balances
-
-        leave_balance.save(
-            update_fields=[
-                "remaining_leave_balances",
-                "used",
-                "closing_balance",
-            ]
-        )
-
-        leave_application.save(update_fields=["is_leave_deducted"])
+        return get_object_or_404(LeaveApplication, slug=self.kwargs.get("slug"))
 
     def form_valid(self, form):
-        response = super().form_valid(form)
+        """Status, balance and log are applied together (shared with the mobile
+        API in services/leave_approval.py). Previously the status was saved
+        even when the balance update failed (e.g. insufficient balance)."""
+        from ..services.leave_approval import change_status
 
-        leave_application = form.instance
-        action_by = self.request.user
-
+        self.object = form.instance
         try:
-            self.update_leave_balance(leave_application)
+            change_status(form.instance, form.instance.status, self.request.user)
         except ValidationError as e:
-            messages.error(self.request, str(e))
-            return response
-
-        LeaveLog.create_log(leave_application, action_by, leave_application.status)
+            messages.error(self.request, e.messages[0])
+            return redirect(self.get_success_url())
 
         messages.success(
             self.request,
-            _(f"Leave application {leave_application.status} successfully"),
+            _(f"Leave application {form.instance.status} successfully"),
         )
-
-        return response
+        return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse_lazy(
