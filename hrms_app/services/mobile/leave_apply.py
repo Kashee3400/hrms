@@ -19,14 +19,16 @@ from django.utils import timezone
 from django.utils.html import escape, linebreaks
 
 from hrms_app.forms.leave_form import LeaveApplicationForm
-from hrms_app.models import Holiday, LeaveType
+from hrms_app.models import Holiday, LeaveBalanceOpenings, LeaveType
 from hrms_app.services.leave_balance_summary import get_dashboard_leave_balances
+from hrms_app.services import attendance_lock
 from hrms_app.services.leave_service import LeaveDomainService
 from hrms_app.utility.leave_utils import LeavePolicyManager
 
 LWP_CODE = "LWP"
-# Short leave has its own time-based form on the web; not part of this flow.
-EXCLUDED_CODES = {"STL"}
+# Short leave has its own time-based form (services/mobile/short_leave.py);
+# it is listed in the options but never goes through the day-based flow.
+SHORT_LEAVE_CODE = "STL"
 # CL and SL don't count Sundays/holidays inside the range (apply_leave.js).
 OFF_DAY_EXCLUDED_CODES = {"CL", "SL"}
 SL_ATTACHMENT_ABOVE_DAYS = 5
@@ -62,36 +64,52 @@ def can_apply_with(code, available):
 # ─────────────────────────────────────────────────────────────
 
 
+def _option(user, leave_type, color):
+    code = leave_type.leave_type_short_code
+    available = available_balance(user, leave_type)
+    is_short = code == SHORT_LEAVE_CODE
+    return {
+        "id": leave_type.pk,
+        "name": leave_type.leave_type,
+        "code": code,
+        "color": color or leave_type.color_hex,
+        "available": available,
+        # STL balance depends on the chosen date's month; its own preview
+        # checks it, so the type is always selectable.
+        "can_apply": is_short or can_apply_with(code, available),
+        "is_lwp": code == LWP_CODE,
+        "is_short_leave": is_short,
+        "allow_half_day": leave_type.allow_half_day,
+        "skips_off_days": code in OFF_DAY_EXCLUDED_CODES,
+        "attachment_required_above_days": SL_ATTACHMENT_ABOVE_DAYS if code == "SL" else None,
+        "min_notice_days": leave_type.min_notice_days,
+        "min_days": leave_type.min_days_limit,
+        "max_days": leave_type.max_days_limit,
+    }
+
+
 def get_apply_options(user):
     """Leave types the user can see on the web leave cards, with rules."""
     seen = set()
     types = []
     for row in get_dashboard_leave_balances(user):
         leave_type = row["leave_type"]
-        code = leave_type.leave_type_short_code
-        if leave_type.pk in seen or code in EXCLUDED_CODES:
+        if leave_type.pk in seen:
             continue
         seen.add(leave_type.pk)
-        available = available_balance(user, leave_type)
-        types.append(
-            {
-                "id": leave_type.pk,
-                "name": leave_type.leave_type,
-                "code": code,
-                "color": row["color"] or leave_type.color_hex,
-                "available": available,
-                "can_apply": can_apply_with(code, available),
-                "is_lwp": code == LWP_CODE,
-                "allow_half_day": leave_type.allow_half_day,
-                "skips_off_days": code in OFF_DAY_EXCLUDED_CODES,
-                "attachment_required_above_days": (
-                    SL_ATTACHMENT_ABOVE_DAYS if code == "SL" else None
-                ),
-                "min_notice_days": leave_type.min_notice_days,
-                "min_days": leave_type.min_days_limit,
-                "max_days": leave_type.max_days_limit,
-            }
-        )
+        types.append(_option(user, leave_type, row["color"]))
+
+    # STL balances are monthly: the web card only shows when this month's row
+    # exists, but a short leave can be for an earlier month this year.
+    stl = LeaveType.objects.filter(leave_type_short_code=SHORT_LEAVE_CODE).first()
+    if (
+        stl
+        and stl.pk not in seen
+        and LeaveBalanceOpenings.objects.filter(
+            user=user, leave_type=stl, year=timezone.localdate().year, is_active=True
+        ).exists()
+    ):
+        types.append(_option(user, stl, None))
 
     manager = user.reports_to
     designation = getattr(getattr(manager, "personal_detail", None), "designation", None)
@@ -184,8 +202,10 @@ def parse_input(user, data):
     """Returns (LeaveInput, None) or (None, {field: message})."""
     errors = {}
     leave_type = LeaveType.objects.filter(pk=data.get("leave_type")).first()
-    if leave_type is None or leave_type.leave_type_short_code in EXCLUDED_CODES:
+    if leave_type is None:
         errors["leave_type"] = "Select a valid leave type."
+    elif leave_type.leave_type_short_code == SHORT_LEAVE_CODE:
+        errors["leave_type"] = "Short leave uses the short leave form."
 
     def parse_date(key):
         try:
@@ -231,6 +251,9 @@ def preview(user, leave_input):
     code = li.leave_type.leave_type_short_code
 
     errors = [breakdown.error] if breakdown.error else []
+    lock = attendance_lock.active_lock(li.start, li.end)
+    if lock:
+        errors.insert(0, attendance_lock.lock_message(lock))
     if not breakdown.error:
         try:
             LeavePolicyManager(

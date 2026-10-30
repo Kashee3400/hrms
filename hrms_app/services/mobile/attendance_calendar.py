@@ -15,7 +15,8 @@ from django.conf import settings
 from django.db.models import Max, Q
 from django.utils import timezone
 
-from hrms_app.models import AttendanceLog, LeaveApplication, LeaveDay, LockStatus, OfficeClosure, UserTour
+from hrms_app.models import AttendanceLog, LeaveApplication, LeaveDay, OfficeClosure, UserTour
+from hrms_app.services import attendance_lock
 from hrms_app.services.mobile import attendance_codes as codes_mod
 from hrms_app.services.mobile.formatters import hhmm
 
@@ -138,16 +139,12 @@ def _calendar_events(user, start, end):
 
 
 def _lock(start, end):
-    lock = (
-        LockStatus.objects.filter(is_locked="locked")
-        .filter(
-            Q(from_date__lte=end, to_date__gte=start)
-            | Q(lock_year=start.year, lock_month=start.month)
-        )
-        .order_by("-locked_at")
-        .first()
-    )
-    return {"is_locked": lock is not None, "reason": lock.reason if lock else None}
+    """Same rule as every mobile action (services/attendance_lock.py)."""
+    lock = attendance_lock.active_lock(start, end)
+    return {
+        "is_locked": lock is not None,
+        "reason": attendance_lock.lock_message(lock) if lock else None,
+    }
 
 
 def get_month_calendar(user, year, month):

@@ -15,6 +15,7 @@ from django.utils import timezone
 from django.utils.html import strip_tags
 
 from hrms_app.models import LeaveApplication, LeaveLog
+from hrms_app.services import attendance_lock
 from hrms_app.services.leave_service import LeaveDomainService
 from hrms_app.services.mobile.formatters import hhmm, iso_date
 from hrms_app.services.mobile.home_summary import comp_off_payload, leave_balances_payload
@@ -43,18 +44,26 @@ def _local_date(dt):
     return timezone.localtime(dt).date() if dt else None
 
 
-def _actions(user, leave):
-    own = leave.appliedBy_id == user.pk
+def leave_lock(leave):
+    """Lock info for the leave's whole date range (audit freeze)."""
+    return attendance_lock.lock_info(leave.startDate, leave.endDate)
+
+
+def _actions(user, leave, lock=None):
+    """What the applicant may do. Nothing is allowed on a locked period."""
+    lock = lock or leave_lock(leave)
+    open_ = leave.appliedBy_id == user.pk and not lock["is_locked"]
     return {
-        "can_cancel": own and leave.status in CANCELLABLE and user.has_perm(CHANGE_PERMISSION),
-        "can_edit": own and leave.status in EDITABLE and user.has_perm(CHANGE_PERMISSION),
-        "can_delete": own and leave.status in EDITABLE and user.has_perm(DELETE_PERMISSION),
+        "can_cancel": open_ and leave.status in CANCELLABLE and user.has_perm(CHANGE_PERMISSION),
+        "can_edit": open_ and leave.status in EDITABLE and user.has_perm(CHANGE_PERMISSION),
+        "can_delete": open_ and leave.status in EDITABLE and user.has_perm(DELETE_PERMISSION),
     }
 
 
 def leave_item(user, leave):
     leave_type = leave.leave_type
     reason = _plain(leave.reason)
+    lock = leave_lock(leave)
     return {
         "id": leave.pk,
         "application_no": leave.applicationNo,
@@ -78,7 +87,8 @@ def leave_item(user, leave):
         "status_display": leave.get_status_display(),
         "applied_on": timezone.localtime(leave.applyingDate).isoformat(),
         "reason_preview": reason[:120],
-        **_actions(user, leave),
+        **lock,
+        **_actions(user, leave, lock),
     }
 
 
@@ -187,19 +197,31 @@ def leave_detail(user, leave, build_url):
     return data
 
 
+def _refusal(leave, action, not_allowed):
+    """Why `action` can't be done: the lock message wins, else `not_allowed`."""
+    lock = leave_lock(leave)
+    if lock["is_locked"]:
+        return lock["lock_reason"]
+    return not_allowed
+
+
 @transaction.atomic
 def request_cancellation(user, leave):
-    """Approved -> pending_cancellation, logged like the web status form."""
+    """Approved -> pending_cancellation, logged like the web status form.
+    Returns None on success, else the reason it was refused."""
     if not _actions(user, leave)["can_cancel"]:
-        return False
+        return _refusal(leave, "cancel", "Only approved leave can be cancelled.")
     leave.status = settings.PENDING_CANCELLATION
     leave.save()  # signals notify the manager
     LeaveLog.create_log(leave, user, leave.status)
-    return True
+    return None
 
 
 def delete_leave(user, leave):
+    """Returns None on success, else the reason it was refused."""
     if not _actions(user, leave)["can_delete"]:
-        return False
+        return _refusal(
+            leave, "delete", "Only pending, rejected or cancelled applications can be deleted."
+        )
     leave.delete()
-    return True
+    return None

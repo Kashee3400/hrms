@@ -4,13 +4,19 @@ can see and act on - the mobile counterpart of the web tracker's
 "Requested Leaves" and the status buttons on the leave detail page.
 """
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models import Q
 from django.utils import timezone
 
 from hrms_app.services import leave_approval
 from hrms_app.services.leave_service import LeaveDomainService
-from hrms_app.services.mobile.my_leaves import PAGE_SIZE, STATUS_GROUPS, leave_detail, leave_item
+from hrms_app.services.mobile.my_leaves import (
+    PAGE_SIZE,
+    STATUS_GROUPS,
+    leave_detail,
+    leave_item,
+    leave_lock,
+)
 
 
 def _applicant(user, build_url):
@@ -36,8 +42,7 @@ def team_item(reviewer, leave, build_url):
     return {
         **leave_item(reviewer, leave),
         "applicant": _applicant(leave.appliedBy, build_url),
-        "needs_action": leave.status in AWAITING
-        and bool(leave_approval.allowed_statuses(reviewer, leave)),
+        "needs_action": leave.status in AWAITING and bool(_open_actions(reviewer, leave)),
     }
 
 
@@ -96,14 +101,23 @@ def team_leave_detail(reviewer, leave, build_url):
         "applicant_balance": record.remaining_leave_balances if record else None,
         # Button labels as on the web ("Approve", "Reject", "Recommend"…).
         "allowed_actions": [
-            {"status": value, "label": str(label)}
-            for value, label in leave_approval.allowed_statuses(reviewer, leave)
+            {"status": value, "label": str(label)} for value, label in _open_actions(reviewer, leave)
         ],
     }
 
 
+def _open_actions(reviewer, leave):
+    """Allowed review actions; none while the leave's period is locked."""
+    if leave_lock(leave)["is_locked"]:
+        return []
+    return leave_approval.allowed_statuses(reviewer, leave)
+
+
 def act(reviewer, leave, new_status, remark=""):
     """Returns None on success or an error message."""
+    lock = leave_lock(leave)
+    if lock["is_locked"]:
+        return lock["lock_reason"]
     allowed = {value for value, _ in leave_approval.allowed_statuses(reviewer, leave)}
     if new_status not in allowed:
         return "This action is not allowed for this application."
@@ -111,4 +125,6 @@ def act(reviewer, leave, new_status, remark=""):
         leave_approval.change_status(leave, new_status, reviewer, notes=(remark or "").strip())
     except ValidationError as exc:
         return exc.messages[0]
+    except PermissionDenied as exc:  # the web's pre_save lock guard
+        return str(exc)
     return None

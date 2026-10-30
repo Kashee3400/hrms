@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from django.utils import timezone
 
 from hrms_app.hrms.utils import create_response
-from hrms_app.services.mobile import leave_apply, my_leaves, team_leaves
+from hrms_app.services.mobile import leave_apply, my_leaves, short_leave, team_leaves
 
 
 def _error(errors, http_status=status.HTTP_400_BAD_REQUEST):
@@ -145,11 +145,9 @@ class MyLeaveDetailView(APIView):
         leave = my_leaves.get_leave(request.user, leave_id)
         if leave is None:
             return _error({"__all__": ["Leave application not found."]}, status.HTTP_404_NOT_FOUND)
-        if not my_leaves.delete_leave(request.user, leave):
-            return _error(
-                {"__all__": ["Only pending, rejected or cancelled applications can be deleted."]},
-                status.HTTP_403_FORBIDDEN,
-            )
+        refusal = my_leaves.delete_leave(request.user, leave)
+        if refusal:
+            return _error({"__all__": [refusal]}, status.HTTP_403_FORBIDDEN)
         return create_response("success", "Leave application deleted.", None)
 
 
@@ -162,10 +160,9 @@ class MyLeaveCancelView(APIView):
         leave = my_leaves.get_leave(request.user, leave_id)
         if leave is None:
             return _error({"__all__": ["Leave application not found."]}, status.HTTP_404_NOT_FOUND)
-        if not my_leaves.request_cancellation(request.user, leave):
-            return _error(
-                {"__all__": ["Only approved leave can be cancelled."]}, status.HTTP_403_FORBIDDEN
-            )
+        refusal = my_leaves.request_cancellation(request.user, leave)
+        if refusal:
+            return _error({"__all__": [refusal]}, status.HTTP_403_FORBIDDEN)
         return create_response(
             "success",
             "Cancellation requested. Your manager will review it.",
@@ -246,4 +243,63 @@ class TeamLeaveActionView(_ReviewerView):
             "success",
             f"Leave application {leave.status}.",
             team_leaves.team_leave_detail(request.user, leave, request.build_absolute_uri),
+        )
+
+
+# ─────────────────────────────────────────────────────────────
+# Short leave (STL)
+# ─────────────────────────────────────────────────────────────
+
+
+class ShortLeavePreviewView(APIView):
+    """POST /api/v1/leave/short/preview/ {date, from_time?, to_time?}
+
+    Attendance summary for the day, month balance, duration and errors.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        parsed, errors = short_leave.parse_input(request.data)
+        if errors:
+            return _error(errors)
+        day, from_time, to_time = parsed
+        return create_response(
+            "success", "Short leave preview.", short_leave.preview(request.user, day, from_time, to_time)
+        )
+
+
+class ShortLeaveApplyView(APIView):
+    """POST /api/v1/leave/short/apply/ {date, from_time, to_time, leave_address, reason}"""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not request.user.has_perm(leave_apply.APPLY_PERMISSION):
+            return _error({"__all__": ["You do not have permission to apply for leave."]}, status.HTTP_403_FORBIDDEN)
+        parsed, errors = short_leave.parse_input(request.data)
+        if errors:
+            return _error(errors)
+        day, from_time, to_time = parsed
+        application, errors = short_leave.submit(
+            request.user,
+            day,
+            from_time,
+            to_time,
+            leave_address=request.data.get("leave_address"),
+            reason=request.data.get("reason"),
+        )
+        if errors:
+            return _error(errors)
+        return create_response(
+            "success",
+            "Short leave applied. Sent to your manager for approval.",
+            {
+                "id": application.pk,
+                "application_no": application.applicationNo,
+                "slug": application.slug,
+                "status": application.status,
+                "used_leave": application.usedLeave,
+            },
+            status.HTTP_201_CREATED,
         )
