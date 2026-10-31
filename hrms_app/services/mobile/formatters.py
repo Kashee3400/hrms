@@ -9,6 +9,13 @@ def plain_text(text):
     return html.unescape(strip_tags(text or "")).strip()
 
 
+def employee_code_label(code):
+    """Company format, always three digits: "7" -> "KMPCL-007", "033" -> "KMPCL-033"."""
+    text = str(code or "").strip()
+    number = text.upper().removeprefix("KMPCL-")
+    return f"KMPCL-{number.zfill(3)}" if number.isdigit() else (text or None)
+
+
 def iso_date(value):
     return value.isoformat() if value else None
 

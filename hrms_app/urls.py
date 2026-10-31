@@ -19,6 +19,13 @@ from hrms_app.views.mobile_leave_api import (
     TeamLeaveDetailView,
     TeamLeaveListView,
 )
+from hrms_app.views.mobile_profile_api import (
+    ChangePasswordView,
+    ProfileAddressView,
+    ProfileAvatarView,
+    ProfileDetailsView,
+    ProfileView,
+)
 from hrms_app.views.mobile_tour_api import (
     MyTourCancelView,
     MyTourDetailView,
@@ -93,6 +100,11 @@ urlpatterns = [
     path("leave/team/<int:leave_id>/", TeamLeaveDetailView.as_view(), name="mobile-leave-team-detail"),
     path("leave/team/<int:leave_id>/action/", TeamLeaveActionView.as_view(), name="mobile-leave-team-action"),
     path("holiday/list/", HolidayListView.as_view(), name="mobile-holiday-list"),
+    path("profile/", ProfileView.as_view(), name="mobile-profile"),
+    path("profile/details/", ProfileDetailsView.as_view(), name="mobile-profile-details"),
+    path("profile/address/<str:kind>/", ProfileAddressView.as_view(), name="mobile-profile-address"),
+    path("profile/avatar/", ProfileAvatarView.as_view(), name="mobile-profile-avatar"),
+    path("profile/change-password/", ChangePasswordView.as_view(), name="mobile-profile-change-password"),
     path("tour/apply-options/", TourApplyOptionsView.as_view(), name="mobile-tour-apply-options"),
     path("tour/overview/", TourOverviewView.as_view(), name="mobile-tour-overview"),
     path("tour/my/", MyTourListView.as_view(), name="mobile-tour-my-list"),

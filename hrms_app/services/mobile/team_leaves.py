@@ -9,6 +9,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from hrms_app.services import leave_approval
+from hrms_app.services.mobile.formatters import employee_code_label
 from hrms_app.services.leave_service import LeaveDomainService
 from hrms_app.services.mobile.my_leaves import (
     PAGE_SIZE,
@@ -27,7 +28,7 @@ def _applicant(user, build_url):
         "id": user.pk,
         "name": user.get_full_name() or user.username,
         # The web shows the username as the employee code.
-        "employee_code": user.username,
+        "employee_code": employee_code_label(user.username),
         "designation": str(designation) if designation else None,
         "avatar_url": build_url(avatar.url) if avatar else None,
     }
