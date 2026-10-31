@@ -187,7 +187,7 @@ def remove_expired_allowed_users():
 
 def push_notification(user,head,body,url):
     payload = {"head": head, "body": body, 
-        "icon": "http://hr.kasheemilk.com:7777/static/hrms_app/img/logo.png", "url": url}
+        "icon": "https://hr.kasheemilk.com/static/hrms_app/img/logo.png", "url": url}
     send_user_notification(user=user, payload=payload, ttl=1000)
 
 

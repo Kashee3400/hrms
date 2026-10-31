@@ -108,7 +108,7 @@ def _queue_emails(task, instance_id, texts):
 
     def enqueue():
         try:
-            task.delay(instance_id, 'http', domain, employee_text=texts[0], manager_text=texts[1])
+            task.delay(instance_id, 'https', domain, employee_text=texts[0], manager_text=texts[1])
         except Exception:
             logging.getLogger(__name__).exception("Could not queue the emails for %s", instance_id)
 
@@ -141,7 +141,7 @@ def _notify_admin_department(leave):
 
     def enqueue():
         try:
-            send_admin_leave_notification.delay(leave.id, 'http', domain, message, receiver_ids)
+            send_admin_leave_notification.delay(leave.id, 'https', domain, message, receiver_ids)
         except Exception:
             logging.getLogger(__name__).exception("Could not queue the admin email for %s", leave.id)
 
