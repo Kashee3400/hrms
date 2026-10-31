@@ -216,6 +216,19 @@ def save_tour(user, data, instance=None):
     return tour, None
 
 
+def policy_block(user, data):
+    """The TOUR_LIMIT refusal for this tour, or None if that's not what stops it."""
+    fields, errors = _parse_input(data)
+    if errors:
+        return None
+    form = TourForm(fields, user=user)
+    try:
+        form.is_valid()
+    except AttributeError:
+        return None
+    return next((m for m in form.non_field_errors() if "denied" in m), None)
+
+
 def _send_emails(tour, *, edited):
     """Like the web's apply/edit views; a queue outage must not fail the request."""
     texts = {}

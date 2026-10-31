@@ -19,6 +19,11 @@ from hrms_app.views.mobile_leave_api import (
     TeamLeaveDetailView,
     TeamLeaveListView,
 )
+from hrms_app.views.mobile_gap_api import (
+    ApprovalMailPreviewView,
+    ApprovalMailSendView,
+    AttendanceGapListView,
+)
 from hrms_app.views.mobile_profile_api import (
     ChangePasswordView,
     ProfileAddressView,
@@ -26,6 +31,7 @@ from hrms_app.views.mobile_profile_api import (
     ProfileDetailsView,
     ProfileView,
 )
+from hrms_app.views.mobile_settings_api import AppSettingDetailView, AppSettingListView
 from hrms_app.views.mobile_tour_api import (
     MyTourCancelView,
     MyTourDetailView,
@@ -100,6 +106,11 @@ urlpatterns = [
     path("leave/team/<int:leave_id>/", TeamLeaveDetailView.as_view(), name="mobile-leave-team-detail"),
     path("leave/team/<int:leave_id>/action/", TeamLeaveActionView.as_view(), name="mobile-leave-team-action"),
     path("holiday/list/", HolidayListView.as_view(), name="mobile-holiday-list"),
+    path("app-settings/", AppSettingListView.as_view(), name="mobile-app-settings"),
+    path("app-settings/<str:key>/", AppSettingDetailView.as_view(), name="mobile-app-setting-detail"),
+    path("attendance/gaps/", AttendanceGapListView.as_view(), name="mobile-attendance-gaps"),
+    path("approval-mail/preview/", ApprovalMailPreviewView.as_view(), name="mobile-approval-mail-preview"),
+    path("approval-mail/send/", ApprovalMailSendView.as_view(), name="mobile-approval-mail-send"),
     path("profile/", ProfileView.as_view(), name="mobile-profile"),
     path("profile/details/", ProfileDetailsView.as_view(), name="mobile-profile-details"),
     path("profile/address/<str:kind>/", ProfileAddressView.as_view(), name="mobile-profile-address"),

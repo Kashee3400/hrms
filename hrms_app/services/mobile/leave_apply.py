@@ -284,6 +284,7 @@ def preview(user, leave_input):
     code = li.leave_type.leave_type_short_code
 
     errors = [breakdown.error] if breakdown.error else []
+    policy_errors = []
     lock = attendance_lock.active_lock(li.start, li.end)
     if lock:
         errors.insert(0, attendance_lock.lock_message(lock))
@@ -299,10 +300,16 @@ def preview(user, leave_input):
                 bookedLeave=breakdown.total,
             ).validate_policies()
         except ValidationError as exc:
-            errors.extend(exc.messages)
+            policy_errors = exc.messages
+            errors.extend(policy_errors)
 
     balance_ok = code == LWP_CODE or projected >= 0
     return {
+        # A policy the competent authority can waive by mail. A lock or an
+        # overlapping application can't be approved away.
+        "approval_needed": bool(policy_errors)
+        and not lock
+        and not any("overlapping" in message for message in policy_errors),
         "leave_type_id": li.leave_type.pk,
         "days": breakdown.days,
         "total_days": breakdown.total,

@@ -63,8 +63,11 @@ from .tour import (
 from .holiday import Holiday, WishingCard, HRAnnouncement, OfficeClosure
 from .notification import Notification, NotificationSetting, DeviceToken
 from .misc import AppSetting, FormProgress, SentEmail, EmailOTP
+from .attendance_gap import ApprovalMail, AttendanceGap
 
 __all__ = [
+    "ApprovalMail",
+    "AttendanceGap",
     "Role",
     "CustomUser",
     "Logo",

@@ -1058,6 +1058,26 @@ class AppSettingAdmin(admin.ModelAdmin):
     ordering = ("key",)
 
 
+from .models import ApprovalMail, AttendanceGap
+
+
+@admin.register(AttendanceGap)
+class AttendanceGapAdmin(admin.ModelAdmin):
+    list_display = ("user", "date", "kind", "is_open", "first_notified_on", "expired_notified_on")
+    list_filter = ("kind", "is_open", "date")
+    search_fields = ("user__username", "user__first_name", "user__last_name")
+    raw_id_fields = ("user", "approval_mail")
+
+
+@admin.register(ApprovalMail)
+class ApprovalMailAdmin(admin.ModelAdmin):
+    list_display = ("user", "kind", "start_date", "end_date", "to_email", "sent_at")
+    list_filter = ("kind", "sent_at")
+    search_fields = ("user__username", "subject")
+    raw_id_fields = ("user",)
+    readonly_fields = ("sent_at",)
+
+
 @admin.register(PermanentAddress)
 class PermanentAddressAdmin(admin.ModelAdmin):
     list_display = ("user", "address_line_1", "state", "zipcode", "is_active", "created_at")

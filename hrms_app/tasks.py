@@ -135,6 +135,30 @@ def send_leave_application_email(subject, message, recipient_list):
         send_mail(subject, message, settings.HRMS_DEFAULT_FROM_EMAIL, recipient_list)
 
 
+@shared_task
+def send_approval_mail(subject, body, to, cc, reply_to):
+    """The employee's beyond-policy request; replies go to the employee."""
+    if not DEBUG:
+        EmailMultiAlternatives(
+            subject,
+            body,
+            settings.HRMS_DEFAULT_FROM_EMAIL,
+            [to],
+            cc=cc,
+            reply_to=[reply_to] if reply_to else None,
+        ).send()
+
+
+@shared_task
+def scan_attendance_gaps():
+    """Daily, after the night's attendance sync."""
+    from .services.attendance_gaps import scan
+
+    result = scan()
+    logger.info("Attendance gap scan: %s", result)
+    return result
+
+
 def push_notification(user,head,body,url):
     payload = {"head": head, "body": body, 
         "icon": "http://hr.kasheemilk.com:7777/static/hrms_app/img/logo.png", "url": url}
