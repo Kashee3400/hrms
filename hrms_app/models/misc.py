@@ -51,6 +51,26 @@ class AppSetting(models.Model):
         return f"{self.key}: {self.value} (Active: {self.beyond_policy})"
 
 
+class AllowedUserExpiry(models.Model):
+    """When an employee's place in AppSetting.allowed_users ends. A daily job
+    removes them; people added without one stay until removed by hand."""
+
+    setting = models.ForeignKey(AppSetting, on_delete=models.CASCADE, related_name="user_expiries")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="+")
+    expires_on = models.DateField(verbose_name="Allowed Until")
+
+    class Meta:
+        db_table = "tbl_allowed_user_expiry"
+        verbose_name = "Allowed User Expiry"
+        verbose_name_plural = "Allowed User Expiries"
+        constraints = [
+            models.UniqueConstraint(fields=["setting", "user"], name="unique_allowed_user_expiry")
+        ]
+
+    def __str__(self):
+        return f"{self.setting.key}: {self.user.username} until {self.expires_on}"
+
+
 class FormProgress(models.Model):
     STATUS_CHOICES = [
         ("in-progress", "In Progress"),

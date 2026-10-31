@@ -24,6 +24,11 @@ from hrms_app.views.mobile_gap_api import (
     ApprovalMailSendView,
     AttendanceGapListView,
 )
+from hrms_app.views.mobile_notification_api import (
+    NotificationFeedView,
+    NotificationReadAllView,
+    NotificationReadView,
+)
 from hrms_app.views.mobile_profile_api import (
     ChangePasswordView,
     ProfileAddressView,
@@ -42,6 +47,7 @@ from hrms_app.views.mobile_tour_api import (
     TeamTourListView,
     TourApplyOptionsView,
     TourOverviewView,
+    TourPdfView,
 )
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -106,6 +112,9 @@ urlpatterns = [
     path("leave/team/<int:leave_id>/", TeamLeaveDetailView.as_view(), name="mobile-leave-team-detail"),
     path("leave/team/<int:leave_id>/action/", TeamLeaveActionView.as_view(), name="mobile-leave-team-action"),
     path("holiday/list/", HolidayListView.as_view(), name="mobile-holiday-list"),
+    path("notifications/feed/", NotificationFeedView.as_view(), name="mobile-notification-feed"),
+    path("notifications/feed/read-all/", NotificationReadAllView.as_view(), name="mobile-notification-read-all"),
+    path("notifications/feed/<int:notification_id>/read/", NotificationReadView.as_view(), name="mobile-notification-read"),
     path("app-settings/", AppSettingListView.as_view(), name="mobile-app-settings"),
     path("app-settings/el-policy/", ElPolicyView.as_view(), name="mobile-app-settings-el-policy"),
     path("app-settings/<str:key>/", AppSettingDetailView.as_view(), name="mobile-app-setting-detail"),
@@ -123,6 +132,7 @@ urlpatterns = [
     path("tour/my/<int:tour_id>/", MyTourDetailView.as_view(), name="mobile-tour-my-detail"),
     path("tour/my/<int:tour_id>/cancel/", MyTourCancelView.as_view(), name="mobile-tour-my-cancel"),
     path("tour/my/<int:tour_id>/rerequest/", MyTourRerequestView.as_view(), name="mobile-tour-my-rerequest"),
+    path("tour/pdf/<str:token>/", TourPdfView.as_view(), name="mobile-tour-pdf"),
     path("tour/team/", TeamTourListView.as_view(), name="mobile-tour-team-list"),
     path("tour/team/<int:tour_id>/", TeamTourDetailView.as_view(), name="mobile-tour-team-detail"),
     path("tour/team/<int:tour_id>/action/", TeamTourActionView.as_view(), name="mobile-tour-team-action"),

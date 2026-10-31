@@ -13,6 +13,7 @@ from hrms_app.utility.attendance_mapper import aggregate_attendance_data
 
 OFF_COLOR = "#CCCCCC"
 ABSENT_COLOR = "#FF0000"
+TOUR_COLOR = "#06c1c4"
 
 # Fixed codes produced by the mapper / attendance logs.
 FIXED_LABELS = {

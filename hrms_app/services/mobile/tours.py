@@ -11,6 +11,7 @@ Mobile only:
 """
 from django.conf import settings
 from django.contrib.sites.models import Site
+from django.core import signing
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.db.models import Count, Q
@@ -34,6 +35,8 @@ DELETE_PERMISSION = "hrms_app.delete_usertour"
 EDITABLE = {settings.PENDING}
 CANCELLABLE = {settings.APPROVED, settings.EXTENDED}
 REREQUESTABLE = {settings.APPROVED, settings.REJECTED}
+PDF_SALT = "mobile-tour-pdf"
+PDF_LINK_SECONDS = 60 * 60
 
 # Status filter values the app sends -> statuses they cover.
 STATUS_GROUPS = {
@@ -53,6 +56,14 @@ _REQUIRED = {
     "end_time": "Select the end time.",
     "remarks": "Enter the remark & objectives.",
 }
+
+
+def tour_from_pdf_token(token):
+    """The tour of a signed PDF link, or None once it has expired."""
+    try:
+        return UserTour.objects.filter(pk=signing.loads(token, salt=PDF_SALT, max_age=PDF_LINK_SECONDS)).first()
+    except signing.BadSignature:
+        return None
 
 
 def tour_lock(tour):
@@ -105,7 +116,7 @@ def tour_detail(user, tour, build_url):
         **tour_item(user, tour),
         "last_change": _last_change(tour),
         "approver": _person(tour.applied_by.reports_to),
-        "pdf_url": build_url(reverse("generate_tour_pdf", kwargs={"slug": tour.slug})),
+        "pdf_url": build_url(reverse("mobile-tour-pdf", kwargs={"token": signing.dumps(tour.pk, salt=PDF_SALT)})),
         "logs": [
             {
                 "action": log.action or "",

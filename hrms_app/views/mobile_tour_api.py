@@ -1,6 +1,6 @@
 """Tour endpoints for the mobile app (JWT auth)."""
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 
 from django.utils import timezone
@@ -10,6 +10,7 @@ from hrms_app.services import tour_approval
 from hrms_app.services.leave_approval import is_leave_reviewer
 from hrms_app.services.mobile import team_tours, tours
 from hrms_app.views.mobile_leave_api import _error, _int_param
+from hrms_app.views.tour_views import render_tour_pdf
 
 _NOT_FOUND = {"__all__": ["Tour not found."]}
 
@@ -138,6 +139,20 @@ class MyTourRerequestView(APIView):
             "Tour sent for approval again.",
             tours.tour_detail(request.user, tour, request.build_absolute_uri),
         )
+
+
+class TourPdfView(APIView):
+    """GET /api/v1/tour/pdf/<token>/ - the app opens the PDF in the browser,
+    which has no login, so the detail payload gives a short-lived signed link."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, token):
+        tour = tours.tour_from_pdf_token(token)
+        if tour is None:
+            return _error({"__all__": ["This link has expired. Open the tour again."]}, status.HTTP_404_NOT_FOUND)
+        return render_tour_pdf(request, tour)
 
 
 class _ReviewerView(APIView):

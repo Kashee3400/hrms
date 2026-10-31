@@ -1,7 +1,7 @@
 from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils.timezone import now
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework.views import APIView
 from hrms_app.hrms.serializers import *
 from rest_framework import status
@@ -892,7 +892,7 @@ class UpdateNotificationStatusView(UpdateAPIView):
 
 class UserTourViewSet(viewsets.ModelViewSet):
     serializer_class = UserTourSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAdminUser]
     lookup_field = "id"
 
     def create(self, request, *args, **kwargs):

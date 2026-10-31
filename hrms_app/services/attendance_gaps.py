@@ -46,6 +46,7 @@ from hrms_app.tasks import HR_EMAIL, send_leave_application_email
 MODE_KEY = "ATTENDANCE_GAP_ENGINE"
 START_KEY = "ATTENDANCE_GAP_START"
 EXCLUDE_KEY = "ATTENDANCE_GAP_EXCLUDE"
+LAST_RUN_KEY = "ATTENDANCE_GAP_LAST_RUN"
 LIMIT_KEY = "CL_SL_WORKING_DAY_LIMIT"
 DEFAULT_LIMIT = 4
 LOOKBACK_DAYS = 7
@@ -422,4 +423,34 @@ def scan(today=None):
     }
     if mode == "report" or missing_sync:
         _report_to_hr(today, found, missing_sync, mode)
+    _mark_run(today)
     return {"mode": mode, "employees": len(found), "reminders": reminders}
+
+
+def _mark_run(today):
+    AppSetting.objects.update_or_create(
+        key=LAST_RUN_KEY, defaults={"value": today.isoformat(), "beyond_policy": False}
+    )
+
+
+def alert_admins(text):
+    """Tells the superusers in the app and HR by mail that the engine needs a look."""
+    superusers = list(get_user_model().objects.filter(is_active=True, is_superuser=True))
+    for admin in superusers:
+        Notification.objects.create(
+            sender=admin,
+            receiver=admin,
+            message=text,
+            notification_type=settings.ATTENDANCE_REGULARISATION,
+            target_url="/",
+        )
+    _queue_mail("Attendance reminder engine alert", text, HR_EMAIL)
+
+
+def check_health(today=None):
+    """Later in the morning: did today's scan run? Returns True when fine."""
+    today = today or timezone.localdate()
+    if engine_mode() == "off" or _start_date() is None or _setting(LAST_RUN_KEY) == today.isoformat():
+        return True
+    alert_admins(f"The attendance reminder scan did not run on {today:%d %b %Y}. Please check the server.")
+    return False

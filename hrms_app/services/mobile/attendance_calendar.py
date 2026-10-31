@@ -111,7 +111,7 @@ def _tour_events(user, start, end):
                     "title": f"{tour.from_destination} → {tour.to_destination}",
                     "subtitle": f"{tour.start_date:%d %b} – {tour_end:%d %b}",
                     "status": tour.status,
-                    "color": "#06c1c4",
+                    "color": codes_mod.TOUR_COLOR,
                 }
             )
     return events

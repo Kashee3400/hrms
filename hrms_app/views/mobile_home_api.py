@@ -18,7 +18,7 @@ class HomeSummaryAPIView(APIView):
 
     def get(self, request):
         try:
-            data = get_home_summary(request.user)
+            data = get_home_summary(request.user, request.build_absolute_uri)
         except Exception:
             logger.exception("home summary failed for user %s", request.user.pk)
             return create_response("error", "Could not load home summary.", status_code=500)

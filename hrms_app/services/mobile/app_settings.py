@@ -12,8 +12,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils import timezone
 
-from hrms_app.models import AppSetting, LeaveType
-from hrms_app.services.attendance_gaps import EXCLUDE_KEY, LIMIT_KEY, MODE_KEY, START_KEY
+from hrms_app.models import AllowedUserExpiry, AppSetting, LeaveType
+from hrms_app.services.attendance_gaps import EXCLUDE_KEY, LAST_RUN_KEY, LIMIT_KEY, MODE_KEY, START_KEY
 from hrms_app.services.mobile.formatters import employee_code_label
 
 NUMBER, CHOICE, DATE, TEXT = "number", "choice", "date", "text"
@@ -56,12 +56,18 @@ SETTINGS = {
 CHOICES = {MODE_KEY: ["off", "report", "live"]}
 
 
-def _employee(user):
+def _employee(user, until=None):
     return {
         "id": user.pk,
         "name": user.get_full_name() or user.username,
         "code": employee_code_label(user.username),
+        "until": until.isoformat() if until else None,
     }
+
+
+def _allowed(row):
+    until = {item.user_id: item.expires_on for item in row.user_expiries.all()}
+    return [_employee(user, until.get(user.pk)) for user in row.allowed_users.all()]
 
 
 def _payload(key, row):
@@ -76,19 +82,21 @@ def _payload(key, row):
         "value": row.value if row else "",
         "has_policy": has_policy,
         "beyond_policy": row.beyond_policy if row else False,
-        "allowed_users": [_employee(user) for user in row.allowed_users.all()] if row and has_policy else [],
+        "allowed_users": _allowed(row) if row and has_policy else [],
         "updated_at": row.updated_at.isoformat() if row else None,
     }
 
 
 def get_settings():
-    rows = {row.key: row for row in AppSetting.objects.prefetch_related("allowed_users")}
+    rows = {row.key: row for row in AppSetting.objects.prefetch_related("allowed_users", "user_expiries")}
+    last_run = rows.pop(LAST_RUN_KEY, None)
     keys = [*SETTINGS, *sorted(key for key in rows if key not in SETTINGS)]
     users = get_user_model().objects.filter(is_active=True).order_by("first_name", "last_name")
     return {
         "settings": [_payload(key, rows.get(key)) for key in keys],
         "employees": [_employee(user) for user in users],
         "el_policy": get_el_policy(),
+        "engine_last_run": last_run.value if last_run else None,
     }
 
 
@@ -110,6 +118,31 @@ def _clean_value(key, value):
     if key == MODE_KEY and value != "off" and not _has_start_date():
         return None, "Set 'Reminders Start From' first."
     return value, None
+
+
+def _clean_until(data, adding):
+    """Returns (date, error). New employees must have an end date."""
+    raw = str(data.get("allowed_until") or "").strip()
+    if not adding:
+        return None, None
+    try:
+        until = date.fromisoformat(raw)
+    except ValueError:
+        return None, "Select the Allowed Until date."
+    return (None, "Allowed Until can't be in the past.") if until < timezone.localdate() else (until, None)
+
+
+def _save_allowed(row, wanted_ids, until):
+    wanted = set(
+        get_user_model().objects.filter(pk__in=wanted_ids, is_active=True).values_list("pk", flat=True)
+    )
+    current = set(row.allowed_users.values_list("pk", flat=True))
+    row.allowed_users.set(wanted)
+    row.user_expiries.exclude(user_id__in=wanted).delete()
+    for user_id in wanted - current:
+        AllowedUserExpiry.objects.update_or_create(
+            setting=row, user_id=user_id, defaults={"expires_on": until}
+        )
 
 
 def _has_start_date():
@@ -144,6 +177,12 @@ def update_setting(actor, key, data):
         return None, error
 
     has_policy = SETTINGS.get(key, (0, 0, 0, 0, True))[4]
+    wanted_ids = data.get("allowed_users") or []
+    current_ids = set(row.allowed_users.values_list("pk", flat=True)) if row else set()
+    until, error = _clean_until(data, adding=has_policy and bool(set(wanted_ids) - current_ids))
+    if error:
+        return None, error
+
     with transaction.atomic():
         created = row is None
         old_value = row.value if row else ""
@@ -155,9 +194,7 @@ def update_setting(actor, key, data):
             row.beyond_policy = bool(data.get("beyond_policy"))
         row.save()
         if has_policy:
-            row.allowed_users.set(
-                get_user_model().objects.filter(pk__in=data.get("allowed_users") or [], is_active=True)
-            )
+            _save_allowed(row, wanted_ids, until)
         _log(actor, row, old_value, created)
     return _payload(key, row), None
 

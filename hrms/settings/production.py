@@ -68,6 +68,14 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'hrms_app.tasks.scan_attendance_gaps',
         'schedule': crontab(minute=30, hour=9, day_of_week='mon-sat'),
     },
+    'check_attendance_gap_engine': {
+        'task': 'hrms_app.tasks.check_attendance_gap_engine',
+        'schedule': crontab(minute=0, hour=11, day_of_week='mon-sat'),
+    },
+    'remove_expired_allowed_users': {
+        'task': 'hrms_app.tasks.remove_expired_allowed_users',
+        'schedule': crontab(minute=15, hour=0),
+    },
     'send_reminder_email': {
     'task': 'hrms_app.tasks.send_reminder_email',
     'schedule': crontab(minute=0, hour=10, day_of_month='18-25'),

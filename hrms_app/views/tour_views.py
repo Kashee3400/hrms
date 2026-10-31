@@ -358,22 +358,25 @@ class TourApplicationUpdateView(ModelPermissionRequiredMixin, UpdateView):
 #             messages.warning(request, "Extension request rejected.")
 #         return redirect("tour_application_detail", slug=extension_request.tour.slug)
     
-class GenerateTourPDFView(View):
+def render_tour_pdf(request, tour_details):
+    logo = Logo.objects.all().first()
+    context = {
+        "object": tour_details,
+        "logo": logo,
+    }
+    html_template = "pdf/tour_details_pdf.html"
+    html_content = render_to_string(html_template, context, request=request)
+    pdf_file = HTML(
+        string=html_content, base_url=request.build_absolute_uri()
+    ).write_pdf()
+    response = HttpResponse(pdf_file, content_type="application/pdf")
+    response["Content-Disposition"] = 'inline; filename="tour_details.pdf"'
+    return response
+
+
+class GenerateTourPDFView(TourPermissionMixin, View):
     def get(self, request, slug):
-        tour_details = get_object_or_404(UserTour, slug=slug)
-        logo = Logo.objects.all().first()
-        context = {
-            "object": tour_details,
-            "logo": logo,
-        }
-        html_template = "pdf/tour_details_pdf.html"
-        html_content = render_to_string(html_template, context, request=request)
-        pdf_file = HTML(
-            string=html_content, base_url=request.build_absolute_uri()
-        ).write_pdf()
-        response = HttpResponse(pdf_file, content_type="application/pdf")
-        response["Content-Disposition"] = 'inline; filename="tour_details.pdf"'
-        return response
+        return render_tour_pdf(request, self.get_tour_application(slug))
 
 
 class UploadBillView(LoginRequiredMixin, UserPassesTestMixin, FormView):

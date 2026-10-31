@@ -152,11 +152,37 @@ def send_approval_mail(subject, body, to, cc, reply_to):
 @shared_task
 def scan_attendance_gaps():
     """Daily, after the night's attendance sync."""
-    from .services.attendance_gaps import scan
+    from .services.attendance_gaps import alert_admins, scan
 
-    result = scan()
+    try:
+        result = scan()
+    except Exception as exc:
+        logger.exception("Attendance gap scan failed")
+        alert_admins(f"The attendance reminder scan failed: {exc}")
+        raise
     logger.info("Attendance gap scan: %s", result)
     return result
+
+
+@shared_task
+def check_attendance_gap_engine():
+    """Daily, after the scan: alerts if it never ran."""
+    from .services.attendance_gaps import check_health
+
+    return check_health()
+
+
+@shared_task
+def remove_expired_allowed_users():
+    """Ends the time-limited exceptions given from the app's settings."""
+    expired = AllowedUserExpiry.objects.filter(expires_on__lt=timezone.localdate()).select_related("setting")
+    removed = 0
+    for item in expired:
+        item.setting.allowed_users.remove(item.user_id)
+        item.delete()
+        removed += 1
+    logger.info("Removed %s expired allowed users", removed)
+    return removed
 
 
 def push_notification(user,head,body,url):

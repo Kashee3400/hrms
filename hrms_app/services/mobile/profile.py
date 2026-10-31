@@ -34,6 +34,7 @@ from hrms_app.tasks import send_personal_detail_update_email
 logger = logging.getLogger(__name__)
 
 EDIT_PERMISSION = "hrms_app.change_personaldetails"
+MARRIED = "married"
 MAX_AVATAR_BYTES = 8 * 1024 * 1024
 AVATAR_SIDE = 800
 ADDRESS_FIELDS = ("address_line_1", "address_line_2", "country", "district", "state", "zipcode")
@@ -140,6 +141,12 @@ def _form_errors(form):
     return {name: [str(error) for error in messages] for name, messages in form.errors.items()}
 
 
+def _is_married(status_id):
+    if not str(status_id).isdigit():
+        return False
+    return MaritalStatus.objects.filter(pk=status_id, marital_status__iexact=MARRIED).exists()
+
+
 def update_details(user, data):
     """Same fields as the web's Update Personal Detail form. Returns errors or None."""
     details = user.personal_detail
@@ -150,6 +157,11 @@ def update_details(user, data):
     # the stored values and anything the client sends is ignored.
     fields["official_mobile_number"] = details.official_mobile_number
     fields["designation"] = details.designation_id
+    if _is_married(fields["marital_status"]):
+        if not fields["marriage_ann"]:
+            return {"marriage_ann": ["Select your marriage anniversary date."]}
+    else:
+        fields["marriage_ann"] = ""
     form = EmployeePersonalDetailForm(fields, instance=details)
     if not form.is_valid():
         return _form_errors(form)

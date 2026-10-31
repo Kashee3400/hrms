@@ -18,6 +18,7 @@ from hrms_app.models import (
 from hrms_app.services.leave_approval import is_leave_reviewer, review_queue
 from hrms_app.services.leave_balance_summary import get_dashboard_leave_balances
 from hrms_app.services.mobile import attendance_codes
+from hrms_app.services.mobile.celebrations import get_celebrations
 from hrms_app.services.mobile.formatters import hhmm, iso_date, plain_text, shift_payload
 from hrms_app.services.mobile.recent_activity import get_recent_activity
 from hrms_app.services.tour_approval import review_queue as tour_review_queue
@@ -166,7 +167,7 @@ def _team_pending(user):
     }
 
 
-def get_home_summary(user):
+def get_home_summary(user, build_url=str):
     today = timezone.localdate()
     return {
         "date": today.isoformat(),
@@ -178,6 +179,7 @@ def get_home_summary(user):
         "month_summary": _month_summary(user, today),
         "missing_punches": _missing_punches(user, today),
         "next_holiday": _next_holiday(user, today),
+        "celebrations": get_celebrations(today, build_url),
         "team_pending": _team_pending(user),
         "recent_activity": get_recent_activity(user, today),
         "unread_notifications": Notification.objects.filter(receiver=user, is_read=False).count(),

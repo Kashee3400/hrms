@@ -309,7 +309,7 @@ from datetime import timedelta
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        "hrms_app.jwt_auth.StampedJWTAuthentication",
     ),
     "DEFAULT_FILTER_BACKENDS": ["django_filters.rest_framework.DjangoFilterBackend"],
     # 'DEFAULT_PERMISSION_CLASSES': (
@@ -335,6 +335,7 @@ SIMPLE_JWT = {
     "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
     "TOKEN_TYPE_CLAIM": "token_type",
     "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
+    "TOKEN_OBTAIN_SERIALIZER": "hrms_app.jwt_auth.StampedTokenSerializer",
 }
 
 MONTHS = [
