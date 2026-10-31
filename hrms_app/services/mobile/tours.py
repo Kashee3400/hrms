@@ -23,7 +23,7 @@ from hrms_app.forms.tour_form import TourDateTimeUpdateForm
 from hrms_app.hrms.form import TourForm
 from hrms_app.models import TourDateTimeChangeLog, TourStatusLog, UserTour
 from hrms_app.services import attendance_lock
-from hrms_app.services.mobile.formatters import hhmm, iso_date, plain_text
+from hrms_app.services.mobile.formatters import hhmm, iso_date, plain_text, timeline
 from hrms_app.services.mobile.home_summary import active_tour, tour_payload
 from hrms_app.services.mobile.my_leaves import PAGE_SIZE, _person
 from hrms_app.services.workflow_messages import tour_label
@@ -117,15 +117,17 @@ def tour_detail(user, tour, build_url):
         "last_change": _last_change(tour),
         "approver": _person(tour.applied_by.reports_to),
         "pdf_url": build_url(reverse("mobile-tour-pdf", kwargs={"token": signing.dumps(tour.pk, salt=PDF_SALT)})),
-        "logs": [
-            {
-                "action": log.action or "",
-                "by": log.action_by_name or "",
-                "at": timezone.localtime(log.timestamp).isoformat(),
-                "notes": _log_note(log.comments),
-            }
-            for log in tour.logs.order_by("timestamp")
-        ],
+        "logs": timeline(
+            [
+                {
+                    "action": log.action or "",
+                    "by": log.action_by_name or "",
+                    "at": timezone.localtime(log.timestamp).isoformat(),
+                    "notes": _log_note(log.comments),
+                }
+                for log in tour.logs.order_by("timestamp", "pk")
+            ]
+        ),
     }
 
 

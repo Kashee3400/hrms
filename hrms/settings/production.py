@@ -72,6 +72,10 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'hrms_app.tasks.check_attendance_gap_engine',
         'schedule': crontab(minute=0, hour=11, day_of_week='mon-sat'),
     },
+    'send_approval_reminders': {
+        'task': 'hrms_app.tasks.send_approval_reminders',
+        'schedule': crontab(minute=30, hour=10, day_of_week='mon-sat'),
+    },
     'remove_expired_allowed_users': {
         'task': 'hrms_app.tasks.remove_expired_allowed_users',
         'schedule': crontab(minute=15, hour=0),
@@ -84,17 +88,8 @@ CELERY_BEAT_SCHEDULE = {
         'task': 'hrms_app.tasks.backup_database',
         'schedule': crontab(minute=0, hour=3),    
         },
-        'calculate-daily-attendance-cache': {
-        'task': 'myapp.tasks.calculate_daily_attendance_cache',
-        'schedule': crontab(hour=2, minute=0),  # Run at 2:00 AM daily
-        'args': (1,)  # Process yesterday's data
-    },
-    'recalculate-monthly-attendance': {
-        'task': 'myapp.tasks.recalculate_monthly_attendance_cache',
-        'schedule': crontab(hour=3, minute=0, day_of_month=1),
-    },
-    "refresh-short-leave-monthly": {
-        "task": "leave.tasks.refresh_short_leave_task",
+    "accrue-monthly-short-leave": {
+        "task": "hrms_app.tasks.accrue_monthly_short_leave",
         "schedule": crontab(
             minute=5,
             hour=0,

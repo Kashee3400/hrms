@@ -12,7 +12,12 @@ from hrms_app.models import AttendanceGap, AttendanceStatusColor, LeaveApplicati
 from hrms_app.services import tour_approval
 from hrms_app.services.mobile.attendance_codes import ABSENT_COLOR, TOUR_COLOR
 from hrms_app.services.mobile.my_leaves import PAGE_SIZE
-from hrms_app.services.notification_push import ATTENDANCE_GAPS_ROUTE, app_route
+from hrms_app.services.notification_push import (
+    APPROVALS_ROUTE,
+    APPROVALS_TOURS_ROUTE,
+    ATTENDANCE_GAPS_ROUTE,
+    app_route,
+)
 
 LEAVE, TOUR, ATTENDANCE, OTHER = "leave", "tour", "attendance", "other"
 CATEGORIES = {
@@ -104,6 +109,9 @@ def _item(user, row, leaves, tours, absent_color, has_open_gaps):
         color = absent_color
         route = app_route(row)
         action = kind in GAP_KINDS and has_open_gaps
+    elif row.go_route_mobile in (APPROVALS_ROUTE, APPROVALS_TOURS_ROUTE):
+        # The daily reminder is about the queue, not one record.
+        kind, title, route = "review", "Waiting for Your Decision", app_route(row)
     elif category == OTHER:
         kind, title = "info", "Comp-Off Update" if row.notification_type == settings.CO_STATUS else "Update"
     else:

@@ -150,6 +150,16 @@ def send_approval_mail(subject, body, to, cc, reply_to):
 
 
 @shared_task
+def send_approval_reminders():
+    """Daily: reviewers hear what has been waiting for them."""
+    from .services.approval_reminders import send_approval_reminders as send
+
+    sent = send()
+    logger.info("Approval reminders sent: %s", sent)
+    return sent
+
+
+@shared_task
 def scan_attendance_gaps():
     """Daily, after the night's attendance sync."""
     from .services.attendance_gaps import alert_admins, scan
@@ -579,7 +589,7 @@ def recalculate_monthly_attendance_cache(year, month):
     """
     try:
         from calendar import monthrange
-        
+
         start_date = date(year, month, 1)
         _, last_day = monthrange(year, month)
         end_date = date(year, month, last_day)
@@ -612,6 +622,12 @@ def refresh_short_leave_task(self):
     """
     system_user = User.objects.filter(is_superuser=True).first()
     refresh_monthly_short_leave(system_user=system_user)
+
+
+@shared_task
+def accrue_monthly_short_leave():
+    """First of the month: this month's balance rows. Rows already there stay as they are."""
+    call_command("accrue_short_leave")
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)

@@ -17,7 +17,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from hrms_app.hrms.utils import call_soap_api
-from hrms_app.models import AttendanceStatusColor, DeviceInformation
+from hrms_app.models import AttendanceLog, AttendanceStatusColor, DeviceInformation
 from hrms_app.services.mobile.attendance_calendar import get_month_calendar
 from hrms_app.services.mobile.attendance_codes import LeaveCodes, classify, day_codes
 from hrms_app.services.mobile.formatters import employee_code_label, iso_date
@@ -111,12 +111,25 @@ def get_team_today(user):
     }
 
 
+def _missing_punches(users, start, end):
+    """{user id: days with no punch-out}, same flag as the employee's calendar."""
+    found = defaultdict(set)
+    logs = AttendanceLog.objects.filter(
+        applied_by__in=users, reg_status=settings.MIS_PUNCHING, start_date__date__range=[start, end]
+    ).values_list("applied_by_id", "start_date")
+    for user_id, punched_at in logs:
+        found[user_id].add(timezone.localtime(punched_at).date())
+    return found
+
+
 def get_team_month(user, year, month, build_url):
     today = timezone.localdate()
     start, end = date(year, month, 1), date(year, month, calendar.monthrange(year, month)[1])
     team = list(reportees(user))
     shows_today = start <= today <= end
     punched = _punched_today(team, today)[0] if shows_today else set()
+    leave_codes = LeaveCodes.load()
+    missing = _missing_punches([user, *team], start, end)
     present_color = (
         AttendanceStatusColor.objects.filter(status=settings.PRESENT).values_list("color_hex", flat=True).first()
     )
@@ -127,7 +140,15 @@ def get_team_month(user, year, month, build_url):
         for day, (code, color) in sorted(codes.items()):
             if day == today and member.pk in punched and not code:
                 code, color = "P", present_color
-            days.append({"date": iso_date(day), "code": code, "color": color})
+            days.append(
+                {
+                    "date": iso_date(day),
+                    "code": code,
+                    "color": color,
+                    "category": classify(code, leave_codes) if code else None,
+                    "missing_punch": day in missing[member.pk],
+                }
+            )
         return {**_member(member, build_url, is_self=is_self), "days": days}
 
     return {

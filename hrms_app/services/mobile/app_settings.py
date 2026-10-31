@@ -13,6 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from hrms_app.models import AllowedUserExpiry, AppSetting, LeaveType
+from hrms_app.services.approval_reminders import REMINDER_DAYS_KEY
 from hrms_app.services.attendance_gaps import EXCLUDE_KEY, LAST_RUN_KEY, LIMIT_KEY, MODE_KEY, START_KEY
 from hrms_app.services.mobile.formatters import employee_code_label
 
@@ -49,6 +50,13 @@ SETTINGS = {
         "Excluded Employees",
         "Employee codes that get no reminders, separated by commas. Example: KMPCL-000, KMPCL-012",
         TEXT,
+        REMINDERS,
+        False,
+    ),
+    REMINDER_DAYS_KEY: (
+        "Approval Reminder",
+        "Working days a request can wait before its reviewer is reminded each day. 0 switches this off.",
+        NUMBER,
         REMINDERS,
         False,
     ),

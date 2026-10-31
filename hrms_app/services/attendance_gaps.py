@@ -294,14 +294,21 @@ def _email_of(user):
     return user.official_email or user.email
 
 
-def _notify(receiver, sender, text, subject):
+def _notify(
+    receiver,
+    sender,
+    text,
+    subject,
+    route=ATTENDANCE_GAPS_ROUTE,
+    notification_type=settings.ATTENDANCE_REGULARISATION,
+):
     Notification.objects.create(
         sender=sender,
         receiver=receiver,
         message=text,
-        notification_type=settings.ATTENDANCE_REGULARISATION,
+        notification_type=notification_type,
         target_url="/",
-        go_route_mobile=ATTENDANCE_GAPS_ROUTE,
+        go_route_mobile=route,
     )
     email = _email_of(receiver)
     if email:
@@ -450,7 +457,10 @@ def alert_admins(text):
 def check_health(today=None):
     """Later in the morning: did today's scan run? Returns True when fine."""
     today = today or timezone.localdate()
-    if engine_mode() == "off" or _start_date() is None or _setting(LAST_RUN_KEY) == today.isoformat():
+    go_live = _start_date()
+    if engine_mode() == "off" or go_live is None or _setting(LAST_RUN_KEY) == today.isoformat():
+        return True
+    if today <= go_live:  # scan() only looks at days after go-live begins
         return True
     alert_admins(f"The attendance reminder scan did not run on {today:%d %b %Y}. Please check the server.")
     return False

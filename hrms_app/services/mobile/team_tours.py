@@ -13,6 +13,7 @@ from django.db.models import Q
 
 from hrms_app.services import tour_approval
 from hrms_app.services.mobile.team_leaves import _applicant
+from hrms_app.services.mobile.team_out import team_out
 from hrms_app.services.mobile.tours import PAGE_SIZE, STATUS_GROUPS, tour_detail, tour_item, tour_lock
 
 DECIDE_ACTIONS = [(settings.APPROVED, "Approve"), (settings.REJECTED, "Reject")]
@@ -89,6 +90,11 @@ def team_tour_detail(reviewer, tour, build_url):
         "allowed_actions": [{"status": value, "label": label} for value, label in actions],
         "waiting_note": (
             "Waiting for the reporting manager's decision." if waiting and not actions else None
+        ),
+        "team_out": (
+            team_out(reviewer, tour.applied_by, tour.start_date, tour.extended_end_date or tour.end_date)
+            if tour.status in (settings.PENDING, settings.EXTENDED)
+            else None
         ),
     }
 

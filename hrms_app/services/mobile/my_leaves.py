@@ -14,7 +14,7 @@ from django.utils import timezone
 from hrms_app.models import LeaveApplication, LeaveLog
 from hrms_app.services import attendance_lock
 from hrms_app.services.leave_service import LeaveDomainService
-from hrms_app.services.mobile.formatters import employee_code_label, hhmm, iso_date
+from hrms_app.services.mobile.formatters import employee_code_label, hhmm, iso_date, timeline
 from hrms_app.services.mobile.formatters import plain_text as _plain
 from hrms_app.services.mobile.home_summary import comp_off_payload, leave_balances_payload
 from hrms_app.services.mobile.leave_apply import applied_leave_days
@@ -177,15 +177,17 @@ def leave_detail(user, leave, build_url):
                 else None
             ),
             "days": applied_leave_days(leave),
-            "logs": [
-                {
-                    "action": log.action,
-                    "by": log.action_by_name,
-                    "at": timezone.localtime(log.timestamp).isoformat(),
-                    "notes": _plain(log.notes),
-                }
-                for log in leave.logs.order_by("timestamp")
-            ],
+            "logs": timeline(
+                [
+                    {
+                        "action": log.action,
+                        "by": log.action_by_name,
+                        "at": timezone.localtime(log.timestamp).isoformat(),
+                        "notes": _plain(log.notes),
+                    }
+                    for log in leave.logs.order_by("timestamp", "pk")
+                ]
+            ),
         }
     )
     return data

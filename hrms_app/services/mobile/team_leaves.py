@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from hrms_app.services import leave_approval
 from hrms_app.services.mobile.formatters import employee_code_label
+from hrms_app.services.mobile.team_out import team_out
 from hrms_app.services.leave_service import LeaveDomainService
 from hrms_app.services.mobile.my_leaves import (
     PAGE_SIZE,
@@ -108,6 +109,16 @@ def team_leave_detail(reviewer, leave, build_url):
         "applicant_balance": record.remaining_leave_balances if record else None,
         "allowed_actions": [{"status": value, "label": label} for value, label in actions],
         "waiting_note": None if actions else _waiting_note(leave),
+        "team_out": (
+            team_out(
+                reviewer,
+                leave.appliedBy,
+                timezone.localtime(leave.startDate).date(),
+                timezone.localtime(leave.endDate).date(),
+            )
+            if leave.status in (settings.PENDING, settings.RECOMMEND)
+            else None
+        ),
     }
 
 

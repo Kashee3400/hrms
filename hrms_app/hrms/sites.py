@@ -5,14 +5,11 @@ from ..views.attendance_view import BulkAttendanceView, AttendancePreviewAjaxVie
     AttendanceStatsAjaxView
 from ..views.leave_bulk import BulkLeaveCreateView,BulkLeaveHistoryView
 from ..views.leave_bulk import LeaveBalanceInitializerView
-# from ..views.apply_leave import ApplyOrUpdateLeaveView
 from ..views.tour_views import (
     ApplyTourView,
     TourApplicationDetailView,
     TourApplicationUpdateView,
     TourTrackerView,GenerateTourPDFView,
-    # TourExtensionRequestCreateView,
-    # TourExtensionRequestReviewView
     )
 class CustomSite:
     def __init__(self):

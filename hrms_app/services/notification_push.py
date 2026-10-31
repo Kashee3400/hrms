@@ -17,6 +17,10 @@ _TYPES = {
 # The app's list of days to act on; stored in Notification.go_route_mobile.
 ATTENDANCE_GAPS_ROUTE = "/attendance/gaps"
 
+# A reviewer's queue, for the daily reminder.
+APPROVALS_ROUTE = "/approvals"
+APPROVALS_TOURS_ROUTE = "/approvals?tab=tours"
+
 # Reviewer-side screens for the same records (see the app's AppRoutes).
 _REVIEW_PREFIXES = {
     settings.LEAVE_STATUS: "/approvals/leaves",
@@ -36,8 +40,8 @@ def app_route(notification):
     The applicant opens their own application; anyone else (the manager)
     opens the review screen, which has the approve/reject actions.
     """
-    if notification.go_route_mobile == ATTENDANCE_GAPS_ROUTE:
-        return ATTENDANCE_GAPS_ROUTE
+    if notification.go_route_mobile in (ATTENDANCE_GAPS_ROUTE, APPROVALS_ROUTE, APPROVALS_TOURS_ROUTE):
+        return notification.go_route_mobile
     _, _, prefix = _TYPES.get(notification.notification_type, (None, None, None))
     if prefix is None:
         return "/notifications"
