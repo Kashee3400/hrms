@@ -4,7 +4,13 @@ from hrms_app.views.leave_balance_view import ForwardLeaveBalanceView,CreditELLe
 from hrms_app.views.mobile_home_api import HomeSummaryAPIView, HomeTodayAPIView
 from hrms_app.views.mobile_device_api import DeviceTokenView, DeviceTokenDetailView
 from hrms_app.views.mobile_app_api import AppVersionAPIView
-from hrms_app.views.mobile_attendance_api import AttendanceCalendarView, HolidayListView
+from hrms_app.views.mobile_attendance_api import (
+    AttendanceCalendarView,
+    HolidayListView,
+    TeamMemberDayView,
+    TeamMonthView,
+    TeamTodayView,
+)
 from hrms_app.views.mobile_leave_api import (
     LeaveApplyOptionsView,
     LeaveApplyView,
@@ -119,6 +125,9 @@ urlpatterns = [
     path("app-settings/el-policy/", ElPolicyView.as_view(), name="mobile-app-settings-el-policy"),
     path("app-settings/<str:key>/", AppSettingDetailView.as_view(), name="mobile-app-setting-detail"),
     path("attendance/gaps/", AttendanceGapListView.as_view(), name="mobile-attendance-gaps"),
+    path("attendance/team/", TeamMonthView.as_view(), name="mobile-team-month"),
+    path("attendance/team/today/", TeamTodayView.as_view(), name="mobile-team-today"),
+    path("attendance/team/<int:member_id>/day/", TeamMemberDayView.as_view(), name="mobile-team-member-day"),
     path("approval-mail/preview/", ApprovalMailPreviewView.as_view(), name="mobile-approval-mail-preview"),
     path("approval-mail/send/", ApprovalMailSendView.as_view(), name="mobile-approval-mail-send"),
     path("profile/", ProfileView.as_view(), name="mobile-profile"),
