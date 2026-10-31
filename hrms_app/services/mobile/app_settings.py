@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
 from django.utils import timezone
 
-from hrms_app.models import AppSetting
+from hrms_app.models import AppSetting, LeaveType
 from hrms_app.services.attendance_gaps import EXCLUDE_KEY, LIMIT_KEY, MODE_KEY, START_KEY
 from hrms_app.services.mobile.formatters import employee_code_label
 
@@ -88,6 +88,7 @@ def get_settings():
     return {
         "settings": [_payload(key, rows.get(key)) for key in keys],
         "employees": [_employee(user) for user in users],
+        "el_policy": get_el_policy(),
     }
 
 
@@ -159,3 +160,89 @@ def update_setting(actor, key, data):
             )
         _log(actor, row, old_value, created)
     return _payload(key, row), None
+
+
+# ─────────────────────────────────────────────────────────────
+# EL policy (fields of the EL LeaveType row)
+# ─────────────────────────────────────────────────────────────
+
+EL_CODE = "EL"
+
+
+def _el_type():
+    return LeaveType.objects.filter(leave_type_short_code=EL_CODE).first()
+
+
+def _el_policy(el):
+    return {
+        "allow_half_day": el.allow_half_day,
+        "half_day_value": el.half_day_value,
+        "min_days_limit": el.min_days_limit,
+        "min_notice_days": el.min_notice_days,
+        "restricted_after": list(el.restricted_after_leave_types.values_list("pk", flat=True)),
+        # EL's list says what can't follow EL. What stops EL itself is on these.
+        "blocked_by": list(
+            LeaveType.objects.filter(restricted_after_leave_types=el).values_list(
+                "leave_type_short_code", flat=True
+            )
+        ),
+        "leave_types": [
+            {"id": item.pk, "code": item.leave_type_short_code}
+            for item in LeaveType.objects.order_by("leave_type_short_code")
+        ],
+    }
+
+
+def get_el_policy():
+    el = _el_type()
+    return _el_policy(el) if el else None
+
+
+def _number(data, name, label, *, required=False):
+    """Returns (value or None, error). Blank switches an optional rule off."""
+    raw = data.get(name)
+    if raw in (None, ""):
+        return None, f"Enter {label}." if required else None
+    try:
+        value = float(raw)
+    except (TypeError, ValueError):
+        return None, f"Enter a valid number for {label}."
+    return (None, f"{label} can't be negative.") if value < 0 else (value, None)
+
+
+def update_el_policy(actor, data):
+    """Returns (payload, error message). Applies to new applications at once."""
+    el = _el_type()
+    if el is None:
+        return None, "EL leave type not found."
+    half_value, error = _number(data, "half_day_value", "half day value", required=True)
+    if not error and not 0 < half_value <= 1:
+        error = "Half day value must be between 0 and 1."
+    min_days, days_error = _number(data, "min_days_limit", "min days limit")
+    notice, notice_error = _number(data, "min_notice_days", "min notice days")
+    error = error or days_error or notice_error
+    if error:
+        return None, error
+
+    before = _el_policy(el)
+    with transaction.atomic():
+        el.allow_half_day = bool(data.get("allow_half_day"))
+        el.half_day_value = half_value
+        el.min_days_limit = min_days
+        el.min_notice_days = notice
+        el.save()
+        el.restricted_after_leave_types.set(
+            LeaveType.objects.filter(pk__in=data.get("restricted_after") or [])
+        )
+        after = _el_policy(el)
+        changes = {key: (before[key], after[key]) for key in after if before[key] != after[key]}
+        LogEntry.objects.create(
+            user_id=actor.pk,
+            content_type_id=ContentType.objects.get_for_model(LeaveType).pk,
+            object_id=str(el.pk),
+            object_repr=str(el)[:200],
+            action_flag=CHANGE,
+            change_message=f"EL policy changed from the mobile app: {changes}",
+            action_time=timezone.now(),
+        )
+    return after, None

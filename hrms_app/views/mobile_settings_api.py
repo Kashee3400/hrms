@@ -24,6 +24,19 @@ class AppSettingListView(APIView):
         return create_response("success", "Application settings.", app_settings.get_settings())
 
 
+class ElPolicyView(APIView):
+    """PUT /api/v1/app-settings/el-policy/ {allow_half_day, half_day_value,
+    min_days_limit, min_notice_days, restricted_after}"""
+
+    permission_classes = [IsAuthenticated, IsSuperuser]
+
+    def put(self, request):
+        policy, error = app_settings.update_el_policy(request.user, request.data)
+        if error:
+            return _error({"__all__": [error]}, status.HTTP_400_BAD_REQUEST)
+        return create_response("success", "EL policy saved.", policy)
+
+
 class AppSettingDetailView(APIView):
     """PUT /api/v1/app-settings/<key>/ {value, beyond_policy, allowed_users}"""
 
