@@ -5,7 +5,7 @@
         ],
         "target": {
             "namespace": "android_app",
-            "package_name": "com.kasheemilk.hrms",
+            "package_name": "com.kasheemilk.hr",
             "sha256_cert_fingerprints": [
                 "5E:2F:BD:12:CF:E4:94:F3:93:31:3C:16:0F:2E:F5:36:83:01:D8:6A:FC:DD:DC:C0:2D:D7:01:41:56:11:C8:09",
                 "63:51:2F:FE:D3:22:71:47:86:27:2C:1E:A4:13:D1:C4:C5:49:77:82:0E:C1:89:26:CF:66:1E:A1:E0:6C:5C:E9",

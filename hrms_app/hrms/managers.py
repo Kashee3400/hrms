@@ -64,8 +64,8 @@ class AttendanceStatusHandler:
             rfrom_date,
             rto_date,
             reg_duration,
+            None,
             att_status_short_code,
-            None
         )
     def _is_late_coming(self, login_date_time, logout_date_time):
         return login_date_time.time() > self.user_shift.grace_start_time and (   #  10:00 > 9:45  

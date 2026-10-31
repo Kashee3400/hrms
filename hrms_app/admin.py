@@ -424,7 +424,7 @@ class AttendanceLogAdmin(admin.ModelAdmin):
             AttendanceLogHistory.objects.create(
                 attendance_log=obj,
                 previous_data=make_json_serializable(model_to_dict(obj)),
-                modified_by=obj.applied_by,
+                modified_by=request.user,
             )
             log_start_date = localtime(obj.start_date)
             user_expected_logout_time = log_start_date + timedelta(
@@ -438,6 +438,11 @@ class AttendanceLogAdmin(admin.ModelAdmin):
                 obj.end_date = user_expected_logout_time
             obj.save()
             
+            # Late coming moves the start, so everything below uses the new one.
+            log_start_date = localtime(obj.start_date)
+            user_expected_logout_time = log_start_date + timedelta(
+                hours=static_data["asettings"].full_day_hours
+            )
             log_end_date = localtime(obj.end_date)
             total_duration = log_end_date - log_start_date
             

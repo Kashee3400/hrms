@@ -779,7 +779,7 @@ class TourForm(forms.ModelForm):
             attendance_log__regularized=True
         ).select_related('attendance_log').order_by('-id').first()
 
-        if history:
+        if history and history.previous_data.get("from_date") and history.previous_data.get("to_date"):
             data = history.previous_data
             from_date = localtime(at.str_to_date(data["from_date"])) 
             to_date = localtime(at.str_to_date(data["to_date"]))

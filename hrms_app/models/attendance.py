@@ -273,6 +273,10 @@ class AttendanceLogHistory(models.Model):
         Reverts the associated AttendanceLog to the state in previous_data.
         Handles foreign key relationships correctly by assigning the instances.
         """
+        if not self.previous_data.get("start_date"):
+            self.attendance_log.delete()
+            return
+
         for field, value in self.previous_data.items():
             # If the field is a ForeignKey, assign the actual instance, not just the ID
             try:

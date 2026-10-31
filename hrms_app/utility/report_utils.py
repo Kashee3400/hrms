@@ -249,7 +249,8 @@ def process_sundays_and_holidays(
                     }
 
 from datetime import datetime, timedelta
-from django.utils.timezone import localtime, make_aware, utc
+from django.utils.dateparse import parse_datetime
+from django.utils.timezone import localtime
 
 
 def process_logs(logs, monthly_presence_data, converted_from_datetime, converted_to_datetime):
@@ -305,7 +306,7 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
     # ----------------------------------
     for log in logs:
         emp_code = log.applied_by.personal_detail.employee_code
-        log_date = log.start_date.date()
+        log_date = localtime(log.start_date).date()
         date_key = log_date.strftime("%Y-%m-%d")
         is_backend_reg = log.regularized_backend
 
@@ -320,34 +321,16 @@ def process_logs(logs, monthly_presence_data, converted_from_datetime, converted
         # ----------------------------------
         if history:
             prev = history.previous_data
+            in_time = out_time = ""
 
-            parsed_in_time = datetime.strptime(
-                prev["start_date"], "%Y-%m-%dT%H:%M:%SZ"
-            )
-            parsed_out_time = datetime.strptime(
-                prev["end_date"], "%Y-%m-%dT%H:%M:%SZ"
-            )
-
-            parsed_in_time = (
-                make_aware(parsed_in_time, timezone=utc)
-                if parsed_in_time.tzinfo is None
-                else parsed_in_time
-            )
-            parsed_out_time = (
-                make_aware(parsed_out_time, timezone=utc)
-                if parsed_out_time.tzinfo is None
-                else parsed_out_time
-            )
-
-            in_time = localtime(parsed_in_time).strftime("%I:%M")
-            out_time = (
-                localtime(parsed_out_time).strftime("%I:%M")
-                if prev.get("reg_status") != "mis punching"
-                else ""
-            )
+            # Marked with no punch at all: nothing to show but the R.
+            if prev.get("start_date"):
+                in_time = localtime(parse_datetime(prev["start_date"])).strftime("%I:%M")
+                if prev.get("reg_status") != "mis punching":
+                    out_time = localtime(parse_datetime(prev["end_date"])).strftime("%I:%M")
 
             status = prev.get("att_status_short_code")
-            duration = prev.get("duration")
+            duration = prev.get("duration") or ""
 
         else:
             in_time = localtime(log.start_date).strftime("%I:%M")
@@ -397,7 +380,7 @@ def process_leaves(leaves, monthly_presence_data):
         )
 
         # Remove OFF/FL only if not CL SL
-        if code != "CL" or code != "SL":
+        if code not in ("CL", "SL"):
             if current_entry and (
                 current_entry.get("sunday", {}).get("status") == "OFF"
                 or current_entry.get("holiday", {}).get("status") == "FL"
@@ -441,7 +424,8 @@ def process_leaves(leaves, monthly_presence_data):
 def process_tours(all_tours, monthly_presence_data,detailed):
     for tour in all_tours:
         daily_durations = calculate_daily_tour_durations(
-            tour.start_date, tour.start_time, tour.extended_end_date or tour.end_date, tour.extended_end_time or tour.end_time,detailed
+            tour.start_date, tour.start_time, tour.extended_end_date or tour.end_date, tour.extended_end_time or tour.end_time,detailed,
+            tour.applied_by_id,
         )
         emp_code = tour.applied_by.personal_detail.employee_code
         for date, short_code, duration in daily_durations:
@@ -469,7 +453,7 @@ def get_office_closers(start_date, end_date):
     )
 
 
-def calculate_daily_tour_durations(start_date, start_time, end_date, end_time,detailed):
+def calculate_daily_tour_durations(start_date, start_time, end_date, end_time,detailed, user_id):
     # Combine date and time into datetime objects
     start_datetime = datetime.combine(start_date, start_time or datetime.min.time())
     end_datetime = datetime.combine(end_date, end_time or datetime.min.time())
@@ -479,7 +463,8 @@ def calculate_daily_tour_durations(start_date, start_time, end_date, end_time,de
     while current_datetime.date() <= end_datetime.date():
         # Calculate the end of the current day
         attendance_log = AttendanceLog.objects.filter(
-            start_date__date=current_datetime.date()
+            applied_by_id=user_id,
+            start_date__date=current_datetime.date(),
         ).first()
         # Initialize log duration
         log_duration = timedelta(hours=0)  # Default duration is 0

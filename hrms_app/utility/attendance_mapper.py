@@ -167,6 +167,7 @@ class AttendanceMapper:
                 log.extended_end_date or log.end_date,
                 log.extended_end_time or log.end_time,
                 detailed,
+                employee_id,
             )
             
             for date, short_code, _ in daily_durations:
