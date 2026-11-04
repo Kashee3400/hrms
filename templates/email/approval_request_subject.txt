@@ -1,0 +1,1 @@
+{% autoescape off %}Approval request: {{ request }} - {{ employee_name }} ({{ employee_code }}){% endautoescape %}

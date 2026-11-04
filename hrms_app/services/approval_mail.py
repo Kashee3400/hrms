@@ -6,9 +6,11 @@ forwards it to the competent authority. The decision stays on email.
 The server builds the mail from its own data on both preview and send, so what
 the employee saw is exactly what goes out.
 """
+import re
 from datetime import date
 
 from django.db import transaction
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from hrms_app.models import ApprovalMail, AttendanceGap
@@ -31,6 +33,7 @@ def _attendance_request(user, data):
         "start": group.start,
         "end": group.end,
         "title": f"{label} on {group.dates_label}",
+        "action": f"update my attendance for {group.dates_label} ({label})",
         "note": (
             "The punch-out was not recorded on this day."
             if group.kind == AttendanceGap.MISSING_PUNCH
@@ -52,6 +55,7 @@ def _leave_request(user, data):
         "start": leave_input.start,
         "end": leave_input.end,
         "title": f"{name} from {leave_input.start:%d %b %Y} to {leave_input.end:%d %b %Y}",
+        "action": f"apply for {name} from {leave_input.start:%d %b %Y} to {leave_input.end:%d %b %Y}",
         "note": " ".join(summary["errors"]),
     }, None
 
@@ -61,13 +65,12 @@ def _tour_request(user, data):
     if note is None:
         return None, "This tour doesn't need an approval mail."
     start, end = _dates(data)
+    route = f"{data.get('from_destination')} to {data.get('to_destination')}"
     return {
         "start": start,
         "end": end,
-        "title": (
-            f"Tour {data.get('from_destination')} to {data.get('to_destination')}, "
-            f"{start:%d %b %Y} to {end:%d %b %Y}"
-        ),
+        "title": f"Tour {route}, {start:%d %b %Y} to {end:%d %b %Y}",
+        "action": f"apply for a tour from {route}, {start:%d %b %Y} to {end:%d %b %Y}",
         "note": note,
     }, None
 
@@ -94,32 +97,26 @@ def _recipients(user):
 
 
 def _compose(user, request, reason):
+    """Subject and body come from templates/email/approval_request_*.txt."""
     to, cc, manager = _recipients(user)
     details = getattr(user, "personal_detail", None)
     designation = getattr(details, "designation", None)
-    name = user.get_full_name() or user.username
-    code = employee_code_label(getattr(details, "employee_code", None) or user.username)
-    greeting = (manager.get_full_name() or manager.username) if manager else "HR Team"
-    lines = [
-        f"Dear {greeting},",
-        "",
-        "Please forward this request to the competent authority for approval.",
-        "",
-        f"Employee: {name} ({code})",
-    ]
-    if designation:
-        lines.append(f"Designation: {designation}")
-    lines += [
-        f"Request: {request['title']}",
-        f"Policy note: {request['note']}",
-        f"Reason: {reason}",
-        "",
-        "Regards,",
-        name,
-    ]
+    context = {
+        "manager_name": (manager.get_full_name() or manager.username) if manager else "HR Team",
+        "reason": reason,
+        "request": request["title"],
+        "action": request["action"],
+        # "7.0 days" -> "7 days"
+        "policy_note": re.sub(r"(\d+)\.0\b", r"\1", request["note"] or "").strip(),
+        "employee_name": user.get_full_name() or user.username,
+        "employee_code": employee_code_label(getattr(details, "employee_code", None) or user.username),
+        "designation": str(designation) if designation else "",
+    }
+    subject = render_to_string("email/approval_request_subject.txt", context)
+    body = render_to_string("email/approval_request_body.txt", context)
     return {
-        "subject": f"Approval request: {request['title']} - {name}",
-        "body": "\n".join(lines),
+        "subject": " ".join(subject.split()),
+        "body": re.sub(r"\n{3,}", "\n\n", body).strip(),
         "to": to,
         "cc": cc,
     }

@@ -1,0 +1,27 @@
+{% autoescape off %}{% comment %}
+The mail an employee sends from the HRMS app when a policy stops their request.
+It goes to their reporting manager, with the employee and HR in copy.
+
+Edit the wording freely; keep the {{ ... }} names as they are:
+  manager_name     the reporting manager, or "HR Team" when there is none
+  reason           what the employee typed, exactly as written
+  request          e.g. "Earned Leave (EL) from 04 Nov 2026 to 04 Nov 2026"
+  action           e.g. "apply for Earned Leave (EL) from 04 Nov 2026 to 04 Nov 2026"
+  policy_note      why HRMS stopped it; may be empty
+  employee_name, employee_code, designation
+{% endcomment %}Dear Sir,
+
+{{ reason }}
+
+I request your approval to {{ action }} in HRMS.{% if policy_note %} HRMS did not allow it because: {{ policy_note }}{% endif %}
+
+I kindly request you to approve it and forward it to the competent authority.
+
+Regards,
+{{ employee_name }}
+{% if designation %}{{ designation }}
+{% endif %}{{ employee_code }}
+
+---
+This mail was sent from HRMS on behalf of {{ employee_name }} ({{ employee_code }}). Reply to this mail to respond to the employee directly.
+{% endautoescape %}
