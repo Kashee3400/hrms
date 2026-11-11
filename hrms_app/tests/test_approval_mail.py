@@ -25,7 +25,7 @@ class ApprovalMailTextTests(MobileTestCase):
         print("\n" + body)
         self.assertTrue(body.startswith(f"Dear Sir,\n\n{REASON}\n\nI request your approval to apply for Earned Leave (EL)"))
         self.assertIn("at least 7 days in advance.", body)
-        self.assertIn("sent from HRMS on behalf of P65 Name (KMPCL-065)", body)
+        self.assertTrue(body.endswith("Regards,\nP65 Name\nExec\nKMPCL-065"))
         self.assertNotIn("\n\n\n", body)
 
     def test_reason_is_not_html_escaped(self):

@@ -179,7 +179,7 @@ def get_home_summary(user, build_url=str):
         "month_summary": _month_summary(user, today),
         "missing_punches": _missing_punches(user, today),
         "next_holiday": _next_holiday(user, today),
-        "celebrations": get_celebrations(today, build_url),
+        "celebrations": get_celebrations(today, build_url, viewer=user),
         "team_pending": _team_pending(user),
         "recent_activity": get_recent_activity(user, today),
         "unread_notifications": Notification.objects.filter(receiver=user, is_read=False).count(),

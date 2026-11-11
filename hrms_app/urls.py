@@ -43,6 +43,7 @@ from hrms_app.views.mobile_profile_api import (
     ProfileView,
 )
 from hrms_app.views.mobile_attendance_mark_api import AttendanceMarkView
+from hrms_app.views.mobile_celebration_api import CelebrationWishView, MyWishesView
 from hrms_app.views.mobile_settings_api import AppSettingDetailView, AppSettingListView, ElPolicyView
 from hrms_app.views.mobile_tour_api import (
     MyTourCancelView,
@@ -127,6 +128,8 @@ urlpatterns = [
     path("app-settings/<str:key>/", AppSettingDetailView.as_view(), name="mobile-app-setting-detail"),
     path("attendance/gaps/", AttendanceGapListView.as_view(), name="mobile-attendance-gaps"),
     path("attendance/mark/", AttendanceMarkView.as_view(), name="mobile-attendance-mark"),
+    path("celebrations/wish/", CelebrationWishView.as_view(), name="mobile-celebration-wish"),
+    path("celebrations/wishes/", MyWishesView.as_view(), name="mobile-celebration-wishes"),
     path("attendance/team/", TeamMonthView.as_view(), name="mobile-team-month"),
     path("attendance/team/today/", TeamTodayView.as_view(), name="mobile-team-today"),
     path("attendance/team/<int:member_id>/day/", TeamMemberDayView.as_view(), name="mobile-team-member-day"),

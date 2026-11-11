@@ -20,6 +20,15 @@ def _days(value):
     return f"{value:g} day" + ("" if value == 1 else "s")
 
 
+def _amount(leave):
+    """Short leave is measured in time ("02:00 hrs"), other leave in days."""
+    duration = leave.get_short_leave_duration() if leave.is_short_leave() else None
+    if duration is None:
+        return _days(leave.usedLeave or 0)
+    hours, minutes = divmod(int(duration.total_seconds()) // 60, 60)
+    return f"{hours:02}:{minutes:02} hrs"
+
+
 def _leave_items(user):
     for leave in (
         LeaveApplication.objects.filter(appliedBy=user)
@@ -33,7 +42,7 @@ def _leave_items(user):
             "kind": "leave",
             "id": leave.pk,
             "title": leave.leave_type.leave_type,
-            "subtitle": f"{period} ({_days(leave.usedLeave or 0)})",
+            "subtitle": f"{period} ({_amount(leave)})",
             "status": leave.status,
             "status_display": leave.get_status_display(),
             "color": leave.leave_type.color_hex,

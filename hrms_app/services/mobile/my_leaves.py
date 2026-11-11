@@ -6,6 +6,9 @@ Actions mirror the web detail page (leave_application_detail.html):
                                    the manager then cancels and the balance is restored)
 - pending / cancelled / rejected -> Edit, Delete
 """
+from collections import defaultdict
+from datetime import date
+
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Count, Q, Sum
@@ -17,7 +20,7 @@ from hrms_app.services.leave_service import LeaveDomainService
 from hrms_app.services.mobile.formatters import employee_code_label, hhmm, iso_date, timeline
 from hrms_app.services.mobile.formatters import plain_text as _plain
 from hrms_app.services.mobile.home_summary import comp_off_payload, leave_balances_payload
-from hrms_app.services.mobile.leave_apply import applied_leave_days
+from hrms_app.services.mobile.leave_apply import LWP_CODE, SHORT_LEAVE_CODE, applied_leave_days
 
 PAGE_SIZE = 20
 CANCELLABLE = {settings.APPROVED}
@@ -110,6 +113,58 @@ def get_overview(user, year):
         "comp_off": comp_off_payload(user, timezone.localdate()),
         "counts": {group: counts[group] for group in STATUS_GROUPS} | {"total": counts["total"]},
         "days_taken": counts["days_taken"] or 0,
+        "monthly": monthly_taken(user, year),
+    }
+
+
+def monthly_taken(user, year):
+    """Approved leave days per month and type, counted day by day like the
+    leave's own total, so a leave across two months is split between them.
+    Short leave is hours, not days, so it is left out. LWP is unpaid and is
+    kept out of the paid total."""
+    leaves = (
+        LeaveApplication.objects.filter(
+            appliedBy=user,
+            status=settings.APPROVED,
+            startDate__date__lte=f"{year}-12-31",
+            endDate__date__gte=f"{year}-01-01",
+        )
+        .exclude(leave_type__leave_type_short_code=SHORT_LEAVE_CODE)
+        .select_related("leave_type")
+    )
+    days = defaultdict(lambda: defaultdict(float))
+    types = {}
+    for leave in leaves:
+        leave_type = leave.leave_type
+        types[leave_type.pk] = leave_type
+        for day in applied_leave_days(leave):
+            when = date.fromisoformat(str(day["date"]))
+            if when.year == year and day["counted"]:
+                days[when.month][leave_type.pk] += 1 if day["is_full_day"] else 0.5
+
+    def items(by_type):
+        return [
+            {
+                "code": types[pk].leave_type_short_code,
+                "name": types[pk].leave_type,
+                "color": types[pk].color_hex,
+                "days": value,
+                "is_unpaid": types[pk].leave_type_short_code == LWP_CODE,
+            }
+            for pk, value in sorted(by_type.items(), key=lambda kv: types[kv[0]].leave_type_short_code)
+            if value
+        ]
+
+    totals = defaultdict(float)
+    for by_type in days.values():
+        for pk, value in by_type.items():
+            totals[pk] += value
+    year_items = items(totals)
+    return {
+        "months": [{"month": month, "items": items(days[month])} for month in range(1, 13)],
+        "totals": year_items,
+        "paid_days": sum(item["days"] for item in year_items if not item["is_unpaid"]),
+        "unpaid_days": sum(item["days"] for item in year_items if item["is_unpaid"]),
     }
 
 

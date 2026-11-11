@@ -16,6 +16,7 @@ from django.utils import timezone
 from hrms_app.hrms.utils import call_soap_api
 from hrms_app.models import DeviceInformation
 from hrms_app.services.mobile.formatters import shift_payload
+from hrms_app.services.mobile.today_events import get_today_events
 
 logger = logging.getLogger(__name__)
 
@@ -115,4 +116,5 @@ def get_today_attendance(user):
         "late_by_minutes": late_by,
         "shift": shift,
         "synced_at": now.isoformat(),
+        **get_today_events(user, today),
     }

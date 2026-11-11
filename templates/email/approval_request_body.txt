@@ -22,6 +22,4 @@ Regards,
 {% if designation %}{{ designation }}
 {% endif %}{{ employee_code }}
 
----
-This mail was sent from HRMS on behalf of {{ employee_name }} ({{ employee_code }}). Reply to this mail to respond to the employee directly.
 {% endautoescape %}

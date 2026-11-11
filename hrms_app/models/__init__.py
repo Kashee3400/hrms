@@ -64,11 +64,13 @@ from .holiday import Holiday, WishingCard, HRAnnouncement, OfficeClosure
 from .notification import Notification, NotificationSetting, DeviceToken
 from .misc import AllowedUserExpiry, AppSetting, FormProgress, SentEmail, EmailOTP
 from .attendance_gap import ApprovalMail, AttendanceGap
+from .celebration import CelebrationWish
 
 __all__ = [
     "AllowedUserExpiry",
     "ApprovalMail",
     "AttendanceGap",
+    "CelebrationWish",
     "Role",
     "CustomUser",
     "Logo",
