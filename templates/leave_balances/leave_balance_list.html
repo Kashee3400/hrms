@@ -159,8 +159,7 @@
             {% elif leave_balance.total_balance == 0 %}
             <span class="badge bg-danger-subtle text-danger border border-danger-subtle">{% trans 'Exhausted' %}</span>
             {% elif leave_balance.total_balance <= 1 %} <span
-              class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{% trans 'Low'
-              %}</span>
+              class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{% trans 'Low'%}</span>
               {% else %}
               <span class="badge bg-success-subtle text-success border border-success-subtle">
                 {% trans 'Active' %}</span>
